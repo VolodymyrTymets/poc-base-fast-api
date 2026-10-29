@@ -63,10 +63,10 @@ Evidence (rule B5): the real output of these commands, pasted into the PR body.
 - test: `grep -c "assumed accepted" docs/features/POC-1.1/spec.md` = 0; `wc -l < CLAUDE.md` < 200; `grep -c "doc's order" CLAUDE.md` = 1; `grep -n -i -E "unconfirmed|not confirmed|api/openapi" docs/ARCHITECTURE.md` empty; `grep -c "confirm or re-rank" docs/BUSINESS_MODEL.md` = 0; `git diff --stat main` touches only `docs/` and `CLAUDE.md`.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-1.1/spec.md (acceptance criteria checked off, outcome column closed)
-- [ ] docs/ARCHITECTURE.md, docs/BUSINESS_MODEL.md, CLAUDE.md — R9
-- [ ] docs/DOMAIN_GLOSSARY.md — none expected (refresh-token row already says sha256)
-- [ ] docs/decisions/ADR-0003 … ADR-0010 — R1–R8
+- [x] docs/features/POC-1.1/spec.md (acceptance criteria checked off, outcome column closed)
+- [x] docs/ARCHITECTURE.md, docs/BUSINESS_MODEL.md, CLAUDE.md — R9
+- [x] docs/DOMAIN_GLOSSARY.md — none expected (refresh-token row already says sha256)
+- [x] docs/decisions/ADR-0003 … ADR-0010 — R1–R8
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

@@ -13,7 +13,7 @@ The Node base reaches PostgreSQL (PostGIS enabled) through Prisma. Python needs 
 - ORM: SQLAlchemy 2 in async mode with the `asyncpg` driver. One session per request, provided as a FastAPI dependency.
 - Migrations: Alembic with an async environment. Revision `0001_init` is the final state of the four Prisma migrations.
 - Table and column names are a **target** of parity with the Prisma schema (quoted identifiers such as `"Account"` and `"createdAt"`). Task 2.5 proves it by diffing `pg_dump --schema-only` of a Prisma-migrated and an Alembic-migrated database; this ADR does not claim it before then.
-- Soft deletes only (rule P6): a `deleted` flag from a shared mixin, with `uuid4` ids and `createdAt`/`updatedAt`.
+- Soft deletes only (rule P6): a shared mixin carries only the `deleted` flag. Ids and timestamps follow each Prisma model and are declared per table: for example `AccountRole`, `AccountIdentity` and `AccountProfile` have no `createdAt`/`updatedAt`, `Account.updatedAt` is nullable, and `AccountOnRole` has a composite key instead of an `id`.
 
 ## Rejected alternatives
 | Alternative | Why not |

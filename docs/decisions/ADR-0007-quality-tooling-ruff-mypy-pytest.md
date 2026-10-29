@@ -4,7 +4,7 @@
 - **Status:** accepted
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.1
-- **Supersedes:** Node ADR-0007 (Oxlint replaces ESLint as the linter). uv itself is ADR-0001; the pinned Python is ADR-0002. Scope doc task 1.4.
+- **Supersedes:** none. It is the Python counterpart of Node ADR-0007 (Oxlint replaces ESLint as the linter), which stays in force in the Node repo. uv itself is ADR-0001; the pinned Python is ADR-0002. Scope doc task 1.4.
 
 ## Context
 The repo has no lint, type-check or test tool yet; the command map in `CLAUDE.md` says `none` for all three. Rule B1 needs real commands to gate work on.
@@ -19,7 +19,7 @@ The repo has no lint, type-check or test tool yet; the command map in `CLAUDE.md
 | Alternative | Why not |
 |-------------|---------|
 | black + flake8 + pylint | three tools and three configs where ruff covers lint and format |
-| pyright | mypy is what the scope doc and the stack rules assume |
+| pyright | the scope doc chose mypy strict (task 1.4) and nothing here favours switching |
 | unittest | less expressive fixtures; the stack rules are written for pytest |
 
 ## Consequences

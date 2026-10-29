@@ -8,7 +8,7 @@
 
 ## Context
 The Node base stores the refresh token as a bcrypt hash of the whole JWT. bcrypt only reads the first 72 bytes, so everything after
-them is ignored. In the Python `bcrypt` library, version 5.0.0 and later raise `ValueError` for input over 72 bytes, so that
+them is ignored. Those first bytes are the same for every token of one account, so after a sign-out and a new sign-in an older, still-valid refresh token matches the new hash again (the last risk row of Node ADR-0011). Hashing the full token fixes that, which is the security reason for this decision, beyond the porting problem. In the Python `bcrypt` library, version 5.0.0 and later raise `ValueError` for input over 72 bytes, so that
 design cannot be ported (source: pyca/bcrypt documentation, checked with Context7 on 2026-10-29). This is an authentication decision (rule F2).
 
 ## Decision
@@ -16,7 +16,7 @@ design cannot be ported (source: pyca/bcrypt documentation, checked with Context
 - Passwords stay bcrypt (10 rounds) with the 8 to 72 byte length check, because they are low-entropy and user-chosen.
 - The refresh token travels in the `x-refresh-token` header on `POST /api/v1/auth/refresh`, as the Node base does. An httpOnly cookie remains a later option.
 - Sign-out, password change and password reset clear the stored refresh hash.
-- Access tokens are signed with the single `JWT_SECRET` (ADR-0010).
+- Access tokens are signed with `JWT_SECRET` and refresh tokens with `JWT_REFRESH_TOKEN_SECRET` (ADR-0010).
 
 ## Rejected alternatives
 | Alternative | Why not |

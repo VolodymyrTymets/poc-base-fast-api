@@ -32,6 +32,8 @@ None yet: no HTTP server, no endpoint, no generated output.
 | production | not defined | | **not the agent** (rule C5) |
 
 ## Decided (ADR-0003 to ADR-0010, built by the scope-doc tasks)
+Supersession applies to this repo only; the Node repo's ADRs stay in force there.
+
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
   with a stale-spec test ([ADR-0003](decisions/ADR-0003-rest-api-fastapi-openapi.md)).
 - SQLAlchemy 2 async + asyncpg + Alembic on Postgres/PostGIS, Prisma table and column names as a target proven by task 2.5
