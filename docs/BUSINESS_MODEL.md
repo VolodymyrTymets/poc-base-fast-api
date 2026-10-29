@@ -14,7 +14,7 @@ The work plan is the doc "Scope Breakdown: poc-base on Python + FastAPI (REST)" 
 Status today: only the `uv init` skeleton exists; nothing in that plan is built yet.
 
 ## Ranked goals
-Carried over from `poc-base`; confirm or re-rank when task 1.1 runs.
+Carried over from `poc-base`; confirmed by volodymyr on 2026-10-29 (POC-1.1).
 1. **Project scaffolding** — the base stays easy to fork and reuse as the start of a new POC.
 2. **Authentication** — a working, understandable auth pipeline (OTP sign-in, JWT access/refresh, roles) a new POC can rely on as-is.
 3. **Test base** — a real-database test setup that keeps working and is easy to extend.
