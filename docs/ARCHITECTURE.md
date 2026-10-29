@@ -22,7 +22,7 @@ There is a single package in a `src` layout at the repo root. No `api/` or `web/
 Nothing is persisted yet. No database, cache or queue is wired.
 
 ### Boundaries and contracts
-None yet: no HTTP server, no endpoint, no generated output.
+The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md); no server, endpoint or generated output exists yet.
 
 ### Environments
 | Env | URL | Database | Who may touch it |
