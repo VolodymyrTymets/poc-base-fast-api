@@ -1,7 +1,7 @@
 # ADR-0010 — Root-level API-only repo and environment-based configuration
 
 - **Date:** 2026-10-29
-- **Status:** accepted
+- **Status:** accepted; the package location (`src/poc_base_fast_api/`) is superseded by ADR-0011
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.1
 - **Supersedes:** Node ADR-0008 (Web app scaffold) and the `web/` client parts of Node ADR-0012 (Web auth client), because this repo has no `web/`. The API-side rules of Node ADR-0012 carry over: CORS for the origins in `CORS_ORIGINS`, and a client refreshes only on `UNAUTHORIZED` (ADR-0003). It amends Node ADR-0009 (Configurable ports): only the environment variable names carry over; Docker Compose and `set-ports.sh` belong to task 11.2. Decisions D1, D9 and D10 of the scope doc.
