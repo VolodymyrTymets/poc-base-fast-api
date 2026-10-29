@@ -3,7 +3,7 @@
 <!-- A human writes this line to approve. Until it is here, guard-plan-approval blocks writes to code.
      Approving confirms the assumed answers in spec.md (edit them first to change one). Format:
      Approved-by: volodymyr · <date> -->
-Approved-by:  volodymyr · 2026-10-2
+Approved-by:  volodymyr · 2026-10-29
 
 Pattern followed: the project structure in the scope doc's task 1.3 (rev 114), which is the authority for this task and which
 the other rows' file paths already use; dependency direction after ADR-0003 (transport at the edge, services below it). Build

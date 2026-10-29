@@ -12,7 +12,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | Path | What lives here | Deployable? | Owner |
 |------|-----------------|-------------|-------|
 | `app/` | the importable package; `__init__.py` holds only the `uv init` `main()` that prints a greeting; `main.py`, `config.py` and `dependencies.py` are docstring-only | no | backend |
-| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`) in each, all docstring-only | — | backend |
+| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each, all docstring-only | — | backend |
 | `app/core/`, `app/workers/`, `app/seeds/` | cross-cutting code, the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | empty (`.gitkeep`) until task 1.4 | — | backend |
 | `pyproject.toml` | project metadata, `requires-python >=3.14`, empty `dependencies`, script `poc-base-fast-api` (`app:main`), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |

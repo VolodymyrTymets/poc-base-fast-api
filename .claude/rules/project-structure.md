@@ -29,7 +29,7 @@ poc-base-fast-api/
 ```
 
 ## Modules and where a new feature goes
-1. The modules are `account`, `account_profile`, `account_role`, `auth`, `files` and `notifier`. Each has `<module>.py` in `routers/`, `schemas/`, `models/` and `services/`. A new module adds `<module>.py` to the layers it needs; do not create a package per feature.
+1. The modules are `account`, `account_profile`, `account_role`, `auth`, `files` and `notifier`. Each has `<module>.py` in `routers/`, `schemas/`, `models/` and `services/`; the one exception is `models/`, where the files are `file.py` and `notification.py` (task 2.3). A new module adds `<module>.py` to the layers it needs; do not create a package per feature.
 2. Extra files inside a layer (for example `services/otp.py`) are fine when a task names them. A new top-level module or a new layer is not: it needs an ADR.
 3. Cross-cutting code goes in `core/`, one module per concern (`core/db.py`, `core/errors.py`, ...). Do not put it in a layer.
 
