@@ -19,13 +19,13 @@ list of what the behaviour is. This is the reference the scope doc names for pac
   or the ADRs; rate limiting and the other open items of Node ADR-0011.
 
 ## Acceptance criteria
-- [ ] AC1 Given `api/schema.gql` in the Node repo, when I list its `Query` and `Mutation` fields, then each of the 14 appears in exactly one row of `ENDPOINTS.md`.
-- [ ] AC2 Each row gives method, path (under `/api/v1`), request fields with types and limits, response fields, success status, error codes, auth, roles, and the Node source file.
-- [ ] AC3 Every error code in the doc is one of the eight defined by ADR-0003, and every auth, token and file rule agrees with ADR-0008, ADR-0009 and ADR-0010.
-- [ ] AC4 The behaviours named in the scope doc are recorded where they apply: OTP code in the response only in local, development and test; `restorePassword` always succeeds and never returns the token; password 8 to 72 bytes and no control characters; email trimmed and lowercased; sign-in failures indistinguishable; ownership checks on profile and files.
-- [ ] AC5 Differences from Node (status codes, `NOT_FOUND`, the new content route, nullable phone number, GraphQL-only fields dropped) are listed in one "Mapping decisions" section, each with a reason.
-- [ ] AC6 `docs/ARCHITECTURE.md` links the doc; the PR body carries the coverage-check output.
-- [ ] AC7 The diff touches only `docs/`; `uv sync` and `uv build` still pass.
+- [x] AC1 Given `api/schema.gql` in the Node repo, when I list its `Query` and `Mutation` fields, then each of the 14 appears in exactly one row of `ENDPOINTS.md`.
+- [x] AC2 Each row gives method, path (under `/api/v1`), request fields with types and limits, response fields, success status, error codes, auth, roles, and the Node source file.
+- [x] AC3 Every error code in the doc is one of the eight defined by ADR-0003, and every auth, token and file rule agrees with ADR-0008, ADR-0009 and ADR-0010.
+- [x] AC4 The behaviours named in the scope doc are recorded where they apply: OTP code in the response only in local, development and test; `restorePassword` always succeeds and never returns the token; password 8 to 72 bytes and no control characters; email trimmed and lowercased; sign-in failures indistinguishable; ownership checks on profile and files.
+- [x] AC5 Differences from Node (status codes, `NOT_FOUND`, the new content route, nullable phone number, GraphQL-only fields dropped) are listed in one "Mapping decisions" section, each with a reason.
+- [x] AC6 `docs/ARCHITECTURE.md` links the doc; the PR body carries the coverage-check output.
+- [x] AC7 The diff touches only `docs/`; `uv sync` and `uv build` still pass.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

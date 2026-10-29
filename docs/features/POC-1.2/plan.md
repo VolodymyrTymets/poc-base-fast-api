@@ -47,10 +47,10 @@ Branch `feat/POC-1.2-endpoint-map`, one draft PR (rule A4), cut from `main` (PR 
 - Cells containing `|` (for example `string \| null` for the nullable phone) are written with the pipe escaped, or the check 2 count would be wrong; the check output proves it.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-1.2/spec.md (acceptance criteria ticked)
-- [ ] docs/ARCHITECTURE.md — replace the "None yet" contracts line with a pointer to the endpoint map
-- [ ] docs/DOMAIN_GLOSSARY.md — none expected
-- [ ] docs/decisions — none in this PR. Assumption 5 (413 and 422 carry `VALIDATION_FAILED`) is recorded in the doc's "Mapping decisions" and handed to task 4.2 (`docs/api/ERRORS.md`, ADR-0003's own follow-up) as an input; if you say no, R3 and "Mapping decisions" change before any commit
+- [x] docs/features/POC-1.2/spec.md (acceptance criteria ticked)
+- [x] docs/ARCHITECTURE.md — replace the "None yet" contracts line with a pointer to the endpoint map
+- [x] docs/DOMAIN_GLOSSARY.md — none expected
+- [x] docs/decisions — none in this PR. Assumption 5 (413 and 422 carry `VALIDATION_FAILED`) is recorded in the doc's "Mapping decisions" and handed to task 4.2 (`docs/api/ERRORS.md`, ADR-0003's own follow-up) as an input; if you say no, R3 and "Mapping decisions" change before any commit
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |
