@@ -16,7 +16,7 @@ a root `app/` laid out by layer, with the other tasks' file paths rewritten to m
 - `app/` is laid out by layer. Every module of the Node base becomes one file in each layer: `routers/<module>.py` (an `APIRouter`), `schemas/<module>.py` (Pydantic request and response models), `models/<module>.py` (SQLAlchemy tables) and `services/<module>.py` (business logic). The modules are `account`, `account_profile`, `account_role`, `auth`, `files` and `notifier`.
 - Cross-cutting code (DB session, errors, logging, validation, JWT, cache, pagination) lives in `app/core/`, one module per concern. Shared `Depends` are in `app/dependencies.py`, settings in `app/config.py`, the application and its router wiring in `app/main.py`, background jobs in `app/workers/`, seed items in `app/seeds/`.
 - **Import direction:** routers use services, schemas and dependencies; services use models, schemas and core; models import only from core; `core` imports from no layer; `workers` and `seeds` use services and models; `main.py` only wires. Business logic is never in a router, and services never receive framework objects (ADR-0003).
-- Tests mirror `app/` under `tests/`. `.env` is never committed; `.env.example` lists the variables.
+- The layout inside `tests/` is set by task 3.3, not here. `.env` is never committed; `.env.example` lists the variables.
 - A new top-level module or a new layer needs an ADR. The rule `.claude/rules/project-structure.md` repeats this structure and cites this ADR for it.
 
 ## Rejected alternatives
