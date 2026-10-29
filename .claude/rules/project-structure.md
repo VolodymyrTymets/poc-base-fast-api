@@ -15,7 +15,7 @@ poc-base-fast-api/
 ├── pyproject.toml
 ├── .env                  # secrets, never committed
 ├── app/
-│   ├── main.py           # FastAPI(), include_router, nothing else
+│   ├── main.py           # the app: lifespan, middleware, health, include_router; no business logic
 │   ├── config.py         # settings, validated once at boot
 │   ├── dependencies.py   # shared Depends: current account, require_roles
 │   ├── routers/          # one APIRouter per module
@@ -34,10 +34,10 @@ poc-base-fast-api/
 3. Cross-cutting code goes in `core/`, one module per concern (`core/db.py`, `core/errors.py`, ...). Do not put it in a layer.
 
 ## Import direction
-4. `routers` use `services`, `schemas` and `dependencies`. `services` use `models`, `schemas` and `core`. `models` import only from `core`. `core` imports from no layer. `workers` and `seeds` use `services` and `models`. `main.py` only wires.
+4. `routers` use `services`, `schemas` and `dependencies`. `services` use `models`, `schemas`, `core` and `config`. `models` import only from `core` and from sibling models (relationships). `core` imports from no layer and may read `config`. `schemas` import nothing from `services`, `models` or `routers`. `dependencies` use `services`, `core` and `config`. `workers` and `seeds` use `services`, `models`, `core` and `config`. `config` may be imported by anything except `models` and `schemas`. A module may import siblings in its own layer if there is no cycle. The full statement is in ADR-0011.
 5. No business logic in a router: it parses the request, calls a service, returns a schema. A response model is never an ORM object.
-6. A service never receives a framework object (request, response, `Depends`); it takes plain values and returns plain values or models (ADR-0003).
+6. A service never receives a framework object (request, response, headers, `Depends`). Plain values, models and Pydantic `schemas` (plain data) may go in and out (ADR-0003, ADR-0011).
 7. No module imports from `routers` except `main.py`. A circular import means the logic is in the wrong layer.
 
 ## Tests
-8. The layout inside `tests/` is not decided here: task 3.3 sets it, and the rules are in `testing.md` and `testing-python.md`.
+8. The layout inside `tests/` is not decided here: task 3.3 sets it, and the rules are in `testing.md` and `testing-python.md`. Note for 1.4 and 3.3: `testing-python.md` names a test file `tests/test_<module>.py`, which would collide for one module name across four layers (a router and a service both called `account`); the layout must separate them.

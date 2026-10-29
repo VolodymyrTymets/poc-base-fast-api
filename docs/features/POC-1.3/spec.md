@@ -27,13 +27,13 @@ code anywhere else.
   scope doc (the human does; lines to change are listed in the PR).
 
 ## Acceptance criteria
-- [ ] AC1 Given a fresh clone, when I run `uv sync`, then it succeeds with no dependency added, and `uv run python -I -c "import app"` works.
-- [ ] AC2 The tree equals the list above (35 `.py` files under `app/`, `tests/.gitkeep`); `src/` is gone.
-- [ ] AC3 Every module except `app/__init__.py` holds only a docstring (34 files).
-- [ ] AC4 `uv build` produces a wheel whose only top-level module is `app` and which contains all 35 `.py` files and nothing from `tests/`; `uv run poc-base-fast-api` still prints its greeting.
-- [ ] AC5 `.claude/rules/project-structure.md` exists with `paths:` matching `app/**` and `tests/**`, states the layers, `core/`, `workers/`, `seeds/`, the import direction and where a new feature's files go, and says a new top-level module or layer needs an ADR.
-- [ ] AC6 ADR-0011 is accepted and passes the ADR checks used in POC-1.1; ADR-0010 carries a note that its package location is superseded; `docs/ARCHITECTURE.md` shows the new layout and has no `src/poc_base_fast_api` left.
-- [ ] AC7 The diff touches only `app/`, `tests/`, `pyproject.toml`, `.claude/rules/`, `docs/`, and removes `src/`.
+- [x] AC1 Given a fresh clone, when I run `uv sync`, then it succeeds with no dependency added, and `uv run python -I -c "import app"` works.
+- [x] AC2 The tree equals the list above (35 `.py` files under `app/`, `tests/.gitkeep`); `src/` is gone.
+- [x] AC3 Every module except `app/__init__.py` holds only a docstring (34 files).
+- [x] AC4 `uv build` produces a wheel whose only top-level module is `app` and which contains all 35 `.py` files and nothing from `tests/`; `uv run poc-base-fast-api` still prints its greeting.
+- [x] AC5 `.claude/rules/project-structure.md` exists with `paths:` matching `app/**` and `tests/**`, states the layers, `core/`, `workers/`, `seeds/`, the import direction and where a new feature's files go, and says a new top-level module or layer needs an ADR.
+- [x] AC6 ADR-0011 is accepted and passes the ADR checks used in POC-1.1; ADR-0010 carries a note that its package location is superseded; `docs/ARCHITECTURE.md` shows the new layout and has no `src/poc_base_fast_api` left.
+- [x] AC7 The diff touches only `app/`, `tests/`, `pyproject.toml`, `.claude/rules/`, `docs/`, and removes `src/`.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

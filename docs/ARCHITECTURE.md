@@ -52,7 +52,7 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   ([ADR-0009](decisions/ADR-0009-file-transfer-multipart.md)).
 - API only, `APP_ENV` configuration ([ADR-0010](decisions/ADR-0010-repo-layout-and-configuration.md); its package location is superseded by ADR-0011).
 - Root `app/` package laid out by layer: routers, schemas, models, services, plus core, workers and seeds, with the import
-  direction routers, services, models, core ([ADR-0011](decisions/ADR-0011-project-structure.md)).
+  direction defined in [ADR-0011](decisions/ADR-0011-project-structure.md).
 
 ## Planned (intent from the scope doc, not yet decided)
 - Redis as a derived read cache (task 9.1 decides it; Redis is also the arq queue backend, so flushing it drops in-flight jobs).

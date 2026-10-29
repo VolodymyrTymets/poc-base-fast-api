@@ -62,9 +62,9 @@ the ADR in R1 is written and accepted only after R2's wheel listing passes.
 - not edited here, listed in the PR body for the human: the scope doc (my dated note "read `app/` as `src/poc_base_fast_api/`" is now false; the first half of row 1.3 still says copy `web/`, compose, ports and work in `api/`), `CLAUDE.md` rule P2 (its `app/` wording; ask-first path) and ADR-0010 line 14 (covered by the Status note).
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-1.3/spec.md (acceptance criteria ticked)
-- [ ] docs/ARCHITECTURE.md — R5; docs/decisions/ADR-0011 and the ADR-0010 note — R1
-- [ ] docs/DOMAIN_GLOSSARY.md — none expected
+- [x] docs/features/POC-1.3/spec.md (acceptance criteria ticked)
+- [x] docs/ARCHITECTURE.md — R5; docs/decisions/ADR-0011 and the ADR-0010 note — R1
+- [x] docs/DOMAIN_GLOSSARY.md — none expected
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |
@@ -78,3 +78,4 @@ the ADR in R1 is written and accepted only after R2's wheel listing passes.
 - Spec questions 1 to 3 hold; the `Approved-by:` line confirms them.
 - Estimates: R1 S, R2 S, R3 M (34 small files), R4 S, R5 S (the scope doc says 4 h for the whole task).
 - PR #3 is merged; ticket `POC-1.3`; the human reviewer is volodymyr.
+- Changes made while implementing, after the self-review: the claim that `tests/` mirrors `app/` was dropped (it conflicts with `testing-python.md` and task 3.3); the two model files are `file.py` and `notification.py` as task 2.3 cites them (confirmed by volodymyr); the import-direction rule in ADR-0011 now allows sibling imports, `config`, `dependencies`, `workers`, `seeds` and schemas in services.
