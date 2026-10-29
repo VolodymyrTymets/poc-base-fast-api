@@ -1,0 +1,21 @@
+# Extra destructive command patterns for this repo, one JavaScript regex per line, case-insensitive.
+# Read by the guard-destructive hook and blocked with rule C4.
+# Core already blocks: rm -rf outside build dirs, git clean -fdx, docker volume destruction, infra CLIs,
+# publish/deploy/submit, anything aimed at a production host, piping a download into a shell.
+#
+# Add what is specific to this stack or project. Examples of the shape:
+# ^\s*\S+\s+cache\s+clear\s+--all\b
+# \b(scp|ssh|rsync)\b.*\bpi@
+# \bseed\b.*--wipe\b
+
+# Python ecosystem (rln-agent templates/stack-python)
+\bpip3?\s+install\b.*--break-system-packages
+\bsudo\s+pip3?\b
+\bpip3?\s+uninstall\b.*-y\b
+\bshutil\.rmtree\b
+\bpython3?\s+-m\s+(twine|build)\b.*\bupload\b
+\b(twine\s+upload|uv\s+publish|poetry\s+publish)\b
+
+# This repo
+# Deleting the lockfile by hand bypasses uv (rule T3); uv regenerates it.
+\brm\b.*\buv\.lock\b
