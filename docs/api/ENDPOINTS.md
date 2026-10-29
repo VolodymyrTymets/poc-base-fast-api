@@ -60,11 +60,30 @@ Behaviours to keep:
 
 | Operation | Method and path | Request | Response | Success | Errors | Auth | Roles | Node source |
 |-----------|-----------------|---------|----------|---------|--------|------|-------|-------------|
+| `account` | `GET /account` | none | `{id, createdAt, updatedAt, profile}`, `profile` as below | 200 | `UNAUTHORIZED` | Bearer | any | `account/account.resolver.ts:24-37` |
+| `updateAccountProfile` | `PATCH /accounts/{accountId}/profile` | any of `firstName`, `lastName`, `middleName` (max 50 each), `email` (valid, max 254), `dataOfBirth` (max 10), `SSN` (max 20), `is18YearOld` (boolean), `avatarId` (UUID) | the profile: `{id, phoneNumber: string \| null, firstName, lastName, middleName, dataOfBirth, SSN, email, isPhoneVerified}` | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `EMAIL_ALREADY_REGISTERED`, `VALIDATION_FAILED` | Bearer | `ADMIN` or `CUSTOMER` | `account-profile/account-profile.resolver.ts:25-51`, `account-profile/account-profile.service.ts:49-94`, `account-profile/dto/update-account-profile.input.ts:1-68` |
+
+Behaviours to keep:
+
+- **`account`**: returns the caller's own account, read from the token (`account/account.resolver.ts:24-37`); a token whose account no longer exists is 401 `UNAUTHORIZED` (mapping decision 2). `profile.phoneNumber` is `null` for password accounts (mapping decision 12). The response has a fixed shape: no field selection.
+- **`updateAccountProfile`**: three layers, all required (rule P7): the token authenticates, the role guard requires `ADMIN` or `CUSTOMER` (`auth/guards/role.guard.ts:24-57`, failing is 403), and the path `accountId` must equal the caller's id, else 403 `FORBIDDEN` (`account-profile/account-profile.resolver.ts:32-34`); a missing profile is 404 `NOT_FOUND` (`account-profile/account-profile.resolver.ts:36-40`). An `avatarId` must be a file the caller owns, else 403 (`account-profile/account-profile.service.ts:54-60`). An email is normalised before it is stored, and one already in use answers 409 `EMAIL_ALREADY_REGISTERED` (`account-profile/account-profile.service.ts:62-65,83-89`). Fields that are not sent are left unchanged. Node applies the default `is18YearOld = false` when it is omitted from the input; the column exists (`prisma/models/account.prisma:78`), and task 5.4 decides whether the default still applies on a partial update. The read cache is invalidated after a write (cache itself: task 9.2).
 
 ## File endpoints
 
 | Operation | Method and path | Request | Response | Success | Errors | Auth | Roles | Node source |
 |-----------|-----------------|---------|----------|---------|--------|------|-------|-------------|
+| `createFile` | `POST /files` | `multipart/form-data`: `file` (required, max 10 MB, `image/jpeg` or `image/png`), `name` (optional) | `{id, name, mimeType, size, createdAt, contentUrl}` | 201 | `UNAUTHORIZED`, `VALIDATION_FAILED` | Bearer | any | `files/files.resolver.ts:33-39`, `files/services/file-assert.service.ts:28-49`, `files/files.service.ts:11-27` |
+| `updateFile` | `PATCH /files/{id}` | `multipart/form-data`: `file` (optional, same limits), `name` (optional) | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION_FAILED` | Bearer | any (owner) | `files/files.resolver.ts:43-55`, `files/services/file-assert.service.ts:50-72`, `files/files.service.ts:29-44` |
+| `file` | `GET /files/{id}` | none | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN` | Bearer | any (owner) | `files/files.resolver.ts:59-72`, `files/services/file-assert.service.ts:73-85`, `files/files.service.ts:46-58` |
+| (new) | `GET /files/{id}/content` | none | the bytes, with `Content-Type` and `Content-Length` | 200 | `UNAUTHORIZED`, `FORBIDDEN` | Bearer | any (owner) | `files/files.resolver.ts:76-81` (the `publicUrl` field it replaces), ADR-0009 |
+
+Behaviours to keep:
+
+- **Ownership:** a file is readable and updatable only by the account that created it (`files/services/file-assert.service.ts:71-80`). An unknown id and another account's file are the same 403 `FORBIDDEN` (mapping decision 3).
+- **Limits:** at most 10 MB (`FILE_MAX_SIZE`), mime types from `FILE_ALLOWED_MIME_TYPES`, default `image/jpeg` and `image/png` (`files/services/file-assert.service.ts:13-19`). An oversized upload is 413, a disallowed or missing mime type is 422, both `VALIDATION_FAILED` (mapping decision 6). The size is taken from the received bytes, never from a client-supplied number (`files/files.service.ts:21`).
+- **`updateFile`**: sending a new `file` replaces the stored bytes, size and mime type; the limits are checked again against the new upload. Node let a client resend only `name`; that still works here.
+- **Content:** the bytes are returned only by `GET /files/{id}/content`, and only to the owner; no response carries them inline (mapping decisions 10 and 11). `contentUrl` is the path `/api/v1/files/{id}/content`.
+- **Avatar:** `PATCH` profile with an `avatarId` goes through the same ownership check as a file read.
 
 ## Mapping decisions
 
