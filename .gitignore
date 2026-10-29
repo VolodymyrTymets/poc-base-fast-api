@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Claude Code local state
+.claude/settings.local.json
+.claude/.state/
+
+# IDE
+.idea/
+
+# Local env and tool caches (secrets never committed, rule A6)
+.env
+.env.*
+!.env.example
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/

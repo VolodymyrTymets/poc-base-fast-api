@@ -1,0 +1,17 @@
+[project]
+name = "poc-base-fast-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "volodymyr", email = "volodymyrtymets@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+poc-base-fast-api = "poc_base_fast_api:main"
+
+[build-system]
+requires = ["uv_build>=0.12.22,<0.13.0"]
+build-backend = "uv_build"

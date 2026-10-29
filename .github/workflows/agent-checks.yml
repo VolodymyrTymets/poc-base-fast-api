@@ -1,0 +1,49 @@
+name: agent-checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evidence-check:
+    name: PR evidence block present
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const problems = [];
+            if (!/###\s*Verification/i.test(body)) problems.push('missing "### Verification" section (rule B1/B2)');
+            if (!/###\s*Not verified/i.test(body)) problems.push('missing "### Not verified" section (rule B2)');
+            const ev = (body.split(/###\s*Verification/i)[1] || '').split(/###\s*Not verified/i)[0] || '';
+            if (ev.replace(/[-*\s]/g, '').length < 40) problems.push('the Verification section has no real command output');
+            if (!/[A-Z][A-Z0-9]+-\d+/.test(body + context.payload.pull_request.title)) problems.push('no ticket ID in the title or body (rule A5)');
+            if (problems.length) {
+              core.setFailed('Evidence check failed:\n- ' + problems.join('\n- '));
+            }
+
+  bypass-scan:
+    name: No silent check bypasses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Scan the diff for suppressed checks without a WHY
+        run: |
+          base="origin/${{ github.event.pull_request.base.ref }}"
+          git fetch -q origin "${{ github.event.pull_request.base.ref }}"
+          added=$(git diff "$base"...HEAD --unified=0 | grep -E '^\+' | grep -v '^+++' || true)
+          patterns='# noqa|# type: ignore|# pyright: ignore|# pylint: disable|# fmt: off|@pytest\.mark\.(skip|skipif|xfail)|pytest\.(skip|xfail)\(|--no-verify'
+          bad=$(printf '%s\n' "$added" | grep -nE "$patterns" | grep -v 'WHY:' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Suppressed checks added without a '// WHY:' justification (rule B3):"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+          echo "No unjustified bypasses."
