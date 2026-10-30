@@ -1,7 +1,7 @@
 """Settings read from the environment and validated once at boot. Tasks: 1.5."""
 
 from functools import lru_cache
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from pydantic import BeforeValidator, Field
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -20,11 +20,11 @@ def parse_cors_origins(raw: str | None) -> list[str]:
     return origins or list(DEFAULT_CORS_ORIGINS)
 
 
-def _cors_origins_from_env(value: Any) -> Any:
+def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:
     # NoDecode hands the raw string over; a list (from code) is already parsed.
-    if value is None or isinstance(value, str):
-        return parse_cors_origins(value)
-    return value
+    if isinstance(value, list):
+        return value
+    return parse_cors_origins(value)
 
 
 class Settings(BaseSettings):

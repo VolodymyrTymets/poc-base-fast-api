@@ -31,7 +31,7 @@ Goal 3 (test base): pytest runs from the first commit and the first tests are th
   falls back to `http://localhost:5173,http://localhost:5174` when unset, empty or blank, and replaces rather than extends the defaults.
 - [x] AC5 Given the server runs, `GET /api/v1/health` answers 200 `{"status": "ok"}` on port 3001 (or `PORT`).
 - [x] AC6 A CORS preflight (`OPTIONS /api/v1/health`) from `http://localhost:5173` is allowed; from an unknown origin it gets no allow-origin header.
-- [ ] AC7 `.env.example` and `.env.development.example` exist, list every variable of ADR-0010, and set `JWT_ACCESS_TOKEN_EXPIRES_IN=15m`; no real `.env` is committed.
+- [x] AC7 `.env.example` and `.env.development.example` exist, list every variable of ADR-0010, and set `JWT_ACCESS_TOKEN_EXPIRES_IN=15m`; no real `.env` is committed.
 - [x] AC8 `RUNBOOK.md`, `ARCHITECTURE.md` and `docs/api/ENDPOINTS.md` match what now exists.
 
 ## Edge cases

@@ -54,8 +54,8 @@ config) are checked with Context7 before use (rule D4); the first one to check i
 - executed how: paste the full output into the PR.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-1.4/spec.md (ACs ticked) · [ ] docs/ARCHITECTURE.md · [ ] docs/RUNBOOK.md · [ ] docs/api/ENDPOINTS.md
-- [ ] docs/DOMAIN_GLOSSARY.md — none · [ ] ADR-0012 (R1) and the status note on ADR-0011 · [ ] ARCHITECTURE.md "Decided" list cites ADR-0012
+- [x] docs/features/POC-1.4/spec.md (ACs ticked) · [x] docs/ARCHITECTURE.md · [x] docs/RUNBOOK.md · [x] docs/api/ENDPOINTS.md
+- [x] docs/DOMAIN_GLOSSARY.md — none · [x] ADR-0012 (R1) and the status note on ADR-0011 · [x] ARCHITECTURE.md "Decided" list cites ADR-0012
 - not edited here, for the human: the scope doc (rows 1.4 and 1.5 status; their `api/` paths).
 
 ## Risks
