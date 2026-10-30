@@ -15,6 +15,15 @@ There is no database, cache or queue yet, so the server is all there is to start
 into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
+## Logging, errors and shutdown
+- Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, SSN, DOB and
+  phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
+- Sentry starts only when `APP_ENV` is not `local` and `SENTRY_DSN` is set; with no DSN nothing is sent. See ADR-0013.
+- A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB by default) is answered 413 with the standard error body.
+- `kill -TERM <pid>` (or Ctrl-C) stops accepting connections, lets in-flight requests finish for up to
+  `SHUTDOWN_TIMEOUT_SECONDS` (10), runs the lifespan shutdown, then ends with the SIGTERM status (143 in a shell). That is how
+  uvicorn behaves, not a crash.
+
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` and `uv run poc-base-fast-api`. Coverage is a

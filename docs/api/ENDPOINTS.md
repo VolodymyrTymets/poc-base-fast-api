@@ -20,7 +20,7 @@
   | `EMAIL_ALREADY_REGISTERED` | 409 | the email belongs to another account |
   | `FORBIDDEN` | 403 | authenticated but not allowed |
   | `NOT_FOUND` | 404 | the addressed resource does not exist |
-  | `VALIDATION_FAILED` | 422 (413 for an oversized upload) | body failed validation; `details` lists the fields |
+  | `VALIDATION_FAILED` | 422 (413 for an oversized body) | body failed validation; `details` lists the fields. A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB) is 413 with an empty `details`, for any route, before routing (task 1.6); upload limits are stricter (`FILE_MAX_SIZE`) |
   | `INTERNAL_SERVER_ERROR` | 500 | unexpected; no stack trace outside local |
 
 - **Shared validation rules** (from the Node DTOs in `auth/dto/`, `common/`):

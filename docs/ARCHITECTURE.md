@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0012 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0013 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -13,9 +13,10 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 |------|-----------------|-------------|-------|
 | `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, CORS, `GET /api/v1/health`) and `run()`; `config.py` has `Settings` and `get_settings()`; `dependencies.py` is docstring-only | yes, `uv run poc-base-fast-api` | backend |
 | `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each, all docstring-only | — | backend |
-| `app/core/`, `app/workers/`, `app/seeds/` | cross-cutting code, the arq worker and jobs, the seed runner; docstring-only | — | backend |
+| `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware). The rest is docstring-only | — | backend |
+| `app/workers/`, `app/seeds/` | the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | `unit/` and `e2e/`, a working layout until task 3.3 sets the real one | — | backend |
-| `pyproject.toml` | project metadata, `requires-python >=3.14`, runtime `dependencies` (fastapi, uvicorn, pydantic-settings), a `dev` group (ruff, mypy, pytest and plugins, httpx), the tool settings for ruff, mypy and pytest, script `poc-base-fast-api` (`app.main:run`, ADR-0012), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |
+| `pyproject.toml` | project metadata, `requires-python >=3.14`, runtime `dependencies` (fastapi, uvicorn, pydantic-settings, sentry-sdk), a `dev` group (ruff, mypy, pytest and plugins, httpx), the tool settings for ruff, mypy and pytest, script `poc-base-fast-api` (`app.main:run`, ADR-0012), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |
 | `uv.lock`, `.python-version` | lockfile (uv-owned) and the interpreter pin (3.14) | — | generated / backend |
 | `.env.example`, `.env.development.example` | env templates with placeholders only; a real `.env` is gitignored | — | backend |
 | `docs/`, `.claude/`, `.github/` | agent config, knowledge docs, PR template and the evidence-check workflow | — | backend |
@@ -26,7 +27,7 @@ There is a single root-level `app/` package, laid out by layer ([ADR-0011](decis
 Nothing is persisted yet. No database, cache or queue is wired.
 
 ### Boundaries and contracts
-The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; CORS allows the origins in `CORS_ORIGINS`. No generated output exists yet.
+The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; CORS allows the origins in `CORS_ORIGINS`. A request body over `MAX_REQUEST_BODY_BYTES` gets 413 before routing (the body limit sits inside CORS, so the 413 carries CORS headers). Logs are JSON on stdout with tokens, passwords, SSN, DOB and phone numbers redacted; Sentry is off for `local` and without `SENTRY_DSN`. SIGTERM stops the server after `SHUTDOWN_TIMEOUT_SECONDS` at most. No generated output exists yet.
 
 ### Environments
 | Env | URL | Database | Who may touch it |
@@ -35,7 +36,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0012, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0013, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -47,6 +48,7 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - Tests on a real PostGIS Postgres through testcontainers, one template database per run
   ([ADR-0006](decisions/ADR-0006-test-database-testcontainers.md)).
 - ruff, mypy strict, pytest, installed in task 1.4 and in use ([ADR-0007](decisions/ADR-0007-quality-tooling-ruff-mypy-pytest.md)).
+- Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`
   ([ADR-0008](decisions/ADR-0008-auth-tokens-refresh-hash-and-transport.md)).

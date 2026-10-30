@@ -22,14 +22,14 @@ gets a mechanism instead of a convention. Goal 2 (auth) depends on it being in p
   rate limiting (P3).
 
 ## Acceptance criteria
-- [ ] AC1 Given any log record, when it is formatted, then the output is one JSON object per line with `timestamp`, `level`, `logger`, `message`.
-- [ ] AC2 Given a record whose message, args or `extra` fields carry a JWT, a `Bearer` header value, a password, SSN, DOB or phone number, then each value is replaced by `[REDACTED]` in the output; non-sensitive text is untouched.
-- [ ] AC3 Given `APP_ENV=local`, or an unset/blank `SENTRY_DSN`, then `sentry_sdk` is not initialised; given another env and a DSN, it is, with `send_default_pii=False`, no local variables, and every string and every sensitive key anywhere in events and breadcrumbs (body, headers, query, contexts, breadcrumb data) redacted by the same filter as AC2; request bodies and local variables are not sent.
-- [ ] AC4 Given a request whose body exceeds `MAX_REQUEST_BODY_BYTES`, declared by `Content-Length` or counted while streaming, then the response is 413 and the route handler never sees the body.
-- [ ] AC5 Given a body at exactly the limit, then it is accepted.
-- [ ] AC6 Given the running server receives SIGTERM, then it stops accepting connections, finishes in-flight requests within `SHUTDOWN_TIMEOUT_SECONDS`, runs the lifespan shutdown (logged), and ends with the SIGTERM status (-15, shown as 143 by a shell or container). *Corrected in R4: the plan said "exits 0", but uvicorn re-raises the captured signal after a graceful shutdown (`uvicorn/server.py:348`), so 0 is not what it does.*
-- [ ] AC7 Given a bad `LOG_LEVEL` or a non-positive limit, boot fails naming the field.
-- [ ] AC8 Docs match: ARCHITECTURE, RUNBOOK, ENDPOINTS (413 row), env templates.
+- [x] AC1 Given any log record, when it is formatted, then the output is one JSON object per line with `timestamp`, `level`, `logger`, `message`.
+- [x] AC2 Given a record whose message, args or `extra` fields carry a JWT, a `Bearer` header value, a password, SSN, DOB or phone number, then each value is replaced by `[REDACTED]` in the output; non-sensitive text is untouched.
+- [x] AC3 Given `APP_ENV=local`, or an unset/blank `SENTRY_DSN`, then `sentry_sdk` is not initialised; given another env and a DSN, it is, with `send_default_pii=False`, no local variables, and every string and every sensitive key anywhere in events and breadcrumbs (body, headers, query, contexts, breadcrumb data) redacted by the same filter as AC2; request bodies and local variables are not sent.
+- [x] AC4 Given a request whose body exceeds `MAX_REQUEST_BODY_BYTES`, declared by `Content-Length` or counted while streaming, then the response is 413 and the route handler never sees the body.
+- [x] AC5 Given a body at exactly the limit, then it is accepted.
+- [x] AC6 Given the running server receives SIGTERM, then it stops accepting connections, finishes in-flight requests within `SHUTDOWN_TIMEOUT_SECONDS`, runs the lifespan shutdown (logged), and ends with the SIGTERM status (-15, shown as 143 by a shell or container). *Corrected in R4: the plan said "exits 0", but uvicorn re-raises the captured signal after a graceful shutdown (`uvicorn/server.py:348`), so 0 is not what it does.*
+- [x] AC7 Given a bad `LOG_LEVEL` or a non-positive limit, boot fails naming the field.
+- [x] AC8 Docs match: ARCHITECTURE, RUNBOOK, ENDPOINTS (413 row), env templates.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
