@@ -68,6 +68,7 @@ described in the Node base's `docs/ARCHITECTURE.md`; the REST versions are speci
 ## External integrations
 | Service | Purpose | Failure mode | Sandbox available? |
 |---------|---------|--------------|--------------------|
+| Sentry | error reports, off for `local` and without `SENTRY_DSN` ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)) | the app runs unchanged; events are dropped if the SDK cannot send | no; point a test DSN at a throwaway project |
 | none yet | SMS and email stay log-only (out of scope) | — | — |
 
 ## Known constraints and landmines

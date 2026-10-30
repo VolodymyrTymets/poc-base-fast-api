@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+from app.core.sentry import init_sentry
 
 API_PREFIX = "/api/v1"
 
@@ -27,6 +28,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    init_sentry(settings)
     app = FastAPI(title="poc-base-fast-api", lifespan=lifespan)
     # The methods are the ones the Node base's enableCors allowed; "*" headers are echoed
     # on a preflight, which is how Authorization and x-refresh-token (ADR-0008) get through.

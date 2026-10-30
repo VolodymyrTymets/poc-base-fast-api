@@ -27,6 +27,11 @@ def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:
     return parse_cors_origins(value)
 
 
+def _blank_to_none(value: str | None) -> str | None:
+    # A blank SENTRY_DSN= line in .env means "off", the same as unset.
+    return value.strip() or None if isinstance(value, str) else value
+
+
 class Settings(BaseSettings):
     # extra="ignore": the env templates list variables that later tasks start reading.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -34,6 +39,7 @@ class Settings(BaseSettings):
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    sentry_dsn: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
