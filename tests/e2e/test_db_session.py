@@ -7,6 +7,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.pool import QueuePool
 
 from app.config import Settings
 from app.core.db import get_session
@@ -18,6 +19,13 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 def client_for(app: FastAPI, *, raise_app_exceptions: bool = True) -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions)
     return httpx.AsyncClient(transport=transport, base_url="http://test")
+
+
+def connections_checked_out(app: FastAPI) -> int:
+    """Connections the app's pool has handed out and not got back: 0 once every session is closed."""
+    engine: AsyncEngine = app.state.engine
+    assert isinstance(engine.pool, QueuePool)
+    return engine.pool.checkedout()
 
 
 def add_session_routes(
@@ -85,6 +93,7 @@ async def test_each_request_gets_its_own_session_and_it_is_closed_after(
     assert first is not second
     assert (first_open, second_open) == (True, True)
     assert (first.in_transaction(), second.in_transaction()) == (False, False)
+    assert connections_checked_out(app) == 0
 
 
 async def test_a_failing_request_leaves_nothing_committed(
@@ -101,6 +110,8 @@ async def test_a_failing_request_leaves_nothing_committed(
             )
         ).scalar_one()
     assert rows == 0
+    # The connection is back in the pool, so the session was closed and rolled back, not leaked.
+    assert connections_checked_out(app) == 0
 
 
 async def test_without_a_database_url_the_app_boots_and_health_answers() -> None:

@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import MetaData, select, update
+from sqlalchemy import MetaData, select, text, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped
 
@@ -54,7 +54,18 @@ async def test_an_insert_fills_the_id_the_flag_and_both_timestamps(
         row = (await session.execute(select(MixinProbe))).scalar_one()
 
     assert (len(row.id), row.deleted) == (36, False)
-    assert row.updated_at is not None
+    assert row.updated_at is not None and row.updated_at <= utc_now()
+
+
+async def test_the_engine_sets_the_session_time_zone_to_utc(
+    engine: AsyncEngine,
+) -> None:
+    # Asserted directly: a server already on UTC would pass the clock test below with or
+    # without the setting, so that test alone cannot guard it.
+    async with engine.connect() as connection:
+        zone = (await connection.execute(text("SHOW TimeZone"))).scalar_one()
+
+    assert zone == "UTC"
 
 
 async def test_created_at_comes_from_the_database_in_utc(engine: AsyncEngine) -> None:
@@ -82,10 +93,9 @@ async def test_an_update_moves_updated_at_forward(engine: AsyncEngine) -> None:
         await _rename(session, "after")
         row = (await session.execute(select(MixinProbe))).scalar_one()
 
-    assert (row.name, row.updated_at is not None and row.updated_at > old) == (
-        "after",
-        True,
-    )
+    assert row.name == "after"
+    assert row.updated_at is not None
+    assert row.updated_at > old
 
 
 async def _rename(session: AsyncSession, name: str) -> None:
