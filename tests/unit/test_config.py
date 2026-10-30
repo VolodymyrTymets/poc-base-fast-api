@@ -47,3 +47,27 @@ def test_rejects_an_unknown_app_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_get_settings_builds_the_settings_once() -> None:
     assert get_settings() is get_settings()
+
+
+def test_rejects_an_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LOG_LEVEL", "nope")
+
+    with pytest.raises(ValidationError, match="log_level"):
+        Settings()
+
+
+@pytest.mark.parametrize(
+    ("name", "field"),
+    [
+        ("MAX_REQUEST_BODY_BYTES", "max_request_body_bytes"),
+        ("SHUTDOWN_TIMEOUT_SECONDS", "shutdown_timeout_seconds"),
+    ],
+)
+@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+def test_rejects_a_limit_that_is_not_positive(
+    monkeypatch: pytest.MonkeyPatch, name: str, field: str, value: str
+) -> None:
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValidationError, match=field):
+        Settings()

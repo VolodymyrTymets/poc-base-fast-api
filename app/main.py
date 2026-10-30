@@ -1,5 +1,6 @@
 """The FastAPI application: create_app() with lifespan and CORS, a health route, and include_router for every module in routers/. Tasks: 1.5, 4.1."""
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Literal
@@ -10,8 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+from app.core.body_limit import BodyLimitMiddleware
+from app.core.logging import configure_logging
+from app.core.sentry import init_sentry
 
 API_PREFIX = "/api/v1"
+
+logger = logging.getLogger(__name__)
 
 
 class HealthResponse(BaseModel):
@@ -20,14 +26,20 @@ class HealthResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # Nothing to open yet. The database engine (2.1), the arq pool (6.1) and the
-    # cache (9.x) are started before the yield and closed after it.
+    # The database engine (2.1), the arq pool (6.1) and the cache (9.x) are started
+    # before the yield and closed after it.
+    logger.info("application startup")
     yield
+    logger.info("application shutdown")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    init_sentry(settings)
     app = FastAPI(title="poc-base-fast-api", lifespan=lifespan)
+    # Added before CORS on purpose: the last middleware added is the outermost, and a 413
+    # must still carry the CORS headers or a browser reports a CORS error instead.
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)
     # The methods are the ones the Node base's enableCors allowed; "*" headers are echoed
     # on a preflight, which is how Authorization and x-refresh-token (ADR-0008) get through.
     app.add_middleware(
@@ -49,4 +61,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 def run() -> None:
     """Console script `poc-base-fast-api` (ADR-0012): serve create_app() on PORT."""
-    uvicorn.run("app.main:create_app", factory=True, port=get_settings().port)
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    uvicorn.run(
+        "app.main:create_app",
+        factory=True,
+        port=settings.port,
+        # log_config=None keeps uvicorn's own handlers off, so its lines use our JSON format.
+        log_config=None,
+        # uvicorn handles SIGTERM itself; the timeout bounds how long in-flight requests get.
+        timeout_graceful_shutdown=settings.shutdown_timeout_seconds,
+    )

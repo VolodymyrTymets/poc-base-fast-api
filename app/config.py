@@ -27,12 +27,24 @@ def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:
     return parse_cors_origins(value)
 
 
+def _blank_to_none(value: str | None) -> str | None:
+    # A blank SENTRY_DSN= line in .env means "off", the same as unset.
+    return value.strip() or None if isinstance(value, str) else value
+
+
 class Settings(BaseSettings):
     # extra="ignore": the env templates list variables that later tasks start reading.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
+    # 12 MiB: above FILE_MAX_SIZE (10 MB) plus multipart overhead; the files module (8.x)
+    # enforces the real upload limit.
+    max_request_body_bytes: int = Field(default=12_582_912, gt=0)
+    # How long SIGTERM lets in-flight requests finish before uvicorn cancels them.
+    shutdown_timeout_seconds: int = Field(default=10, ge=1)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    sentry_dsn: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
