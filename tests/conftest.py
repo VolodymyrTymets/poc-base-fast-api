@@ -21,6 +21,7 @@ def isolated_settings_env(
         "SENTRY_DSN",
         "MAX_REQUEST_BODY_BYTES",
         "SHUTDOWN_TIMEOUT_SECONDS",
+        "DATABASE_URL",
     ):
         monkeypatch.delenv(name, raising=False)
     get_settings.cache_clear()
