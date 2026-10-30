@@ -51,7 +51,7 @@
       "Bash(uv --version)",
       "mcp__context7__*",
       "mcp__serena__*",
-      "Bash(gh pr create:*)", "Bash(git push:*)", "Bash(gh issue:*)"
+      "Bash(gh pr create:*)", "Bash(gh issue:*)"
     ],
     "ask": [
       "Bash(uv add:*)", "Bash(uv remove:*)", "Bash(uv lock:*)",
@@ -59,7 +59,8 @@
       "Bash(docker:*)", "Bash(docker compose:*)",
       "Edit(pyproject.toml)", "Edit(.python-version)",
       "Edit(.github/workflows/**)", "Edit(CLAUDE.md)", "Edit(.claude/**)",
-      "mcp__github__create*", "mcp__github__update*"
+      "mcp__github__create*", "mcp__github__update*",
+      "Bash(git push:*)"
     ]
   },
   "_rln_note": "Starter permissions this repo now owns; nothing upstream updates them. Commands come from the CLAUDE.md command map: only `uv sync` and `uv build` exist, so lint and test have no allow entry yet - add them in the task that introduces ruff and pytest (POC-1.4). `uv run` is under ask because it runs arbitrary code; the exact smoke command is allowed. The three `!` .env lines are gitignore negations: they must stay directly under the .env rules and stay bare basenames. deny adds .pypirc, .netrc, tfstate, tfvars and kubeconfig reads and the twine publish spellings. bypassPermissions is not allowed in this repo."
