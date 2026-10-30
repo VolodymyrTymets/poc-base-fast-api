@@ -11,7 +11,9 @@ cp .env.example .env         # optional: every setting has a default; see the fi
 uv run poc-base-fast-api     # serves the API on PORT (default 3001)
 curl localhost:3001/api/v1/health    # {"status":"ok"}
 ```
-There is no database, cache or queue yet, so the server is all there is to start. `uv build` writes the wheel and sdist
+`DATABASE_URL` (`postgresql+asyncpg://...`, nothing else is accepted) is optional: unset or blank, the server still boots and
+`/api/v1/health` answers, and only a route that needs a database session fails. No table exists yet and there is no cache or
+queue. `uv build` writes the wheel and sdist
 into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
@@ -25,6 +27,14 @@ same file for a shared development host. A bad value (for example `PORT=abc`) st
 - `kill -TERM <pid>` (or Ctrl-C) stops accepting connections, lets in-flight requests finish for up to
   `SHUTDOWN_TIMEOUT_SECONDS` (10), runs the lifespan shutdown, then ends with the SIGTERM status (143 in a shell). That is how
   uvicorn behaves, not a crash.
+
+## Database tests
+The tests in `tests/e2e/test_db_session.py` and `tests/e2e/test_db_mixins.py` run against a real Postgres (rule P8) and need
+`TEST_DATABASE_URL`. Copy `.env.test.example` to `.env.test` (gitignored) and point it at a scratch database, or export the
+variable, which wins over the file. Without it those tests fail with a message naming the variable; they are never skipped.
+They create and drop their own tables (`poc_session_rollback_probe`, `PocMixinProbe`), so never point them at a database whose
+tables you care about. Task 3.1 replaces this with a testcontainers PostGIS database and makes the variable optional.
+Postgres time zone does not matter: the app's engine sets the session to UTC.
 
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,

@@ -25,7 +25,7 @@ The Node base reaches PostgreSQL (PostGIS enabled) through Prisma. Python needs 
 ## Consequences
 - Positive: mature ORM and migration tool; async end to end.
 - Accepted cost: a hand-written initial revision; any difference from the Prisma schema must be listed in the parity task.
-- Follow-ups: tasks 2.1 to 2.5. The read cache (task 9.1) wraps service reads, not the ORM.
+- Follow-ups: tasks 2.1 to 2.5. The naming convention and the mixins live in `app/core/db.py` (task 2.1, ADR-0014). The read cache (task 9.1) wraps service reads, not the ORM.
 
 ## Revisit when
 Schema parity with the Node base stops mattering, or SQLAlchemy async cannot meet a requirement.
