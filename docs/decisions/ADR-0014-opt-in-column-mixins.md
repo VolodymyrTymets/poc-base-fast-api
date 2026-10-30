@@ -23,7 +23,7 @@ Prisma's `@updatedAt` is filled by the client on create and on every update, so 
   - `IdMixin`: `id` as `TEXT` primary key, default `str(uuid.uuid4())` generated in Python, no database default.
   - `TimestampMixin`: `createdAt` as `TIMESTAMP(3)` without time zone, not null, database default `CURRENT_TIMESTAMP`; `updatedAt` as `TIMESTAMP(3)` without time zone, nullable in the database, filled by the application on insert and on every update.
   - `SoftDeleteMixin`: `deleted` as `BOOLEAN`, not null, default false in Python and in the database (rule P6).
-- Timestamps are UTC, stored as naive datetimes: the columns have no time zone, and asyncpg refuses an aware datetime for such a column.
+- Timestamps are UTC, stored as naive datetimes: the columns have no time zone, and asyncpg refuses an aware datetime for such a column. The engine sets the session time zone to UTC on every connection, because `CURRENT_TIMESTAMP` fills a column without a time zone in the session's own zone (a database server on `Europe/Kiev` stored `createdAt` two hours ahead of the UTC `updatedAt` until this was set).
 - A table that differs (`Migration`'s nullable `createdAt`, `AccountOnRole`'s composite key) declares those columns itself.
 - `Base.metadata` carries a naming convention that reproduces Prisma's names: `<Table>_pkey`, `<Table>_<cols>_key` for uniques, `<Table>_<cols>_idx` for indexes and `<Table>_<col>_fkey` for foreign keys. This is a target; task 2.5 proves it by diffing `pg_dump --schema-only`.
 
