@@ -31,6 +31,16 @@
 - **Logging (rule P4):** log-only workers record the event type and the account id only, never the OTP code, reset token, phone number or email. Node's workers log the phone number and, in local, development and test, the code and reset token (`background-workers/sms-sender/sms-sender.service.ts:17,19`, `notifier/log-notifier.service.ts:9`, `background-workers/email-sender/email-sender.service.ts:28-33`); that is not ported (mapping decision 17).
 - **Role names:** `CUSTOMER` and `ADMIN`. "any" means any authenticated account.
 
+## Service endpoints
+
+Not one of the 14 Node operations: added by task 1.5.
+
+| Operation | Method and path | Request | Response | Success | Errors | Auth | Roles | Node source |
+|-----------|-----------------|---------|----------|---------|--------|------|-------|-------------|
+| health | `GET /health` under the base path | none | `{"status": "ok"}` | 200 | none | none | none | none (new) |
+
+CORS: origins come from `CORS_ORIGINS` (default `http://localhost:5173,http://localhost:5174`). A preflight from another origin answers 400 and a plain request from one gets no `access-control-allow-origin` header (`app/main.py`, `app/config.py`).
+
 ## Auth endpoints
 
 | Operation | Method and path | Request | Response | Success | Errors | Auth | Roles | Node source |

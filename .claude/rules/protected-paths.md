@@ -33,6 +33,7 @@ Categories to hunt for during setup:
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.*.example
 !**/.env.sample
 !**/.env.template
 **/*.pem

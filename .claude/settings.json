@@ -10,6 +10,7 @@
       "Read(./**/.env)",
       "Read(./**/.env.*)",
       "Read(!.env.example)",
+      "Read(!.env.development.example)",
       "Read(!.env.sample)",
       "Read(!.env.template)",
       "Read(./**/*.pem)",
@@ -46,19 +47,23 @@
       "Bash(uv sync:*)",
       "Bash(uv build:*)",
       "Bash(uv run poc-base-fast-api:*)",
+      "Bash(uv run python:*)",
+      "Bash(uv run ruff check:*)", "Bash(uv run ruff format --check:*)",
+      "Bash(uv run mypy:*)", "Bash(uv run pytest:*)",
       "Bash(uv --version)",
       "mcp__context7__*",
-      "mcp__serena__*"
+      "mcp__serena__*",
+      "Bash(gh pr create:*)", "Bash(gh issue:*)"
     ],
     "ask": [
-      "Bash(git push:*)", "Bash(gh pr create:*)", "Bash(gh issue:*)",
       "Bash(uv add:*)", "Bash(uv remove:*)", "Bash(uv lock:*)",
-      "Bash(uv run:*)", "Bash(uv pip install:*)", "Bash(pip install:*)",
+      "Bash(uv pip install:*)", "Bash(pip install:*)",
       "Bash(docker:*)", "Bash(docker compose:*)",
       "Edit(pyproject.toml)", "Edit(.python-version)",
       "Edit(.github/workflows/**)", "Edit(CLAUDE.md)", "Edit(.claude/**)",
-      "mcp__github__create*", "mcp__github__update*"
+      "mcp__github__create*", "mcp__github__update*",
+      "Bash(git push:*)"
     ]
   },
-  "_rln_note": "Starter permissions this repo now owns; nothing upstream updates them. Commands come from the CLAUDE.md command map: only `uv sync` and `uv build` exist, so lint and test have no allow entry yet - add them in the task that introduces ruff and pytest (POC-1.4). `uv run` is under ask because it runs arbitrary code; the exact smoke command is allowed. The three `!` .env lines are gitignore negations: they must stay directly under the .env rules and stay bare basenames. deny adds .pypirc, .netrc, tfstate, tfvars and kubeconfig reads and the twine publish spellings. bypassPermissions is not allowed in this repo."
+  "_rln_note": "Starter permissions this repo now owns; nothing upstream updates them. Commands come from the CLAUDE.md command map: `uv sync`, `uv build`, the server command and, since POC-1.4, `uv run` of ruff check, ruff format --check, mypy and pytest are allowed (pytest runs repo test code, the same trust as `uv build`). `uv run python` is also allowed, which runs arbitrary code. `git push` stays under ask. The three `!` .env lines are gitignore negations: they must stay directly under the .env rules and stay bare basenames. deny adds .pypirc, .netrc, tfstate, tfvars and kubeconfig reads and the twine publish spellings. bypassPermissions is not allowed in this repo."
 }

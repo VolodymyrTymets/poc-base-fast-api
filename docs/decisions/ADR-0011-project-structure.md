@@ -1,7 +1,7 @@
 # ADR-0011 — Root `app/` package, laid out by layer
 
 - **Date:** 2026-10-29
-- **Status:** accepted
+- **Status:** accepted; the console-script target (`app:main`) is superseded by ADR-0012
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.3
 - **Supersedes:** the package location in ADR-0010 (`src/poc_base_fast_api/`). The rest of ADR-0010 stands: API only, `APP_ENV`, the environment variable names and the single `JWT_SECRET`. Task 1.3 of the scope doc (row text of rev 114).

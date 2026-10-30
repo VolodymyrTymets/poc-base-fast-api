@@ -7,10 +7,14 @@ authors = [
     { name = "volodymyr", email = "volodymyrtymets@gmail.com" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.0",
+    "pydantic-settings>=2.16.2",
+    "uvicorn>=0.54.0",
+]
 
 [project.scripts]
-poc-base-fast-api = "app:main"
+poc-base-fast-api = "app.main:run"
 
 [build-system]
 requires = ["uv_build>=0.12.22,<0.13.0"]
@@ -19,3 +23,34 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = "app"
 module-root = ""
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.4.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+# ADR-0007: the defaults plus bugbear, bandit, async and print checks.
+extend-select = ["B", "S", "ASYNC", "T20"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest tests are plain asserts.
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+files = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

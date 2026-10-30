@@ -8,12 +8,14 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | Task | Command |
 |------|---------|
 | install | `uv sync` |
-| lint | `none` |
-| unit tests | `none` |
-| affected tests | `none` |
+| lint | `uv run ruff check .` |
+| format | `uv run ruff format --check .` |
+| typecheck | `uv run mypy` |
+| unit tests | `uv run pytest tests/unit` |
+| affected tests | `uv run pytest <paths>` |
 | build | `uv build` |
-| dev server | `none` |
-| e2e | `none` |
+| dev server | `uv run poc-base-fast-api` |
+| e2e | `uv run pytest tests/e2e` |
 
 `lint` is the static check: when the map holds a real command it is a B1 gate. `none` means the repo has no such task (never invent one). A repo that runs a type checker or a formatter check may add a `typecheck` or `format` row: each is then a gate too.
 
