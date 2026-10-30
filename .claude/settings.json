@@ -10,6 +10,7 @@
       "Read(./**/.env)",
       "Read(./**/.env.*)",
       "Read(!.env.example)",
+      "Read(!.env.development.example)",
       "Read(!.env.sample)",
       "Read(!.env.template)",
       "Read(./**/*.pem)",
