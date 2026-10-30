@@ -7,14 +7,18 @@
 # prerequisites: uv (>= 0.12), network access for the first interpreter download.
 # Python 3.14 is pinned in .python-version; uv fetches it if it is missing.
 uv sync                      # creates .venv from uv.lock
-uv build                     # wheel + sdist into dist/ (gitignored)
-uv run poc-base-fast-api     # smoke check: prints "Hello from poc-base-fast-api!"
+cp .env.example .env         # optional: every setting has a default; see the file for the variables
+uv run poc-base-fast-api     # serves the API on PORT (default 3001)
+curl localhost:3001/api/v1/health    # {"status":"ok"}
 ```
-There is no server, database, cache or env file yet, so there is nothing else to start.
+There is no database, cache or queue yet, so the server is all there is to start. `uv build` writes the wheel and sdist
+into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
+same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
 ## Commands
-See the command map in `CLAUDE.md` — that is the canonical list. Lint, tests, a dev server and e2e are `none` until
-the scope-doc tasks that introduce them (lint and tests: 1.4; dev server: 1.5).
+See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,
+`uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` and `uv run poc-base-fast-api`. Coverage is a
+diagnostic, run by hand with `uv run pytest --cov=app`.
 
 ## Undocumented steps everyone knows
 - The first `uv sync` downloads Python 3.14 if no matching interpreter is installed.
