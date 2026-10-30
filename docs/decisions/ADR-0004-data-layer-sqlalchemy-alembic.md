@@ -1,7 +1,7 @@
 # ADR-0004 — SQLAlchemy 2 (async) with Alembic on PostgreSQL
 
 - **Date:** 2026-10-29
-- **Status:** accepted
+- **Status:** accepted; the soft-delete bullet about mixins is superseded by [ADR-0014](ADR-0014-opt-in-column-mixins.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.1
 - **Supersedes:** the ORM half of Node ADR-0001 (Use Prisma as the ORM, with a Redis-backed read cache). The Redis cache half is not decided here; task 9.1 decides it. Decision D3 of the scope doc.
@@ -25,7 +25,7 @@ The Node base reaches PostgreSQL (PostGIS enabled) through Prisma. Python needs 
 ## Consequences
 - Positive: mature ORM and migration tool; async end to end.
 - Accepted cost: a hand-written initial revision; any difference from the Prisma schema must be listed in the parity task.
-- Follow-ups: tasks 2.1 to 2.5. The read cache (task 9.1) wraps service reads, not the ORM.
+- Follow-ups: tasks 2.1 to 2.5. The naming convention and the mixins live in `app/core/db.py` (task 2.1, ADR-0014). The read cache (task 9.1) wraps service reads, not the ORM.
 
 ## Revisit when
 Schema parity with the Node base stops mattering, or SQLAlchemy async cannot meet a requirement.

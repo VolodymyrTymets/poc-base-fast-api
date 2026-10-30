@@ -71,3 +71,40 @@ def test_rejects_a_limit_that_is_not_positive(
 
     with pytest.raises(ValidationError, match=field):
         Settings()
+
+
+@pytest.mark.parametrize("value", [None, "", "  "], ids=["unset", "empty", "blank"])
+def test_database_url_is_off_when_unset_or_blank(
+    monkeypatch: pytest.MonkeyPatch, value: str | None
+) -> None:
+    if value is not None:
+        monkeypatch.setenv("DATABASE_URL", value)
+
+    assert Settings().database_url is None
+
+
+def test_accepts_an_asyncpg_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    url = "postgresql+asyncpg://u:p@localhost:5432/poc"
+    monkeypatch.setenv("DATABASE_URL", url)
+
+    assert Settings().database_url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://u:secret@localhost/db",
+        "mysql://u:secret@localhost/db",
+        "secret",
+    ],
+    ids=["no-driver", "other-database", "not-a-url"],
+)
+def test_rejects_a_database_url_without_the_asyncpg_scheme_and_hides_it(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", url)
+
+    with pytest.raises(ValidationError, match="database_url") as error:
+        Settings()
+
+    assert "secret" not in str(error.value)

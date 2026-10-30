@@ -9,9 +9,11 @@ import uvicorn
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings, get_settings
 from app.core.body_limit import BodyLimitMiddleware
+from app.core.db import create_engine, create_session_factory
 from app.core.logging import configure_logging
 from app.core.sentry import init_sentry
 
@@ -25,18 +27,26 @@ class HealthResponse(BaseModel):
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # The database engine (2.1), the arq pool (6.1) and the cache (9.x) are started
-    # before the yield and closed after it.
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # The arq pool (6.1) and the cache (9.x) are started before the yield and closed after
+    # it. The engine is built in create_app (it opens no connection) and closed here.
+    engine: AsyncEngine | None = app.state.engine
     logger.info("application startup")
-    yield
-    logger.info("application shutdown")
+    try:
+        yield
+    finally:
+        if engine is not None:
+            await engine.dispose()
+        logger.info("application shutdown")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
     app = FastAPI(title="poc-base-fast-api", lifespan=lifespan)
+    engine = create_engine(settings)
+    app.state.engine = engine
+    app.state.session_factory = create_session_factory(engine) if engine else None
     # Added before CORS on purpose: the last middleware added is the outermost, and a 413
     # must still carry the CORS headers or a browser reports a CORS error instead.
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)

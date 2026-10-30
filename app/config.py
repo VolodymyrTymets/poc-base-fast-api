@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, Field
+from pydantic import BeforeValidator, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # The local web apps (5173, 5174) that the Node base allowed. Ports move when a fork
@@ -12,6 +12,10 @@ DEFAULT_CORS_ORIGINS: tuple[str, ...] = (
     "http://localhost:5173",
     "http://localhost:5174",
 )
+
+
+# ADR-0004: SQLAlchemy async with the asyncpg driver; any other scheme fails at boot.
+DATABASE_URL_SCHEME = "postgresql+asyncpg://"
 
 
 def parse_cors_origins(raw: str | None) -> list[str]:
@@ -34,7 +38,11 @@ def _blank_to_none(value: str | None) -> str | None:
 
 class Settings(BaseSettings):
     # extra="ignore": the env templates list variables that later tasks start reading.
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # hide_input_in_errors: DATABASE_URL carries a password, and a boot error goes to stderr
+    # before logging is configured, so no rejected value may be echoed back.
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", hide_input_in_errors=True
+    )
 
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
@@ -45,9 +53,19 @@ class Settings(BaseSettings):
     shutdown_timeout_seconds: int = Field(default=10, ge=1)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     sentry_dsn: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
+    # None means "no database": the app still boots, only a route that needs a session fails.
+    database_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
+
+    @field_validator("database_url")
+    @classmethod
+    def _require_asyncpg_scheme(cls, value: str | None) -> str | None:
+        # The message names the field and the scheme, never the value (it holds a password).
+        if value is not None and not value.startswith(DATABASE_URL_SCHEME):
+            raise ValueError(f"database_url must start with {DATABASE_URL_SCHEME}")
+        return value
 
 
 @lru_cache
