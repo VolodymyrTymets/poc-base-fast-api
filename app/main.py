@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import Settings, get_settings
+from app.core.body_limit import BodyLimitMiddleware
 from app.core.sentry import init_sentry
 
 API_PREFIX = "/api/v1"
@@ -30,6 +31,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
     app = FastAPI(title="poc-base-fast-api", lifespan=lifespan)
+    # Added before CORS on purpose: the last middleware added is the outermost, and a 413
+    # must still carry the CORS headers or a browser reports a CORS error instead.
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)
     # The methods are the ones the Node base's enableCors allowed; "*" headers are echoed
     # on a preflight, which is how Authorization and x-refresh-token (ADR-0008) get through.
     app.add_middleware(

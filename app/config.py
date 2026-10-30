@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
+    # 12 MiB: above FILE_MAX_SIZE (10 MB) plus multipart overhead; the files module (8.x)
+    # enforces the real upload limit.
+    max_request_body_bytes: int = Field(default=12_582_912, gt=0)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     sentry_dsn: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     cors_origins: Annotated[
