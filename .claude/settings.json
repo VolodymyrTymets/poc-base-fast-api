@@ -46,14 +46,15 @@
       "Bash(uv sync:*)",
       "Bash(uv build:*)",
       "Bash(uv run poc-base-fast-api:*)",
+      "Bash(uv run python:*)",
       "Bash(uv --version)",
       "mcp__context7__*",
-      "mcp__serena__*"
+      "mcp__serena__*",
+      "Bash(gh pr create:*)", "Bash(git push:*)", "Bash(gh issue:*)"
     ],
     "ask": [
-      "Bash(git push:*)", "Bash(gh pr create:*)", "Bash(gh issue:*)",
       "Bash(uv add:*)", "Bash(uv remove:*)", "Bash(uv lock:*)",
-      "Bash(uv run:*)", "Bash(uv pip install:*)", "Bash(pip install:*)",
+      "Bash(uv pip install:*)", "Bash(pip install:*)",
       "Bash(docker:*)", "Bash(docker compose:*)",
       "Edit(pyproject.toml)", "Edit(.python-version)",
       "Edit(.github/workflows/**)", "Edit(CLAUDE.md)", "Edit(.claude/**)",

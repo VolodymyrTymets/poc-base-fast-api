@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from poc-base-fast-api!")
+"""The poc-base-fast-api application package; layout in ADR-0011."""

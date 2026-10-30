@@ -8,9 +8,11 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | Task | Command |
 |------|---------|
 | install | `uv sync` |
-| lint | `none` |
-| unit tests | `none` |
-| affected tests | `none` |
+| lint | `uv run ruff check .` |
+| format | `uv run ruff format --check .` |
+| typecheck | `uv run mypy` |
+| unit tests | `uv run pytest tests/unit` |
+| affected tests | `uv run pytest <paths>` |
 | build | `uv build` |
 | dev server | `none` |
 | e2e | `none` |
