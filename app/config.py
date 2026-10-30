@@ -33,6 +33,7 @@ class Settings(BaseSettings):
 
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
