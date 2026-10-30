@@ -19,6 +19,8 @@ same file for a shared development host. A bad value (for example `PORT=abc`) st
 - Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, SSN, DOB and
   phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
 - Sentry starts only when `APP_ENV` is not `local` and `SENTRY_DSN` is set; with no DSN nothing is sent. See ADR-0013.
+- Redaction and the JSON format are set up by `uv run poc-base-fast-api` (`app.main:run`). Starting the app another way, for example
+  `uvicorn app.main:create_app --factory`, skips them; a container command (task 11.1) must use the console script.
 - A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB by default) is answered 413 with the standard error body.
 - `kill -TERM <pid>` (or Ctrl-C) stops accepting connections, lets in-flight requests finish for up to
   `SHUTDOWN_TIMEOUT_SECONDS` (10), runs the lifespan shutdown, then ends with the SIGTERM status (143 in a shell). That is how

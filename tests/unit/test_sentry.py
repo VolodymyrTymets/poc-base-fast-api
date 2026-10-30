@@ -91,6 +91,25 @@ def test_scrub_event_redacts_every_part_of_the_event() -> None:
     }
 
 
+def test_scrub_event_drops_raw_log_arguments_and_keeps_the_redacted_text() -> None:
+    event: Any = {
+        "logentry": {
+            "message": "reset failed phone=%s",
+            "formatted": "reset failed phone=+15550109999",
+            "params": ["+15550109999"],
+        }
+    }
+
+    result = sentry.scrub_event(event, {})
+
+    assert result == {
+        "logentry": {
+            "message": f"reset failed phone={REDACTED}",
+            "formatted": f"reset failed phone={REDACTED}",
+        }
+    }
+
+
 def test_scrub_breadcrumb_redacts_its_data() -> None:
     crumb: Any = {
         "category": "log",

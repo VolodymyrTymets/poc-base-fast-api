@@ -38,26 +38,38 @@ class BodyLimitMiddleware:
 
         # State of one request, owned by the task that handles it.
         received = 0
-        rejected = False
+        rejected = False  # the limit was crossed: the app gets no more bytes
+        started = False  # the app has begun its own response
+        answered = False  # we sent the 413: the app's own output is dropped
 
         async def limited_receive() -> Message:
-            nonlocal received, rejected
+            nonlocal received, rejected, answered
+            if rejected:
+                # Bytes past the limit never reach the app, whatever the server delivers next.
+                return {"type": "http.disconnect"}
             message = await receive()
-            if rejected or message["type"] != "http.request":
+            if message["type"] != "http.request":
                 return message
             received += len(message.get("body", b""))
             if received <= self.max_bytes:
                 return message
-            # FastAPI turns an exception raised while reading the body into a 400, so the
-            # 413 is sent here and the app is told the client went away.
             rejected = True
-            await response(scope, receive, send)
+            # A response that has already started cannot become a 413; the app is only
+            # stopped. FastAPI turns an exception raised while reading the body into a 400,
+            # so otherwise the 413 is sent here and the app is told the client went away.
+            if not started:
+                answered = True
+                await response(scope, receive, send)
             return {"type": "http.disconnect"}
 
         async def guarded_send(message: Message) -> None:
+            nonlocal started
             # Whatever the app answers after the 413 is dropped: one response per request.
-            if not rejected:
-                await send(message)
+            if answered:
+                return
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
 
         try:
             await self.app(scope, limited_receive, guarded_send)
@@ -65,5 +77,5 @@ class BodyLimitMiddleware:
             # A handler that reads the body itself sees the disconnect we simulated. The
             # 413 is already sent, so that is the expected end; any other case is a real
             # disconnect and is raised.
-            if not rejected:
+            if not answered:
                 raise

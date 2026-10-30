@@ -27,7 +27,8 @@ def wait_until_healthy(url: str, process: subprocess.Popen[str]) -> None:
             if httpx.get(url, timeout=1).status_code == 200:
                 return
         except httpx.TransportError:
-            time.sleep(0.2)
+            pass
+        time.sleep(0.2)
     pytest.fail("the server did not become healthy")
 
 

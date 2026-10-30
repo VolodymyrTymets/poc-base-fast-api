@@ -14,13 +14,17 @@ log formatter, so redacting log lines alone (rule P4) would leave a second path 
 - `sentry-sdk` is a runtime dependency. `init_sentry(settings)` (`app/core/sentry.py`) starts it only when `APP_ENV` is not
   `local` and `SENTRY_DSN` is non-blank. A malformed DSN stops the boot (rule D5).
 - `data_collection` turns every automatic channel off: user info, cookies, request headers, request bodies, query strings and
-  stack-frame variables. It replaces `send_default_pii`, `include_local_variables` and `max_request_body_size`, which the SDK
-  deprecates in favour of it.
+  stack-frame variables. It supersedes `send_default_pii` (deprecated, and it wins when both are set), `include_local_variables`
+  and `max_request_body_size`; the plan named those three, and this is the substitution. Setting `data_collection` also turns
+  Sentry's built-in `EventScrubber` off, so `before_send` and `before_breadcrumb` are the only scrubbers.
 - `before_send` and `before_breadcrumb` walk the whole event or breadcrumb and apply the log redaction (`redact_mapping`): a
   sensitive key hides its whole value, and every string is scanned for tokens, SSN, phone numbers and `key=value` pairs. If the
-  redacted result is not a dict the event is dropped.
-- What still leaves the process: the exception type, its redacted message, the stack trace without variable values, the
-  environment name, the SDK and runtime versions, and breadcrumbs from log records (redacted).
+  redacted result is not a dict the event is dropped. The logging integration also sends the raw arguments of
+  `logger.error("x=%s", value)` as `logentry.params`; a bare argument has no key to match, so `before_send` removes `params` and
+  keeps the redacted `formatted` text.
+- What still leaves the process: the exception type, its redacted message, the stack trace without variable values but with the
+  source lines around each frame (`frame_context_lines` stays at its default), the environment name, the SDK and runtime
+  versions, and breadcrumbs from log records (redacted).
 - No performance tracing and no Sentry logs product: `traces_sample_rate` and `enable_logs` stay at their defaults (off).
 
 ## Rejected alternatives

@@ -30,6 +30,12 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         ("call +1 (555) 010-9999 now", "555"),
         ("phoneNumber: 5550109999", "5550109999"),
         ("x-refresh-token: abc123", "abc123"),
+        ("Authorization: Basic dXNlcjpwYXNz", "dXNlcjpwYXNz"),
+        ("Cookie: a=1; session=SECRET", "SECRET"),
+        ("phone: (555) 010-9999", "010-9999"),
+        ("phone=555 010 9999", "010 9999"),
+        ("birthDate: 1990-01-31", "1990-01-31"),
+        ("user_ssn=123456789", "123456789"),
     ],
     ids=[
         "jwt-key",
@@ -43,6 +49,12 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         "phone-shape",
         "phone-key",
         "refresh-header",
+        "basic-auth",
+        "cookie-line",
+        "phone-parens",
+        "phone-spaces",
+        "birth-date",
+        "ssn-suffix",
     ],
 )
 def test_redact_removes_the_sensitive_value(text: str, leaked: str) -> None:
@@ -64,6 +76,8 @@ def test_redact_mapping_hides_values_by_key_and_by_shape() -> None:
     result = redact_mapping(
         {
             "password": "hunter2",
+            "birthDate": "1990-01-31",
+            "user_ssn": "123",
             "nested": {"X-Refresh-Token": "abc", "note": f"saw {JWT}"},
             "items": [{"ssn": "123-45-6789"}, "ok"],
             "count": 3,
@@ -72,6 +86,8 @@ def test_redact_mapping_hides_values_by_key_and_by_shape() -> None:
 
     assert result == {
         "password": REDACTED,
+        "birthDate": REDACTED,
+        "user_ssn": REDACTED,
         "nested": {"X-Refresh-Token": REDACTED, "note": f"saw {REDACTED}"},
         "items": [{"ssn": REDACTED}, "ok"],
         "count": 3,

@@ -1,7 +1,7 @@
 """JSON log lines with sensitive values redacted. Tasks: 1.6.
 
 Redaction is best effort (rule P4): it catches the shapes below, it does not make it safe
-to log a secret. It runs in the formatter on the final message, the extra fields and the
+to log a secret. It errs towards over-matching: `tokens=5` is redacted too. It runs in the formatter on the final message, the extra fields and the
 traceback, so no handler that uses the formatter can skip it. Sentry events go through
 the same functions (app/core/sentry.py).
 """
@@ -18,7 +18,7 @@ REDACTED = "[REDACTED]"
 # Keys are compared lower-cased with "-" and "_" removed, so "x-refresh-token",
 # "refreshToken" and "refresh_token" are one spelling. Short names (ssn, dob) must match
 # exactly: as substrings they would hit words such as "classname".
-_EXACT_KEYS = frozenset({"ssn", "dob", "dateofbirth", "dataofbirth"})
+_EXACT_KEYS = frozenset({"dob", "dateofbirth", "dataofbirth", "birthdate", "birthday"})
 _SUBSTRING_KEYS = (
     "password",
     "token",
@@ -32,12 +32,21 @@ _SUBSTRING_KEYS = (
 # A key name inside free text, followed by = or : and its value: password=x, "ssn": "1",
 # phone: +1 555 ... The value is one quoted string or one run without separators.
 _KEY_NAME = (
-    r"[\w-]*(?:password|token|secret|authorization|cookie|phone|apikey)[\w-]*"
-    r"|ssn|dob|date_?of_?birth|data_?of_?birth"
+    r"[\w-]*(?:password|token|secret|apikey)[\w-]*"
+    r"|[\w-]*phone[\w-]*|[\w-]*ssn|dob|(?:date|data)_?of_?birth|birth_?date|birthday"
 )
+# Headers whose value is several words ("Basic dXNlcg==", "a=1; session=x") go to the end of
+# the line instead of the first space.
+_LINE_KEY_NAME = r"[\w-]*(?:authorization|cookie)[\w-]*"
+_VALUE = r"""\[REDACTED\]|"[^"]*"|'[^']*'"""
 _KEY_VALUE = re.compile(
     rf"""(?P<key>(?P<q>["']?)(?:{_KEY_NAME})(?P=q)\s*[=:]\s*)"""
-    r"""(?P<value>\[REDACTED\]|"[^"]*"|'[^']*'|[^\s,;&}\]]+)""",
+    rf"""(?P<value>{_VALUE}|\+?\(?\d[\d\s().-]*\d|[^\s,;&}}\]]+)""",
+    re.IGNORECASE,
+)
+_LINE_KEY_VALUE = re.compile(
+    rf"""(?P<key>(?P<q>["']?)(?:{_LINE_KEY_NAME})(?P=q)\s*[=:]\s*)"""
+    rf"""(?P<value>{_VALUE}|[^\r\n]+)""",
     re.IGNORECASE,
 )
 _BEARER = re.compile(r"\bbearer\s+[\w.~+/=-]+", re.IGNORECASE)
@@ -49,13 +58,19 @@ _PHONE = re.compile(r"\+\d[\d\s().-]{6,}\d")
 
 def is_sensitive_key(key: object) -> bool:
     name = str(key).lower().replace("-", "").replace("_", "")
-    return name in _EXACT_KEYS or any(part in name for part in _SUBSTRING_KEYS)
+    # "ssn" is matched as a suffix (user_ssn, ssn): inside a word it is a false hit (classname).
+    return (
+        name in _EXACT_KEYS
+        or name.endswith("ssn")
+        or any(part in name for part in _SUBSTRING_KEYS)
+    )
 
 
 def redact(text: str) -> str:
     """Replace every sensitive shape in `text`; everything else is returned unchanged."""
     text = _BEARER.sub(REDACTED, text)
     text = _JWT.sub(REDACTED, text)
+    text = _LINE_KEY_VALUE.sub(lambda match: match["key"] + REDACTED, text)
     text = _KEY_VALUE.sub(lambda match: match["key"] + REDACTED, text)
     text = _SSN.sub(REDACTED, text)
     return _PHONE.sub(REDACTED, text)

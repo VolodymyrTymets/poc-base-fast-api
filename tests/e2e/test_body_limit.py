@@ -92,6 +92,54 @@ def test_the_413_carries_cors_headers_for_an_allowed_origin() -> None:
     assert response.headers.get("access-control-allow-origin") == WEB_APP
 
 
+async def test_the_app_gets_no_more_bytes_once_the_limit_is_crossed() -> None:
+    delivered = 0
+    seen: list[str] = []
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        # A handler that keeps reading after the first disconnect it is given.
+        for _ in range(3):
+            seen.append((await receive())["type"])
+
+    async def receive() -> Message:
+        nonlocal delivered
+        delivered += 1
+        return {"type": "http.request", "body": b"x" * 600, "more_body": True}
+
+    async def send(message: Message) -> None:
+        return None
+
+    await BodyLimitMiddleware(app, max_bytes=LIMIT)(
+        {"type": "http", "headers": []}, receive, send
+    )
+
+    assert seen == ["http.request", "http.disconnect", "http.disconnect"]
+    assert delivered == 2
+
+
+async def test_a_response_that_already_started_is_not_followed_by_a_413() -> None:
+    sent: list[Message] = []
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await receive()
+        await receive()
+        await send({"type": "http.response.body", "body": b"partial"})
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"x" * 600, "more_body": True}
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    await BodyLimitMiddleware(app, max_bytes=LIMIT)(
+        {"type": "http", "headers": []}, receive, send
+    )
+
+    assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+    assert sent[0]["status"] == 200
+
+
 async def test_a_lying_content_length_is_still_stopped_while_streaming() -> None:
     reached: list[int] = []
     sent: list[Message] = []

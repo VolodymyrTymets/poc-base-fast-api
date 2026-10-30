@@ -32,12 +32,21 @@ DATA_COLLECTION: DataCollectionUserOptions = {
 }
 
 
-# WHY: redact_mapping returns a dict with the same keys and nesting as its input, but the SDK
-# types Event and Breadcrumb as TypedDicts that mypy cannot build from a plain dict (POC-1.6).
+# WHY: both casts below follow an isinstance(dict) check. redact_mapping returns a dict with
+# the same keys and nesting as its input, but the SDK types Event and Breadcrumb as
+# TypedDicts that mypy cannot build from a plain dict (POC-1.6).
 def scrub_event(event: Event, _hint: Hint) -> Event | None:
     redacted = redact_mapping(event)
     # Returning None drops the event: if the shape is ever not a dict, nothing is sent.
-    return cast(Event, redacted) if isinstance(redacted, dict) else None
+    if not isinstance(redacted, dict):
+        return None
+    logentry = redacted.get("logentry")
+    if isinstance(logentry, dict):
+        # The logging integration sends the raw `logger.error("x=%s", value)` arguments
+        # next to the formatted message. A bare argument has no key to match, so only the
+        # redacted `formatted` text is kept.
+        logentry.pop("params", None)
+    return cast(Event, redacted)
 
 
 def scrub_breadcrumb(crumb: Breadcrumb, _hint: BreadcrumbHint) -> Breadcrumb | None:
