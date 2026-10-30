@@ -56,11 +56,18 @@ def test_rejects_an_unknown_log_level(monkeypatch: pytest.MonkeyPatch) -> None:
         Settings()
 
 
+@pytest.mark.parametrize(
+    ("name", "field"),
+    [
+        ("MAX_REQUEST_BODY_BYTES", "max_request_body_bytes"),
+        ("SHUTDOWN_TIMEOUT_SECONDS", "shutdown_timeout_seconds"),
+    ],
+)
 @pytest.mark.parametrize("value", ["0", "-1", "abc"])
-def test_rejects_a_body_limit_that_is_not_positive(
-    monkeypatch: pytest.MonkeyPatch, value: str
+def test_rejects_a_limit_that_is_not_positive(
+    monkeypatch: pytest.MonkeyPatch, name: str, field: str, value: str
 ) -> None:
-    monkeypatch.setenv("MAX_REQUEST_BODY_BYTES", value)
+    monkeypatch.setenv(name, value)
 
-    with pytest.raises(ValidationError, match="max_request_body_bytes"):
+    with pytest.raises(ValidationError, match=field):
         Settings()

@@ -76,7 +76,12 @@ def redact_mapping(value: object) -> object:
 
 
 # Attributes every LogRecord has; anything else on the record came from `extra=`.
-_RECORD_FIELDS = frozenset(vars(logging.makeLogRecord({}))) | {"message", "asctime"}
+# uvicorn adds `color_message`, a copy of the message with ANSI colour codes: noise in JSON.
+_RECORD_FIELDS = frozenset(vars(logging.makeLogRecord({}))) | {
+    "message",
+    "asctime",
+    "color_message",
+}
 
 
 class JsonFormatter(logging.Formatter):

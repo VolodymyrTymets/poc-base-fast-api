@@ -152,3 +152,9 @@ def test_redact_is_idempotent() -> None:
     once = redact(f"token={JWT} password=x")
 
     assert redact(once) == once
+
+
+def test_formatter_drops_uvicorns_colour_copy_of_the_message() -> None:
+    record = make_record("Started", color_message="\x1b[36mStarted\x1b[0m")
+
+    assert "color_message" not in json.loads(JsonFormatter().format(record))
