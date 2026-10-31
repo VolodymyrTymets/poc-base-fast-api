@@ -111,6 +111,9 @@ INDEX_DEFINITIONS = {
     "File_createdAt_mimeType_idx": 'CREATE INDEX "File_createdAt_mimeType_idx" ON "File" USING btree ("createdAt" DESC, "mimeType")',
     "Notification_pkey": 'CREATE UNIQUE INDEX "Notification_pkey" ON "Notification" USING btree (id)',
     "NotificationRecipient_pkey": 'CREATE UNIQUE INDEX "NotificationRecipient_pkey" ON "NotificationRecipient" USING btree ("notificationId", "accountId")',
+    "DeletedHistory_pkey": 'CREATE UNIQUE INDEX "DeletedHistory_pkey" ON "DeletedHistory" USING btree (id)',
+    "DeletedHistory_relationId_idx": 'CREATE INDEX "DeletedHistory_relationId_idx" ON "DeletedHistory" USING btree ("relationId")',
+    "Migration_pkey": 'CREATE UNIQUE INDEX "Migration_pkey" ON "Migration" USING btree (id)',
 }
 
 # pg_constraint codes: r = RESTRICT, c = CASCADE, n = SET NULL.
