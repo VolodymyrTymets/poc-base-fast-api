@@ -24,20 +24,25 @@ as a hash (the `refreshToken` column holds `sha256`, ADR-0008, never bcrypt).
   (packages 5 to 8); seeds of the two roles (5.1); password, OTP and token logic; any new dependency.
 
 ## Acceptance criteria
-- [ ] AC1 Given `import app.models`, then `Base.metadata.tables` holds exactly `Account`, `AccountRole`, `AccountOnRole`,
+- [x] AC1 Given `import app.models`, then `Base.metadata.tables` holds exactly `Account`, `AccountRole`, `AccountOnRole`,
   `AccountIdentity`, `AccountProfile`, each with the Prisma column names (quoted, mixed case), types, nullability and defaults of the init and `kan_12` migrations.
-- [ ] AC2 Given the metadata, then every index and unique of `account.prisma` exists with Prisma's name: `Account_createdAt_idx` (`createdAt DESC`),
+- [x] AC2 Given the metadata, then every index and unique of `account.prisma` exists with Prisma's name: `Account_createdAt_idx` (`createdAt DESC`),
   `AccountRole_type_key` (unique) and `AccountRole_type_deleted_idx`, `AccountOnRole_deleted_idx`, `AccountIdentity_accountId_key` (unique),
   `AccountIdentity_resetTokenHash_key` (unique), `AccountIdentity_deleted_idx`, `AccountProfile_accountId_key` (unique),
   `AccountProfile_email_key` (unique), `AccountProfile_deleted_idx`; primary keys `<Table>_pkey` (`AccountOnRole` composite `roleId, accountId`).
-- [ ] AC3 Given the foreign keys, then they carry Prisma's actions: `Account.lastAccountRoleId` `ON DELETE SET NULL`; `AccountOnRole.roleId`/`accountId`,
+- [x] AC3 Given the foreign keys, then they carry Prisma's actions: `Account.lastAccountRoleId` `ON DELETE SET NULL`; `AccountOnRole.roleId`/`accountId`,
   `AccountIdentity.accountId`, `AccountProfile.accountId` `ON DELETE RESTRICT`; all `ON UPDATE CASCADE`.
-- [ ] AC4 Given a real Postgres, when the tables are created from the metadata, then `pg_indexes` and `pg_constraint` show the same indexes (including `DESC` and `UNIQUE`) and foreign-key actions as AC2 and AC3.
-- [ ] AC5 Given the relationships, then `configure_mappers()` succeeds and the names are `Account.AccountIdentity`, `AccountProfile`, `AccountOnRole`, `LastAccountRole`;
+- [x] AC4 Given a real Postgres, when the tables are created from the metadata, then `pg_indexes` and `pg_constraint` show the same indexes (including `DESC` and `UNIQUE`) and foreign-key actions as AC2 and AC3.
+- [x] AC5 Given the relationships, then `configure_mappers()` succeeds and the names are `Account.AccountIdentity`, `AccountProfile`, `AccountOnRole`, `LastAccountRole`;
   `AccountRole.AccountOnRole`, `accounts`; `AccountOnRole.AccountRole`, `Account`; `AccountIdentity.Account`; `AccountProfile.Account` (Prisma's names, P1), each pair linked both ways.
-- [ ] AC6 Given a graph of one account with identity, profile, a role and a role link, when it is inserted and read back on a real Postgres, then the relationships load and `updatedAt` is set; a second `AccountRole` of the same `type`, a second identity or profile for one account, a repeated `email` or `resetTokenHash`, and an `AccountOnRole` row naming a missing role or account are each refused by the database.
-- [ ] AC7 `uv run mypy` passes (strict) on the new modules and tests.
-- [ ] AC8 Docs match: ARCHITECTURE, DOMAIN_GLOSSARY (identifiers now decided; the PascalCase line confirmed).
+- [x] AC6 Given a graph of one account with identity, profile, a role and a role link, when it is inserted and read back on a real Postgres, then the relationships load and `updatedAt` is set; a second `AccountRole` of the same `type`, a second identity or profile for one account, a repeated `email` or `resetTokenHash`, and an `AccountOnRole` row naming a missing role or account are each refused by the database.
+- [x] AC7 `uv run mypy` passes (strict) on the new modules and tests.
+- [x] AC8 Docs match: ARCHITECTURE, DOMAIN_GLOSSARY (identifiers now decided; the PascalCase line confirmed).
+
+## Built differently from the plan
+- `relationship(foreign_keys=...)` is not used: `Account` and `AccountRole` are linked by one foreign key directly (`lastAccountRoleId`) and `AccountOnRole` has one foreign key to each, so SQLAlchemy finds no ambiguous join (`configure_mappers()` passes).
+- Each relationship also names its target as a string. Without it, an annotation such as `Mapped[AccountRole]` inside the `AccountRole` class resolved to the class attribute of that name and recursed forever in `configure_mappers()` (mypy did not see it).
+- The real-Postgres test file is `tests/e2e/test_db_account_models.py`: the same basename as the unit test collided in mypy (no `__init__.py`), and the other database tests use the `test_db_*` pattern. The enum type followed `schema_translate_map`, so Q5's primary path held and no fallback was used.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

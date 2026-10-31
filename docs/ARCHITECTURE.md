@@ -12,7 +12,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | Path | What lives here | Deployable? | Owner |
 |------|-----------------|-------------|-------|
 | `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, CORS, `GET /api/v1/health`) and `run()`; `config.py` has `Settings` and `get_settings()`; `dependencies.py` is docstring-only | yes, `uv run poc-base-fast-api` | backend |
-| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each, all docstring-only | — | backend |
+| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` are built (task 2.2, below), the rest are docstring-only | — | backend |
 | `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
 | `app/workers/`, `app/seeds/` | the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | `unit/` and `e2e/`, a working layout until task 3.3 sets the real one | — | backend |
@@ -24,7 +24,13 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 There is a single root-level `app/` package, laid out by layer ([ADR-0011](decisions/ADR-0011-project-structure.md), rule file `.claude/rules/project-structure.md`). No `src/`, `api/` or `web/` directory is part of the repo.
 
 ### Where data truth lives
-Nothing is persisted yet: no table exists (`Base.metadata` is empty until tasks 2.2 and 2.3). The data layer plumbing is built: with
+Nothing is persisted yet: no migration exists (Alembic is task 2.4), so no real database holds a table. The account models are
+mapped (task 2.2) and importing `app.models` registers five tables on `Base.metadata`: `Account`, `AccountRole`, `AccountOnRole`,
+`AccountIdentity` and `AccountProfile`, plus the `AccountRoleType` enum. Names, column types, primary keys, foreign-key actions and
+indexes follow the Prisma DDL; every unique is a unique index (as Prisma emits it) and `Account_createdAt_idx` is `DESC`. Attributes
+are snake_case over the quoted column names (`created_at` for `"createdAt"`, `date_of_birth` for the Node column `"dataOfBirth"`),
+relationships keep the Node names (`Account.AccountIdentity`, `AccountRole.accounts`, ...). `AccountProfile.avatarId` is a plain
+column until task 2.3 adds `File` and its foreign key. `File` and `Notification*` are not mapped yet (task 2.3). The data layer plumbing is built: with
 `DATABASE_URL` set, `create_app` builds one SQLAlchemy async engine (asyncpg, session time zone UTC) and the lifespan disposes it;
 `get_session` gives each request its own `AsyncSession`, which never commits by itself. Without `DATABASE_URL` the app boots and
 only a route that needs a session fails. No cache or queue is wired.
@@ -64,6 +70,9 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   direction defined in [ADR-0011](decisions/ADR-0011-project-structure.md).
 
 ## Planned (intent from the scope doc, not yet decided)
+- Task 2.3 maps `File`, `Notification` and `NotificationRecipient` and, in `account.py` and `account_profile.py`, adds what points at them:
+  `AccountProfile_avatarId_fkey` with `AccountProfile.Avatar`, `Account.Files` and `Account.NotificationRecipient`. It extends the table
+  set asserted in `tests/unit/test_db_base.py`.
 - Redis as a derived read cache (task 9.1 decides it; Redis is also the arq queue backend, so flushing it drops in-flight jobs).
 - Reference implementation to port from: the Node `poc-base` repo (NestJS + GraphQL + Prisma), 14 GraphQL operations that
   become REST routes (task 1.2).

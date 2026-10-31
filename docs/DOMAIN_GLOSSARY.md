@@ -3,9 +3,9 @@
 > One meaning per term. This drives naming in code, database and UI copy.
 > A new user-facing noun means a line here, in the same PR (rule E1).
 
-No domain code exists yet. These are the terms inherited from the Node `poc-base`, which the scope doc ports with the
+Only the account tables are mapped so far (task 2.2). These are the terms inherited from the Node `poc-base`, which the scope doc ports with the
 same table and column names. They are deliberately generic: a POC forked from this repo extends the table with its own
-domain and does not repurpose these names. Python identifiers are not decided yet (task 2.2); the Node name is the reference.
+domain and does not repurpose these names. Python identifiers are decided for the account tables (task 2.2, see "Naming rules"); the Node name is still the reference.
 
 | Term (client language) | Reference identifier (Node base) | Means exactly | Not to be confused with |
 |------------------------|----------------------------------|---------------|-------------------------|
@@ -21,7 +21,11 @@ domain and does not repurpose these names. Python identifiers are not decided ye
 
 ## Naming rules that follow from the above
 - "Delete" always means a soft delete (`deleted` flag); there is no hard-delete vocabulary.
-- Relationship names follow the Node base's PascalCase-per-model convention only if task 2.2 confirms it for SQLAlchemy.
+- Python class names and relationship names are the Node names, PascalCase (`Account.AccountProfile`, `AccountOnRole.AccountRole`),
+  confirmed for SQLAlchemy in task 2.2; Prisma's own lower-case `AccountRole.accounts` stays as it is. Column attributes are snake_case
+  over the unchanged quoted column name (`first_name` for `"firstName"`, `ssn` for `"SSN"`, `is_18_year_old` for `"is18YearOld"`).
+- The Node column `"dataOfBirth"` is a typo kept for schema parity (ADR-0004); the Python attribute is `date_of_birth`. It holds text, not a date.
+- `refreshToken` and `resetTokenHash` keep their Node column names on `AccountIdentity`; both hold a sha256, never the token (rule P5).
 
 ## Status/enum vocabularies
 | Enum | Values | Meaning of each |
