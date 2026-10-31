@@ -1,3 +1,5 @@
+import importlib
+
 import pytest
 from sqlalchemy import ForeignKey, Index, MetaData
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -54,8 +56,19 @@ def create_table_sql(name: str) -> str:
     return str(CreateTable(table).compile(dialect=POSTGRES))
 
 
-def test_the_real_base_has_no_tables_until_the_models_land() -> None:
-    assert dict(Base.metadata.tables) == {}
+def test_only_the_app_models_are_on_the_real_base() -> None:
+    # WHY: this asserted an empty Base.metadata until the first models landed (POC-2.2,
+    # human-approved in the plan). It still fails if a scratch test model lands on the
+    # real Base, which Alembic (2.4) diffs; task 2.3 extends the set.
+    importlib.import_module("app.models")
+
+    assert set(Base.metadata.tables) == {
+        "Account",
+        "AccountRole",
+        "AccountOnRole",
+        "AccountIdentity",
+        "AccountProfile",
+    }
 
 
 def test_constraints_and_indexes_are_named_the_way_prisma_names_them() -> None:
