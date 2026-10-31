@@ -109,6 +109,8 @@ INDEX_DEFINITIONS = {
     # Task 2.3
     "File_pkey": 'CREATE UNIQUE INDEX "File_pkey" ON "File" USING btree (id)',
     "File_createdAt_mimeType_idx": 'CREATE INDEX "File_createdAt_mimeType_idx" ON "File" USING btree ("createdAt" DESC, "mimeType")',
+    "Notification_pkey": 'CREATE UNIQUE INDEX "Notification_pkey" ON "Notification" USING btree (id)',
+    "NotificationRecipient_pkey": 'CREATE UNIQUE INDEX "NotificationRecipient_pkey" ON "NotificationRecipient" USING btree ("notificationId", "accountId")',
 }
 
 # pg_constraint codes: r = RESTRICT, c = CASCADE, n = SET NULL.
@@ -121,6 +123,8 @@ FOREIGN_KEY_ACTIONS = {
     # Task 2.3
     "AccountProfile_avatarId_fkey": ("n", "c"),
     "File_createdById_fkey": ("r", "c"),
+    "NotificationRecipient_notificationId_fkey": ("r", "c"),
+    "NotificationRecipient_accountId_fkey": ("r", "c"),
 }
 
 

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.account_profile import AccountProfile
     from app.models.account_role import AccountOnRole, AccountRole
     from app.models.file import File
+    from app.models.notification import NotificationRecipient
 
 
 class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -37,6 +38,9 @@ class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         back_populates="last_role_accounts"
     )
     files: Mapped[list[File]] = relationship(back_populates="created_by")
+    notification_recipients: Mapped[list[NotificationRecipient]] = relationship(
+        back_populates="account"
+    )
 
 
 # Declared after the class: the descending index needs the mapped column.

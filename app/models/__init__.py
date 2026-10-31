@@ -5,6 +5,7 @@ from app.models.account import Account, AccountIdentity
 from app.models.account_profile import AccountProfile
 from app.models.account_role import AccountOnRole, AccountRole, AccountRoleType
 from app.models.file import File, FileType
+from app.models.notification import Notification, NotificationRecipient
 
 __all__ = [
     "Account",
@@ -15,4 +16,6 @@ __all__ = [
     "AccountRoleType",
     "File",
     "FileType",
+    "Notification",
+    "NotificationRecipient",
 ]

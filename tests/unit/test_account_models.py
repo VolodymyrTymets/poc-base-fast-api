@@ -17,6 +17,7 @@ from app.models import (
     AccountRole,
     AccountRoleType,
     File,
+    NotificationRecipient,
 )
 
 # The dialect the DDL is compiled for; an engine opens no connection until it is used.
@@ -149,6 +150,20 @@ FOREIGN_KEYS = {
         "RESTRICT",
         "CASCADE",
     ),
+    "NotificationRecipient_notificationId_fkey": (
+        "NotificationRecipient",
+        "notificationId",
+        "Notification",
+        "RESTRICT",
+        "CASCADE",
+    ),
+    "NotificationRecipient_accountId_fkey": (
+        "NotificationRecipient",
+        "accountId",
+        "Account",
+        "RESTRICT",
+        "CASCADE",
+    ),
 }
 
 
@@ -275,6 +290,7 @@ RELATIONSHIPS: dict[tuple[type[Base], str], tuple[type[Base], str, bool]] = {
     (Account, "account_on_roles"): (AccountOnRole, "account", True),
     (Account, "last_account_role"): (AccountRole, "last_role_accounts", False),
     (Account, "files"): (File, "created_by", True),
+    (Account, "notification_recipients"): (NotificationRecipient, "account", True),
     (AccountRole, "account_on_roles"): (AccountOnRole, "account_role", True),
     (AccountRole, "last_role_accounts"): (Account, "last_account_role", True),
     (AccountOnRole, "account_role"): (AccountRole, "account_on_roles", False),

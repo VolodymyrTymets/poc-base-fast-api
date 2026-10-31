@@ -69,6 +69,8 @@ def test_only_the_app_models_are_on_the_real_base() -> None:
         "AccountIdentity",
         "AccountProfile",
         "File",
+        "Notification",
+        "NotificationRecipient",
     }
 
 
