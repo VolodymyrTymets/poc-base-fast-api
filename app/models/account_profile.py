@@ -1,9 +1,14 @@
 """Table AccountProfile. Tasks: 2.2."""
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, Index, Text, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, SoftDeleteMixin
+
+if TYPE_CHECKING:
+    from app.models.account import Account
 
 
 class AccountProfile(IdMixin, SoftDeleteMixin, Base):
@@ -33,6 +38,8 @@ class AccountProfile(IdMixin, SoftDeleteMixin, Base):
     # A plain column for now: the foreign key to "File" and the Avatar relationship
     # arrive with task 2.3, which creates the File table.
     avatar_id: Mapped[str | None] = mapped_column("avatarId", Text)
+
+    Account: Mapped[Account] = relationship("Account", back_populates="AccountProfile")
 
     __table_args__ = (
         Index("AccountProfile_accountId_key", "accountId", unique=True),

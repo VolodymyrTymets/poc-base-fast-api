@@ -1,11 +1,15 @@
 """AccountRoleType, tables AccountRole and AccountOnRole. Tasks: 2.2."""
 
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey, Index, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, SoftDeleteMixin
+
+if TYPE_CHECKING:
+    from app.models.account import Account
 
 
 class AccountRoleType(enum.StrEnum):
@@ -18,6 +22,14 @@ class AccountRole(IdMixin, SoftDeleteMixin, Base):
 
     type: Mapped[AccountRoleType] = mapped_column(
         Enum(AccountRoleType, name="AccountRoleType")
+    )
+
+    AccountOnRole: Mapped[list[AccountOnRole]] = relationship(
+        "AccountOnRole", back_populates="AccountRole"
+    )
+    # Prisma's own lower-case name: the accounts whose last used role this is.
+    accounts: Mapped[list[Account]] = relationship(
+        "Account", back_populates="LastAccountRole"
     )
 
     # Prisma makes a unique with CREATE UNIQUE INDEX, not a UNIQUE constraint, so the
@@ -45,5 +57,10 @@ class AccountOnRole(SoftDeleteMixin, Base):
         ForeignKey("Account.id", ondelete="RESTRICT", onupdate="CASCADE"),
         primary_key=True,
     )
+
+    AccountRole: Mapped[AccountRole] = relationship(
+        "AccountRole", back_populates="AccountOnRole"
+    )
+    Account: Mapped[Account] = relationship("Account", back_populates="AccountOnRole")
 
     __table_args__ = (Index("AccountOnRole_deleted_idx", "deleted"),)

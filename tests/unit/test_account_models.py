@@ -3,12 +3,20 @@
 from typing import Any
 
 import pytest
-from sqlalchemy import Column, Enum, Table
+from sqlalchemy import Column, Enum, Table, inspect
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import configure_mappers
 from sqlalchemy.schema import CreateIndex, CreateTable, DefaultClause
 
 from app.core.db import Base
-from app.models import AccountRoleType
+from app.models import (
+    Account,
+    AccountIdentity,
+    AccountOnRole,
+    AccountProfile,
+    AccountRole,
+    AccountRoleType,
+)
 
 # The dialect the DDL is compiled for; an engine opens no connection until it is used.
 POSTGRES = create_async_engine("postgresql+asyncpg://").dialect
@@ -238,3 +246,82 @@ def test_create_table_compiles_with_quoted_mixed_case_names(name: str) -> None:
     sql = str(CreateTable(table(name)).compile(dialect=POSTGRES))
 
     assert sql.startswith(f'\nCREATE TABLE "{name}" (')
+
+
+MODELS: list[type[Base]] = [
+    Account,
+    AccountRole,
+    AccountOnRole,
+    AccountIdentity,
+    AccountProfile,
+]
+
+# (class, relationship name) -> (target class, name on the other side, is a list).
+# The names are Prisma's (scope decision P1), including the lower-case `accounts`.
+RELATIONSHIPS: dict[tuple[type[Base], str], tuple[type[Base], str, bool]] = {
+    (Account, "AccountIdentity"): (AccountIdentity, "Account", False),
+    (Account, "AccountProfile"): (AccountProfile, "Account", False),
+    (Account, "AccountOnRole"): (AccountOnRole, "Account", True),
+    (Account, "LastAccountRole"): (AccountRole, "accounts", False),
+    (AccountRole, "AccountOnRole"): (AccountOnRole, "AccountRole", True),
+    (AccountRole, "accounts"): (Account, "LastAccountRole", True),
+    (AccountOnRole, "AccountRole"): (AccountRole, "AccountOnRole", False),
+    (AccountOnRole, "Account"): (Account, "AccountOnRole", False),
+    (AccountIdentity, "Account"): (Account, "AccountIdentity", False),
+    (AccountProfile, "Account"): (Account, "AccountProfile", False),
+}
+
+
+def test_the_mappers_configure_without_an_ambiguous_join() -> None:
+    configure_mappers()
+
+
+def test_each_model_has_exactly_the_prisma_relationships() -> None:
+    configure_mappers()
+
+    actual = {
+        (cls, name)
+        for cls in MODELS
+        for name in (prop.key for prop in inspect(cls).relationships)
+    }
+
+    assert actual == set(RELATIONSHIPS)
+
+
+@pytest.mark.parametrize(
+    ("owner", "name"),
+    RELATIONSHIPS,
+    ids=[f"{o.__name__}.{n}" for o, n in RELATIONSHIPS],
+)
+def test_a_relationship_points_at_its_target_and_back(
+    owner: type[Base], name: str
+) -> None:
+    configure_mappers()
+    target, back, is_list = RELATIONSHIPS[(owner, name)]
+
+    relationship = inspect(owner).relationships[name]
+
+    assert (
+        relationship.mapper.class_,
+        relationship.back_populates,
+        relationship.uselist,
+    ) == (
+        target,
+        back,
+        is_list,
+    )
+
+
+def test_linking_one_side_fills_the_other_side_in_memory() -> None:
+    account = Account()
+    identity = AccountIdentity(Account=account)
+    profile = AccountProfile(Account=account)
+    role = AccountRole(type=AccountRoleType.CUSTOMER)
+    link = AccountOnRole(Account=account, AccountRole=role)
+    account.LastAccountRole = role
+
+    assert account.AccountIdentity is identity
+    assert account.AccountProfile is profile
+    assert account.AccountOnRole == [link]
+    assert role.AccountOnRole == [link]
+    assert role.accounts == [account]

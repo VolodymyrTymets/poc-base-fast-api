@@ -1,12 +1,17 @@
 """Tables Account and AccountIdentity. Tasks: 2.2."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Index, Text
 from sqlalchemy.dialects.postgresql import TIMESTAMP
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base, IdMixin, SoftDeleteMixin, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.account_profile import AccountProfile
+    from app.models.account_role import AccountOnRole, AccountRole
 
 
 class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -20,6 +25,23 @@ class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         "lastAccountRoleId",
         Text,
         ForeignKey("AccountRole.id", ondelete="SET NULL", onupdate="CASCADE"),
+    )
+
+    # Relationship names are Prisma's, PascalCase (scope decision P1); the column
+    # attributes stay snake_case.
+    # The target is also given as a string because inside the class body a bare
+    # `AccountIdentity` in an annotation would resolve to the attribute of that name.
+    AccountIdentity: Mapped[AccountIdentity | None] = relationship(
+        "AccountIdentity", back_populates="Account"
+    )
+    AccountProfile: Mapped[AccountProfile | None] = relationship(
+        "AccountProfile", back_populates="Account"
+    )
+    AccountOnRole: Mapped[list[AccountOnRole]] = relationship(
+        "AccountOnRole", back_populates="Account"
+    )
+    LastAccountRole: Mapped[AccountRole | None] = relationship(
+        "AccountRole", back_populates="accounts"
     )
 
 
@@ -50,6 +72,8 @@ class AccountIdentity(IdMixin, SoftDeleteMixin, Base):
     # sha256 of the refresh token, never bcrypt of the whole JWT (rule P5, ADR-0008).
     # The column keeps the Node name `refreshToken` for schema parity.
     refresh_token: Mapped[str | None] = mapped_column("refreshToken", Text)
+
+    Account: Mapped[Account] = relationship("Account", back_populates="AccountIdentity")
 
     __table_args__ = (
         Index("AccountIdentity_accountId_key", "accountId", unique=True),
