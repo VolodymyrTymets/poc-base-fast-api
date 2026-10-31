@@ -17,8 +17,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from app.config import Settings
 
-# The names Prisma gives its constraints (ADR-0014), so the parity diff of task 2.5 has less
-# to explain. A mixed-case table or column name is quoted by SQLAlchemy on its own.
+# The names Prisma gives its constraints (ADR-0014), so the names stay close to the Node base's
+# (a convention, not diffed: ADR-0019). A mixed-case table or column name is quoted by SQLAlchemy on its own.
 NAMING_CONVENTION = {
     "pk": "%(table_name)s_pkey",
     "uq": "%(table_name)s_%(column_0_N_name)s_key",

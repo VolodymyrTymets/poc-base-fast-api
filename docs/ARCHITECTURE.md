@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0015 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0019 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -50,12 +50,12 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0018, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0019, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
   with a stale-spec test ([ADR-0003](decisions/ADR-0003-rest-api-fastapi-openapi.md)).
-- SQLAlchemy 2 async + asyncpg + Alembic on Postgres/PostGIS, Prisma table and column names as a target proven by task 2.5
+- SQLAlchemy 2 async + asyncpg + Alembic on Postgres/PostGIS, Prisma table and column names as a naming target, not diffed (ADR-0019)
   ([ADR-0004](decisions/ADR-0004-data-layer-sqlalchemy-alembic.md)).
 - Alembic in `migrations/` with `alembic.ini` at the repo root, the URL from `Settings`, hand-written frozen revisions that import nothing from `app`,
   `alembic check` with type and default comparison on; it extends ADR-0011 with the import rule for `env.py`
@@ -71,8 +71,10 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   task 2.1; it supersedes one bullet of ADR-0004 ([ADR-0014](decisions/ADR-0014-opt-in-column-mixins.md)).
 - Relationship attributes follow SQLAlchemy convention (snake_case, plural collections), not the Node base's PascalCase
   ([ADR-0016](decisions/ADR-0016-snake-case-relationship-names.md)).
-- `AccountProfile` omits the Node columns `SSN` and `is18YearOld`; the parity diff of task 2.5 expects exactly those two differences
+- `AccountProfile` omits the Node columns `SSN` and `is18YearOld`; with the dropped `Migration` table these are the known differences from the Node schema (ADR-0019)
   ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)).
+- Schema parity with the Node base is a naming convention, not proven by a `pg_dump` diff; task 2.5 is a smoke run of `alembic upgrade head`, `alembic check` and the app
+  ([ADR-0019](decisions/ADR-0019-schema-parity-not-diffed.md)).
 - Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`
