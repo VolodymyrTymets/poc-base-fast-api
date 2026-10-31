@@ -20,7 +20,7 @@ No code precedent is needed: no code behaviour changes. Library facts (Alembic C
 - layer: none.
 - test: none new (human decision: docs and ADR only). Existing `tests/e2e/test_db_migrations.py` is not rerun as the proof.
 - executed how: `docker run -d --name poc-base-fast-api-smoke -e POSTGRES_PASSWORD=... -p 5440:5432 postgis/postgis:16-3.4`; wait for `pg_isready`;
-  `export DATABASE_URL=postgresql+asyncpg://postgres:...@localhost:5440/postgres`; `uv run alembic upgrade head`; `uv run alembic check`; `psql` (via `docker exec`) `select * from alembic_version` and `\dt` count;
+  `docker exec ... psql -c 'create database smoke_empty'` and `export DATABASE_URL=postgresql+asyncpg://postgres:...@localhost:5440/smoke_empty` (changed during the run: `alembic check` fails on the image's default `postgres` database, see the spec's edge cases); `uv run alembic upgrade head`; `uv run alembic check`; `psql` (via `docker exec`) `select * from alembic_version` and `\dt` count;
   `uv run poc-base-fast-api &`, `curl localhost:3001/api/v1/health`, `kill -TERM` (the health route opens no database connection: it shows that the app boots with the URL set, not that it reads the schema; the database evidence is the `alembic` and `psql` output, and "app reads the migrated schema" goes under "Not verified"); then `docker rm -f poc-base-fast-api-smoke` (each of the run and the remove only after an explicit yes in the same message, C4). Throwaway password, never committed or logged (A6).
 - risk: port 3001 busy or the image missing offline. Cheapest check: `lsof -i :3001`, `docker image ls postgis/postgis` before starting. If `check` reports a diff, stop and report (B4), do not edit the revision.
 

@@ -65,7 +65,7 @@ See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff 
 |---------|-------|-----|
 | `alembic` prints `FAILED: DATABASE_URL is not set` | no `DATABASE_URL` in the environment or in `.env` of the current directory | export it, or run from the repo root where `.env` lives |
 | `extension "postgis" is not available` (or permission denied to create it) | the server has no PostGIS files, or the role is not a superuser | use a PostGIS server (the `postgis/postgis` image) and a role that may create extensions |
-| `alembic check` lists tables such as `state` or `geocode_settings` as removed | the database is the default `postgres` database of the `postgis/postgis` image, which also installs the tiger geocoder and topology extensions | run against a database made with `CREATE DATABASE` (it holds only `postgis`) |
+| `alembic check` lists tables such as `state` or `geocode_settings` as removed | the database is the default `postgres` database of the `postgis/postgis` image, where the image also installed `postgis_tiger_geocoder` and `postgis_topology` (seen in `pg_extension`) | run against a database made with `CREATE DATABASE`: it starts empty and the first revision adds `postgis` |
 | `uv sync` reports no interpreter satisfies `>=3.14` | no 3.14 installed and downloads are blocked | allow `uv python install 3.14`, or install 3.14 another way; do not lower the pin (rule T2) |
 
 ## Release
