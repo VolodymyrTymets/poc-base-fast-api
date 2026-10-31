@@ -8,10 +8,10 @@ so a developer's own tables are never touched and nothing is dropped except that
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.orm import selectinload
@@ -181,11 +181,19 @@ async def test_a_new_file_gets_its_defaults_and_an_update_time(
 async def test_the_bytes_of_a_file_are_replaced_and_the_update_time_moves(
     database: Database, seeded: Seeded
 ) -> None:
+    long_ago = datetime(2000, 1, 1)
     factory = create_session_factory(database.engine)
+    async with factory() as session:
+        # Backdated so that "moved" is a strict comparison: an insert and an update can land in
+        # the same millisecond of a timestamp(3). Setting the column explicitly bypasses onupdate.
+        await session.execute(
+            update(File).where(File.id == seeded.file_id).values(updated_at=long_ago)
+        )
+        await session.commit()
+
     async with factory() as session:
         file = await session.get(File, seeded.file_id)
         assert file is not None
-        first_update = file.updated_at
         file.content = b"new bytes"
         await session.commit()
 
@@ -195,8 +203,7 @@ async def test_the_bytes_of_a_file_are_replaced_and_the_update_time_moves(
         assert stored is not None
         assert stored.content == b"new bytes"
         assert stored.updated_at is not None
-        assert first_update is not None
-        assert stored.updated_at >= first_update
+        assert stored.updated_at > long_ago
 
 
 def _profile_with_avatar(avatar_id: str) -> list[object]:

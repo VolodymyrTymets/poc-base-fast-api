@@ -32,7 +32,8 @@ class AccountProfile(IdMixin, SoftDeleteMixin, Base):
     # The Node column is spelled "dataOfBirth"; the name stays for schema parity (ADR-0004)
     # and only the Python attribute is spelled correctly. It holds text, not a date.
     date_of_birth: Mapped[str | None] = mapped_column("dataOfBirth", Text)
-    # SET NULL: removing a file must not remove the profile that showed it.
+    # SET NULL matches the Prisma DDL. Files are soft-deleted (rule P6), so the action rarely
+    # runs: a soft-deleted file stays referenced here and the services of 8.x must filter on it.
     avatar_id: Mapped[str | None] = mapped_column(
         "avatarId",
         Text,
