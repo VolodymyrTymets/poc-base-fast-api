@@ -31,10 +31,6 @@ class AccountProfile(IdMixin, SoftDeleteMixin, Base):
     # The Node column is spelled "dataOfBirth"; the name stays for schema parity (ADR-0004)
     # and only the Python attribute is spelled correctly. It holds text, not a date.
     date_of_birth: Mapped[str | None] = mapped_column("dataOfBirth", Text)
-    ssn: Mapped[str | None] = mapped_column("SSN", Text)
-    is_18_year_old: Mapped[bool] = mapped_column(
-        "is18YearOld", default=False, server_default=text("false")
-    )
     # A plain column for now: the foreign key to "File" and the Avatar relationship
     # arrive with task 2.3, which creates the File table.
     avatar_id: Mapped[str | None] = mapped_column("avatarId", Text)

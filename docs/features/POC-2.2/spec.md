@@ -25,7 +25,7 @@ as a hash (the `refreshToken` column holds `sha256`, ADR-0008, never bcrypt).
 
 ## Acceptance criteria
 - [x] AC1 Given `import app.models`, then `Base.metadata.tables` holds exactly `Account`, `AccountRole`, `AccountOnRole`,
-  `AccountIdentity`, `AccountProfile`, each with the Prisma column names (quoted, mixed case), types, nullability and defaults of the init and `kan_12` migrations.
+  `AccountIdentity`, `AccountProfile`, each with the Prisma column names (quoted, mixed case), types, nullability and defaults of the init and `kan_12` migrations, except `AccountProfile.SSN` and `is18YearOld`, which this base drops (ADR-0015).
 - [x] AC2 Given the metadata, then every index and unique of `account.prisma` exists with Prisma's name: `Account_createdAt_idx` (`createdAt DESC`),
   `AccountRole_type_key` (unique) and `AccountRole_type_deleted_idx`, `AccountOnRole_deleted_idx`, `AccountIdentity_accountId_key` (unique),
   `AccountIdentity_resetTokenHash_key` (unique), `AccountIdentity_deleted_idx`, `AccountProfile_accountId_key` (unique),
@@ -44,6 +44,9 @@ as a hash (the `refreshToken` column holds `sha256`, ADR-0008, never bcrypt).
 - Each relationship also names its target as a string. Without it, an annotation such as `Mapped[AccountRole]` inside the `AccountRole` class resolved to the class attribute of that name and recursed forever in `configure_mappers()` (mypy did not see it).
 - The real-Postgres test file is `tests/e2e/test_db_account_models.py`: the same basename as the unit test collided in mypy (no `__init__.py`), and the other database tests use the `test_db_*` pattern. The enum type followed `schema_translate_map`, so Q5's primary path held and no fallback was used.
 
+## Changed after the plan was approved
+- On the human's instruction ("no need for this project"), `AccountProfile` has no `SSN` or `is18YearOld` column: removed from the model, the tests, the REST contract and the glossary, and recorded in [ADR-0015](../../decisions/ADR-0015-drop-ssn-and-is18yearold.md). This narrows the Prisma parity target for task 2.5.
+
 ## Edge cases
 | Case | Expected behaviour | Decided by |
 |------|--------------------|-----------|
@@ -52,13 +55,13 @@ as a hash (the `refreshToken` column holds `sha256`, ADR-0008, never bcrypt).
 | Prisma's unique is `CREATE UNIQUE INDEX`, not a `UNIQUE` constraint | declare `Index(..., unique=True)` with the `_key` name so `pg_dump` matches in 2.5 | Prisma DDL |
 | Two foreign-key paths between `Account` and `AccountRole` (`lastAccountRoleId` and `AccountOnRole`) | the join is unambiguous (each pair of tables has one direct foreign key), so no `foreign_keys=` is needed; `configure_mappers()` is the check | SQLAlchemy |
 | `dataOfBirth` (sic) holds a date as text | column keeps the name for parity; Python attribute is `date_of_birth`; no type change | Q3 |
-| Column holding secrets (`hash`, `salt`, `otpHash`, `refreshToken`, `resetTokenHash`, `SSN`) | no `__repr__` or log line lists model columns (rule D8, P4) | CLAUDE.md |
+| Column holding secrets (`hash`, `salt`, `otpHash`, `refreshToken`, `resetTokenHash`) | no `__repr__` or log line lists model columns (rule D8, P4) | CLAUDE.md |
 
 ## Open questions
 | # | Question | My assumed answer | Needs a human? |
 |---|----------|-------------------|----------------|
 | Q1 | `AccountProfile.avatarId` is a foreign key to `File`, and `Account.Files`, `Account.NotificationRecipient`, `AccountProfile.Avatar` point at tables 2.3 builds. A `ForeignKey("File.id")` or a relationship to a class that does not exist makes `create_all` and `configure_mappers` fail. | 2.2 declares `avatarId` as a plain nullable `text` column. 2.3 adds the `AccountProfile_avatarId_fkey`, `AccountProfile.Avatar`, `Account.Files` and `Account.NotificationRecipient` when it creates `File` and `Notification*`, so 2.3 also edits `account.py` and `account_profile.py` (its row lists neither). AC1 to AC3 then cover everything except that one foreign key. | **yes**, it changes the 2.3 file list |
-| Q2 | Python names | snake_case attributes mapped to the exact quoted column names (the 2.1 pattern: `created_at` to `"createdAt"`, `ssn` to `"SSN"`, `is_18_year_old` to `"is18YearOld"`); class names and relationship names are Prisma's, so P1 is confirmed for SQLAlchemy, including the lower-case `accounts` that Prisma itself uses. | confirm |
+| Q2 | Python names | snake_case attributes mapped to the exact quoted column names (the 2.1 pattern: `created_at` to `"createdAt"`, `first_name` to `"firstName"`); class names and relationship names are Prisma's, so P1 is confirmed for SQLAlchemy, including the lower-case `accounts` that Prisma itself uses. | confirm |
 | Q3 | Fix the `dataOfBirth` typo? | No: the column name is a parity target (ADR-0004). The Python attribute is `date_of_birth`, a comment says why the column differs. | confirm |
 | Q4 | Python type of the enum | `enum.StrEnum` mapped with `sqlalchemy.Enum(..., name="AccountRoleType")`; the PostgreSQL type is created by `create_all` here and by Alembic in 2.4. | confirm |
 | Q5 | Does the real-Postgres test create tables in the scratch database (as 2.1 does) or in a throwaway schema? | A throwaway schema through `schema_translate_map`, so a developer's own `"Account"` table is never dropped. The enum experiment runs first in R3. If the enum does not follow the translate map, the fixture fails when `"Account"` already exists rather than dropping anything, and any other path stops and asks the human (rule C4). The test database is a scratch one named in `.env.test`, never the default `postgres` database. | confirm |

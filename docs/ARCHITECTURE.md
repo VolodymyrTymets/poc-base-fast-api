@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0014 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0015 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -27,7 +27,7 @@ There is a single root-level `app/` package, laid out by layer ([ADR-0011](decis
 Nothing is persisted yet: no migration exists (Alembic is task 2.4), so no real database holds a table. The account models are
 mapped (task 2.2) and importing `app.models` registers five tables on `Base.metadata`: `Account`, `AccountRole`, `AccountOnRole`,
 `AccountIdentity` and `AccountProfile`, plus the `AccountRoleType` enum. Names, column types, primary keys, foreign-key actions and
-indexes follow the Prisma DDL; every unique is a unique index (as Prisma emits it) and `Account_createdAt_idx` is `DESC`. Attributes
+indexes follow the Prisma DDL, except that `AccountProfile` has no `SSN` or `is18YearOld` column ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)); every unique is a unique index (as Prisma emits it) and `Account_createdAt_idx` is `DESC`. Attributes
 are snake_case over the quoted column names (`created_at` for `"createdAt"`, `date_of_birth` for the Node column `"dataOfBirth"`),
 relationships keep the Node names (`Account.AccountIdentity`, `AccountRole.accounts`, ...). `AccountProfile.avatarId` is a plain
 column until task 2.3 adds `File` and its foreign key. `File` and `Notification*` are not mapped yet (task 2.3). The data layer plumbing is built: with
@@ -45,7 +45,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0014, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0015, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -59,6 +59,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - ruff, mypy strict, pytest, installed in task 1.4 and in use ([ADR-0007](decisions/ADR-0007-quality-tooling-ruff-mypy-pytest.md)).
 - Opt-in column mixins (`id` as `text`, `createdAt`/`updatedAt` as UTC `timestamp(3)`, `deleted`) and Prisma-shaped constraint names, built in
   task 2.1; it supersedes one bullet of ADR-0004 ([ADR-0014](decisions/ADR-0014-opt-in-column-mixins.md)).
+- `AccountProfile` omits the Node columns `SSN` and `is18YearOld`; the parity diff of task 2.5 expects exactly those two differences
+  ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)).
 - Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`

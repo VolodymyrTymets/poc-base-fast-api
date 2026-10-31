@@ -10,7 +10,7 @@ domain and does not repurpose these names. Python identifiers are decided for th
 | Term (client language) | Reference identifier (Node base) | Means exactly | Not to be confused with |
 |------------------------|----------------------------------|---------------|-------------------------|
 | Account | `Account` | The authenticatable identity: id, login timestamps, soft-delete flag. Holds no personal data itself. | Profile |
-| Profile | `AccountProfile` | Personal details attached 1:1 to an Account: name, phone, email, DOB, SSN, avatar. | Account |
+| Profile | `AccountProfile` | Personal details attached 1:1 to an Account: name, phone, email, DOB, avatar. | Account |
 | Identity / credentials | `AccountIdentity` | Password and OTP hash material, the password-reset token hash and the refresh-token hash. Never exposed through the API. | Profile |
 | Role | `AccountRole` (`CUSTOMER`, `ADMIN`), `AccountOnRole` | A named permission bucket; an Account is placed in roles many-to-many. | — |
 | File | `File` | A tracked upload: bytes in a Postgres `bytea` column, mime type, size. | an external object store; bytes live in the database |
@@ -23,7 +23,8 @@ domain and does not repurpose these names. Python identifiers are decided for th
 - "Delete" always means a soft delete (`deleted` flag); there is no hard-delete vocabulary.
 - Python class names and relationship names are the Node names, PascalCase (`Account.AccountProfile`, `AccountOnRole.AccountRole`),
   confirmed for SQLAlchemy in task 2.2; Prisma's own lower-case `AccountRole.accounts` stays as it is. Column attributes are snake_case
-  over the unchanged quoted column name (`first_name` for `"firstName"`, `ssn` for `"SSN"`, `is_18_year_old` for `"is18YearOld"`).
+  over the unchanged quoted column name (`first_name` for `"firstName"`, `is_phone_verified` for `"isPhoneVerified"`).
+- The Node columns `"SSN"` and `"is18YearOld"` of `AccountProfile` are not part of this base (ADR-0015); do not add them back.
 - The Node column `"dataOfBirth"` is a typo kept for schema parity (ADR-0004); the Python attribute is `date_of_birth`. It holds text, not a date.
 - `refreshToken` and `resetTokenHash` keep their Node column names on `AccountIdentity`; both hold a sha256, never the token (rule P5).
 

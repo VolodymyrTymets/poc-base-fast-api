@@ -68,9 +68,7 @@ COLUMNS: dict[str, dict[str, tuple[str, bool, str | None]]] = {
         "lastName": ("TEXT", True, None),
         "middleName": ("TEXT", True, None),
         "dataOfBirth": ("TEXT", True, None),
-        "SSN": ("TEXT", True, None),
         "deleted": ("BOOLEAN", False, FALSE),
-        "is18YearOld": ("BOOLEAN", False, FALSE),
         "avatarId": ("TEXT", True, None),
     },
 }
