@@ -1,7 +1,7 @@
 # ADR-0014 — Opt-in column mixins and Prisma-shaped constraint names
 
 - **Date:** 2026-10-30
-- **Status:** accepted
+- **Status:** accepted; the task 2.5 parity-diff wording is superseded by [ADR-0019](ADR-0019-schema-parity-not-diffed.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-2.1
 - **Supersedes:** one bullet of [ADR-0004](ADR-0004-data-layer-sqlalchemy-alembic.md): "a shared mixin carries only the `deleted` flag. Ids and timestamps follow each Prisma model and are declared per table". The rest of ADR-0004 stands.

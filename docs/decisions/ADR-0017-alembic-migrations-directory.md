@@ -1,7 +1,7 @@
 # ADR-0017 — Alembic lives in `migrations/` at the repo root
 
 - **Date:** 2026-10-31
-- **Status:** accepted
+- **Status:** accepted; the task 2.5 diff wording is superseded by [ADR-0019](ADR-0019-schema-parity-not-diffed.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-2.4
 - **Extends:** [ADR-0011](ADR-0011-project-structure.md) (the layout of `app/`, which says nothing about tooling beside it) and [ADR-0004](ADR-0004-data-layer-sqlalchemy-alembic.md) (Alembic with an async environment, a hand-written `0001_init`). The scope row's path `api/alembic/**` is stale: ADR-0010 and ADR-0011 drop `api/`.

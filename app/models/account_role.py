@@ -32,8 +32,8 @@ class AccountRole(IdMixin, SoftDeleteMixin, Base):
         back_populates="last_account_role"
     )
 
-    # Prisma makes a unique with CREATE UNIQUE INDEX, not a UNIQUE constraint, so the
-    # parity diff of task 2.5 stays empty; the names are written out because the
+    # Prisma makes a unique with CREATE UNIQUE INDEX, not a UNIQUE constraint, so this
+    # follows it; the names are written out because the
     # naming convention would call a unique index `_idx`.
     __table_args__ = (
         Index("AccountRole_type_key", "type", unique=True),

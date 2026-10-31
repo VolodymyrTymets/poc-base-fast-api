@@ -20,7 +20,7 @@ class FileType(enum.StrEnum):
 
 # The Node schema declares this type but no column uses it, so it is tied to the metadata
 # directly: without that, create_all (and the Alembic revision of 2.4) would never emit it
-# and the parity diff of 2.5 would report it missing. Nothing may rely on it yet.
+# and the Node enum would be missing from the database. Nothing may rely on it yet.
 FILE_TYPE = Enum(FileType, name="FileType", metadata=Base.metadata)
 
 

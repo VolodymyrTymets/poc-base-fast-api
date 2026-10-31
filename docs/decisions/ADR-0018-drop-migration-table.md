@@ -1,7 +1,7 @@
 # ADR-0018 — Drop the Node `Migration` table
 
 - **Date:** 2026-10-31
-- **Status:** accepted
+- **Status:** accepted; the task 2.5 diff wording is superseded by [ADR-0019](ADR-0019-schema-parity-not-diffed.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-2.4
 - **Amends:** the schema-parity target of [ADR-0004](ADR-0004-data-layer-sqlalchemy-alembic.md) by one table, next to the two columns of [ADR-0015](ADR-0015-drop-ssn-and-is18yearold.md). Both otherwise stand.

@@ -156,7 +156,7 @@ def test_upgrade_installs_postgis_before_the_types_and_the_types_before_the_tabl
 
 # Column order of the final Node tables: the init migration with the later ones applied (kan_6: `File.key` and
 # `File.status` dropped, `content` added; kan_12: the two reset columns appended to `AccountIdentity`), and without
-# the two columns this base drops (ADR-0015). pg_dump prints columns in this physical order, so task 2.5's diff sees it.
+# the two columns this base drops (ADR-0015). The revision keeps this physical order so a dump reads like the Node one.
 NODE_COLUMN_ORDER = {
     "Account": "id createdAt updatedAt deleted lastLoginAt lastAccountRoleId",
     "AccountIdentity": "id accountId hash salt otpHash otpSalt otpExpiresAt refreshToken deleted "
