@@ -36,7 +36,7 @@ column until task 2.3 adds `File` and its foreign key. `File` and `Notification*
 only a route that needs a session fails. No cache or queue is wired.
 
 ### Boundaries and contracts
-The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; CORS allows the origins in `CORS_ORIGINS`. A request body over `MAX_REQUEST_BODY_BYTES` gets 413 before routing (the body limit sits inside CORS, so the 413 carries CORS headers). Logs are JSON on stdout with tokens, passwords, SSN, DOB and phone numbers redacted; Sentry is off for `local` and without `SENTRY_DSN`. SIGTERM stops the server after `SHUTDOWN_TIMEOUT_SECONDS` at most. No generated output exists yet.
+The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; CORS allows the origins in `CORS_ORIGINS`. A request body over `MAX_REQUEST_BODY_BYTES` gets 413 before routing (the body limit sits inside CORS, so the 413 carries CORS headers). Logs are JSON on stdout with tokens, passwords, DOB and phone numbers redacted; Sentry is off for `local` and without `SENTRY_DSN`. SIGTERM stops the server after `SHUTDOWN_TIMEOUT_SECONDS` at most. No generated output exists yet.
 
 ### Environments
 | Env | URL | Database | Who may touch it |

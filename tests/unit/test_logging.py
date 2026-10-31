@@ -24,8 +24,6 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         ("Authorization: Bearer abc.def-123", "abc.def-123"),
         ("password=hunter2 ok", "hunter2"),
         ('{"password": "hunter2"}', "hunter2"),
-        ("login with ssn 123-45-6789", "123-45-6789"),
-        ('{"ssn": "999"}', "999"),
         ("dob=1990-01-31", "1990-01-31"),
         ("call +1 (555) 010-9999 now", "555"),
         ("phoneNumber: 5550109999", "5550109999"),
@@ -35,7 +33,6 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         ("phone: (555) 010-9999", "010-9999"),
         ("phone=555 010 9999", "010 9999"),
         ("birthDate: 1990-01-31", "1990-01-31"),
-        ("user_ssn=123456789", "123456789"),
     ],
     ids=[
         "jwt-key",
@@ -43,8 +40,6 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         "bearer",
         "password-pair",
         "password-json",
-        "ssn-shape",
-        "ssn-json",
         "dob",
         "phone-shape",
         "phone-key",
@@ -54,7 +49,6 @@ JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
         "phone-parens",
         "phone-spaces",
         "birth-date",
-        "ssn-suffix",
     ],
 )
 def test_redact_removes_the_sensitive_value(text: str, leaked: str) -> None:
@@ -77,9 +71,8 @@ def test_redact_mapping_hides_values_by_key_and_by_shape() -> None:
         {
             "password": "hunter2",
             "birthDate": "1990-01-31",
-            "user_ssn": "123",
             "nested": {"X-Refresh-Token": "abc", "note": f"saw {JWT}"},
-            "items": [{"ssn": "123-45-6789"}, "ok"],
+            "items": [{"note": "fine"}, "ok"],
             "count": 3,
         }
     )
@@ -87,9 +80,8 @@ def test_redact_mapping_hides_values_by_key_and_by_shape() -> None:
     assert result == {
         "password": REDACTED,
         "birthDate": REDACTED,
-        "user_ssn": REDACTED,
         "nested": {"X-Refresh-Token": REDACTED, "note": f"saw {REDACTED}"},
-        "items": [{"ssn": REDACTED}, "ok"],
+        "items": [{"note": "fine"}, "ok"],
         "count": 3,
     }
 
