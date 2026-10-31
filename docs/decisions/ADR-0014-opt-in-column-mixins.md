@@ -11,10 +11,10 @@ Scope-doc row 2.1 asks for mixins for `id`, `createdAt`, `updatedAt` and `delete
 
 | Column | Prisma | Database type | Which tables |
 |--------|--------|---------------|--------------|
-| `id` | `String @id @default(uuid(4))`, no `@db.Uuid` | `TEXT NOT NULL`, no database default (the client generates the uuid) | `Account`, `AccountRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `DeletedHistory`, `Migration`; not `AccountOnRole` or `NotificationRecipient` (composite keys) |
-| `createdAt` | `DateTime @default(now())` | `TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP` | `Account`, `File`, `Notification`; `Migration` has it nullable |
-| `updatedAt` | `DateTime? @updatedAt` | `TIMESTAMP(3)`, nullable | `Account`, `File`, `Notification`, `Migration` |
-| `deleted` | `Boolean @default(false)` | `BOOLEAN NOT NULL DEFAULT false` | every domain table except `Migration` and `DeletedHistory` |
+| `id` | `String @id @default(uuid(4))`, no `@db.Uuid` | `TEXT NOT NULL`, no database default (the client generates the uuid) | `Account`, `AccountRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `DeletedHistory`; not `AccountOnRole` or `NotificationRecipient` (composite keys) |
+| `createdAt` | `DateTime @default(now())` | `TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP` | `Account`, `File`, `Notification` |
+| `updatedAt` | `DateTime? @updatedAt` | `TIMESTAMP(3)`, nullable | `Account`, `File`, `Notification` |
+| `deleted` | `Boolean @default(false)` | `BOOLEAN NOT NULL DEFAULT false` | every domain table except `DeletedHistory` |
 
 Prisma's `@updatedAt` is filled by the client on create and on every update, so a Node row has `updatedAt` set from its first insert even though the column is nullable. The scope row says "uuid4 id", but the database column is `text`; the value is a uuid4 string.
 
@@ -24,7 +24,7 @@ Prisma's `@updatedAt` is filled by the client on create and on every update, so 
   - `TimestampMixin`: `createdAt` as `TIMESTAMP(3)` without time zone, not null, database default `CURRENT_TIMESTAMP`; `updatedAt` as `TIMESTAMP(3)` without time zone, nullable in the database, filled by the application on insert and on every update.
   - `SoftDeleteMixin`: `deleted` as `BOOLEAN`, not null, default false in Python and in the database (rule P6).
 - Timestamps are UTC, stored as naive datetimes: the columns have no time zone, and asyncpg refuses an aware datetime for such a column. The engine sets the session time zone to UTC on every connection, because `CURRENT_TIMESTAMP` fills a column without a time zone in the session's own zone (a database server on `Europe/Kiev` stored `createdAt` two hours ahead of the UTC `updatedAt` until this was set).
-- A table that differs (`Migration`'s nullable `createdAt`, `AccountOnRole`'s composite key) declares those columns itself.
+- A table that differs (`AccountOnRole`'s composite key) declares those columns itself. (The Node `Migration` table, whose `createdAt` was nullable, is not mapped: ADR-0018.)
 - `Base.metadata` carries a naming convention that reproduces Prisma's names: `<Table>_pkey`, `<Table>_<cols>_key` for uniques, `<Table>_<cols>_idx` for indexes and `<Table>_<col>_fkey` for foreign keys. This is a target; task 2.5 proves it by diffing `pg_dump --schema-only`.
 
 ## Rejected alternatives

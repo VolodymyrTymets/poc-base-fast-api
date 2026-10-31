@@ -167,7 +167,6 @@ NODE_COLUMN_ORDER = {
     "AccountRole": "id type deleted",
     "DeletedHistory": "id relationId deletedAt deletedBy",
     "File": "id createdAt updatedAt deleted name mimeType size createdById content",
-    "Migration": "id name successful result description createdAt updatedAt",
     "Notification": "id createdAt updatedAt deleted message type",
     "NotificationRecipient": "notificationId accountId deleted",
 }

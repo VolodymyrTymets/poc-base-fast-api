@@ -6,13 +6,14 @@ Revises: (none)
 Folded in, in the Node repo's order: `20260917083733_init`, `20260918115126_kan_6_postgres_file_storage`
 (`File.key` replaced by `File.content`, a bytea), `20260918130652_kan_6_drop_file_status` (no `FileStatus`
 enum, no `File.status`) and `20260921070817_kan_12_password_auth` (reset-token columns and the unique email).
-The one deliberate difference from the Node schema: `AccountProfile` has no `SSN` or `is18YearOld` column
-(ADR-0015).
+Two deliberate differences from the Node schema: `AccountProfile` has no `SSN` or `is18YearOld` column
+(ADR-0015), and there is no `Migration` table, because Alembic's `alembic_version` records which revisions
+ran (ADR-0018).
 
 This file is frozen: it names every table and column itself and imports nothing from `app`, so a later change
 to a model cannot change what this revision builds. Any schema change is a new revision.
 
-Rollback: `alembic downgrade base` drops the ten tables (their indexes and foreign keys go with them) and the
+Rollback: `alembic downgrade base` drops the nine tables (their indexes and foreign keys go with them) and the
 `AccountRoleType` and `FileType` enum types. It leaves the `postgis` extension installed, because other objects
 in the database may depend on it. The rows in the dropped tables are gone for good, so dump a database that
 holds data before downgrading it.
@@ -238,31 +239,10 @@ def upgrade() -> None:
     )
     op.create_index("DeletedHistory_relationId_idx", "DeletedHistory", ["relationId"])
 
-    op.create_table(
-        "Migration",
-        id_column(),
-        sa.Column("name", sa.Text(), nullable=False),
-        sa.Column(
-            "successful", sa.Boolean(), server_default=sa.text("false"), nullable=False
-        ),
-        sa.Column("result", sa.Text(), nullable=True),
-        sa.Column("description", sa.Text(), nullable=True),
-        # Nullable, unlike every other createdAt: that is how the Node table was created.
-        sa.Column(
-            "createdAt",
-            TIMESTAMP_3,
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            nullable=True,
-        ),
-        updated_at_column(),
-        sa.PrimaryKeyConstraint("id", name="Migration_pkey"),
-    )
-
 
 def downgrade() -> None:
     # Reverse order of creation; a table's indexes and foreign keys go with it.
     for table in (
-        "Migration",
         "DeletedHistory",
         "NotificationRecipient",
         "Notification",

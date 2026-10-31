@@ -1,5 +1,7 @@
 # POC-2.3 — File, notification and system models
 
+> Note (POC-2.4): the `Migration` table described below was removed afterwards, on the human's instruction; see [ADR-0018](../../decisions/ADR-0018-drop-migration-table.md). The text below records what 2.3 built.
+
 Scope-doc row 2.3 (3 h). Depends on 2.2 (merged, PR #8). The ticket text: "`FileType`, `File` (`content` as `LargeBinary`), `Notification`,
 `NotificationRecipient`, `DeletedHistory`, `Migration`. Also in `account.py` and `account_profile.py`: the `AccountProfile_avatarId_fkey` foreign key
 with `AccountProfile.avatar`, `Account.files` and `Account.notification_recipients`; add the new tables to the set asserted in

@@ -7,6 +7,9 @@
      Approved-by: <name> · <date> -->
 Approved-by: volodymyr · 2026-10-31
 
+**Revised after approval, on the human's instruction (what was built is in `spec.md`; where the text below still says otherwise, this note wins):**
+there is no `Migration` table or model: Alembic's `alembic_version` records applied revisions. `0001_init` creates nine tables, not ten, and the PR is not split because the change edits the unmerged `0001_init` itself: [ADR-0018](../../decisions/ADR-0018-drop-migration-table.md).
+
 Pattern followed: `app/core/db.py` and `app/config.py` for the URL (settings validated once, `create_engine` sets the UTC session time zone), Alembic's own async template
 (`alembic init -t async`, Context7 cookbook) for `env.py`, and the table, index and foreign-key names in `app/models/*.py` and the Node DDL for the revision. Tests follow
 `tests/unit/test_account_models.py` (no database) and `tests/e2e/test_db_file_models.py` (real Postgres, fixture that creates and removes only what it made).
@@ -15,7 +18,7 @@ library facts checked with Context7 (rule D4): the async template, `command.chec
 
 ## Contract changes
 - boundary: new CLI surface `alembic upgrade head`, `alembic downgrade base`, `alembic check` (via `uv run`); no HTTP, schema or setting change. `DATABASE_URL` is read as before.
-- data: the first versioned schema (`alembic_version` table, ten tables, two enum types, extension `postgis`). Rollback: `alembic downgrade base` (extension stays), or drop the database; nothing existing is migrated.
+- data: the first versioned schema (`alembic_version` table, nine tables, two enum types, extension `postgis`). Rollback: `alembic downgrade base` (extension stays), or drop the database; nothing existing is migrated.
 - generated output: none; the revision is hand-written source. `uv.lock` changes through `uv add alembic` only (rule T3).
 
 ## Requirements (ordered, one commit each; branch `feat/POC-2.4-alembic-init-revision`, one draft PR)
@@ -33,10 +36,10 @@ library facts checked with Context7 (rule D4): the async template, `command.chec
 - first step, before the rest is written: one table (`Account`, with `AccountRole` and the enum it needs) and the `Account_createdAt_idx` `DESC` index, then `command.check` against a throwaway database (the R3 fixture, built here). It shows early whether `check` is clean on `TIMESTAMP(3)`, defaults, enums and `DESC`; the other nine tables follow only after.
 - files: `migrations/versions/0001_init.py` (new), `tests/unit/test_initial_revision.py` (new).
 - layer: tooling. `revision = "0001_init"`, `down_revision = None`. It does not import `app.models` (a revision is frozen). Order: `CREATE EXTENSION IF NOT EXISTS "postgis"`; `AccountRoleType` and `FileType` (`ENUM(..., create_type=False)` after an explicit create);
-  tables `AccountRole`, `Account`, `AccountOnRole`, `AccountIdentity`, `File`, `AccountProfile`, `Notification`, `NotificationRecipient`, `DeletedHistory`, `Migration` with every name, type, nullability, default, primary key and foreign key action as in the models and the final Node DDL
+  tables `AccountRole`, `Account`, `AccountOnRole`, `AccountIdentity`, `File`, `AccountProfile`, `Notification`, `NotificationRecipient`, `DeletedHistory` with every name, type, nullability, default, primary key and foreign key action as in the models and the final Node DDL
   (`File.content` `bytea`, no `File.key` or `File.status`, no `SSN` / `is18YearOld`); then the twelve indexes (`createdAt DESC` through `sa.text`). Downgrade: indexes and tables in reverse, then both enums; the extension stays. The docstring holds the rollback note (what `downgrade` removes, that the extension and the data in dropped tables are not recoverable).
 - test: offline SQL of `command.upgrade(cfg, "head", sql=True)` (AC5): the set of `CREATE TABLE`, `CREATE TYPE`, `CREATE INDEX` names and the foreign-key constraint names equals those on `Base.metadata`, derived from it; `SSN`, `is18YearOld`, `"key"` and `"status"` are absent; `ScriptDirectory` has exactly one head, `0001_init`; the downgrade SQL (`sql=True` from head to base) drops every created table and type.
-- executed how: the offline `--sql` output read against `../poc-base/api/prisma/migrations/*/migration.sql` (counts: 2 enums, 10 tables, 12 indexes, 9 foreign keys), pasted; the live run is R3.
+- executed how: the offline `--sql` output read against `../poc-base/api/prisma/migrations/*/migration.sql` (counts: 2 enums, 9 tables, 12 indexes, 9 foreign keys), pasted; the live run is R3.
 - risk: a type or default that differs from the models shows only in R3's `check`. The first R3 run is the experiment; fix the revision, never relax `check`.
 
 ### R3 — Real-Postgres migration test (M)

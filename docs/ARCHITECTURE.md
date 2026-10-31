@@ -12,7 +12,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | Path | What lives here | Deployable? | Owner |
 |------|-----------------|-------------|-------|
 | `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, CORS, `GET /api/v1/health`) and `run()`; `config.py` has `Settings` and `get_settings()`; `dependencies.py` is docstring-only | yes, `uv run poc-base-fast-api` | backend |
-| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` (task 2.2) and `file.py`, `notification.py` and `system.py` (task 2.3, below) are built, the rest are docstring-only. `models/system.py` holds `DeletedHistory` and `Migration` and has no counterpart in the other layers | — | backend |
+| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` (task 2.2) and `file.py`, `notification.py` and `system.py` (task 2.3, below) are built, the rest are docstring-only. `models/system.py` holds `DeletedHistory` and has no counterpart in the other layers | — | backend |
 | `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
 | `app/workers/`, `app/seeds/` | the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | `unit/` and `e2e/`, a working layout until task 3.3 sets the real one | — | backend |
@@ -27,11 +27,11 @@ There is a single root-level `app/` package, laid out by layer ([ADR-0011](decis
 ### Where data truth lives
 No application code writes to a database yet, but the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
 types and the `postgis` extension on an empty database, and `alembic check` fails when the models and the revisions drift apart. The account, file, notification and
-system models are mapped (tasks 2.2 and 2.3) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
-`AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient`, `DeletedHistory` and `Migration`, plus the
+system models are mapped (tasks 2.2 and 2.3) and importing `app.models` registers nine tables on `Base.metadata`: `Account`, `AccountRole`,
+`AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient` and `DeletedHistory`, plus the
 `AccountRoleType` and `FileType` enums. `FileType` is tied to the metadata directly because no column uses it; without that `create_all` and Alembic
 would never emit the Postgres type. `File.content` is `bytea` (ADR-0009), plain and not deferred.
-`DeletedHistory` and `Migration` have no `deleted` column, as in the Node schema, and nothing writes to them yet. Names, column types, primary keys, foreign-key actions and
+`DeletedHistory` has no `deleted` column, as in the Node schema, and nothing writes to it yet. The Node `Migration` table is not mapped: Alembic's `alembic_version` records applied revisions ([ADR-0018](decisions/ADR-0018-drop-migration-table.md)). Names, column types, primary keys, foreign-key actions and
 indexes follow the Prisma DDL, except that `AccountProfile` has no `SSN` or `is18YearOld` column ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)); every unique is a unique index (as Prisma emits it) and `Account_createdAt_idx` is `DESC`. Attributes
 are snake_case over the quoted column names (`created_at` for `"createdAt"`, `date_of_birth` for the Node column `"dataOfBirth"`),
 relationships are snake_case, plural for a collection, not Prisma's PascalCase ([ADR-0016](decisions/ADR-0016-snake-case-relationship-names.md); `Account.identity`, `Account.account_on_roles`, ...). `AccountProfile.avatarId` has its
@@ -50,7 +50,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0017, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0018, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -60,6 +60,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - Alembic in `migrations/` with `alembic.ini` at the repo root, the URL from `Settings`, hand-written frozen revisions that import nothing from `app`,
   `alembic check` with type and default comparison on; it extends ADR-0011 with the import rule for `env.py`
   ([ADR-0017](decisions/ADR-0017-alembic-migrations-directory.md)).
+- No `Migration` table: Alembic's `alembic_version` records applied revisions; a third difference from the Node schema next to ADR-0015's two columns
+  ([ADR-0018](decisions/ADR-0018-drop-migration-table.md)).
 - arq worker on Redis, a separate process; retries by `Retry(defer=...)`
   ([ADR-0005](decisions/ADR-0005-job-queue-arq.md)).
 - Tests on a real PostGIS Postgres through testcontainers, one template database per run

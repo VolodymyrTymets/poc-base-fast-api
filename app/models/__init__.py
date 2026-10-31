@@ -6,7 +6,7 @@ from app.models.account_profile import AccountProfile
 from app.models.account_role import AccountOnRole, AccountRole, AccountRoleType
 from app.models.file import File, FileType
 from app.models.notification import Notification, NotificationRecipient
-from app.models.system import DeletedHistory, Migration
+from app.models.system import DeletedHistory
 
 __all__ = [
     "Account",
@@ -18,7 +18,6 @@ __all__ = [
     "DeletedHistory",
     "File",
     "FileType",
-    "Migration",
     "Notification",
     "NotificationRecipient",
 ]
