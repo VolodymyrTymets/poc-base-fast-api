@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 REDACTED = "[REDACTED]"
 
 # Keys are compared lower-cased with "-" and "_" removed, so "x-refresh-token",
-# "refreshToken" and "refresh_token" are one spelling. Short names (ssn, dob) must match
+# "refreshToken" and "refresh_token" are one spelling. The short name dob must match
 # exactly: as substrings they would hit words such as "classname".
 _EXACT_KEYS = frozenset({"dob", "dateofbirth", "dataofbirth", "birthdate", "birthday"})
 _SUBSTRING_KEYS = (
@@ -29,11 +29,11 @@ _SUBSTRING_KEYS = (
     "apikey",
 )
 
-# A key name inside free text, followed by = or : and its value: password=x, "ssn": "1",
+# A key name inside free text, followed by = or : and its value: password=x, "dob": "1",
 # phone: +1 555 ... The value is one quoted string or one run without separators.
 _KEY_NAME = (
     r"[\w-]*(?:password|token|secret|apikey)[\w-]*"
-    r"|[\w-]*phone[\w-]*|[\w-]*ssn|dob|(?:date|data)_?of_?birth|birth_?date|birthday"
+    r"|[\w-]*phone[\w-]*|dob|(?:date|data)_?of_?birth|birth_?date|birthday"
 )
 # Headers whose value is several words ("Basic dXNlcg==", "a=1; session=x") go to the end of
 # the line instead of the first space.
@@ -51,19 +51,13 @@ _LINE_KEY_VALUE = re.compile(
 )
 _BEARER = re.compile(r"\bbearer\s+[\w.~+/=-]+", re.IGNORECASE)
 _JWT = re.compile(r"\beyJ[\w-]+\.[\w-]+\.[\w-]+")
-_SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 # International format only (+ and 8 to 15 digits with common separators).
 _PHONE = re.compile(r"\+\d[\d\s().-]{6,}\d")
 
 
 def is_sensitive_key(key: object) -> bool:
     name = str(key).lower().replace("-", "").replace("_", "")
-    # "ssn" is matched as a suffix (user_ssn, ssn): inside a word it is a false hit (classname).
-    return (
-        name in _EXACT_KEYS
-        or name.endswith("ssn")
-        or any(part in name for part in _SUBSTRING_KEYS)
-    )
+    return name in _EXACT_KEYS or any(part in name for part in _SUBSTRING_KEYS)
 
 
 def redact(text: str) -> str:
@@ -72,7 +66,6 @@ def redact(text: str) -> str:
     text = _JWT.sub(REDACTED, text)
     text = _LINE_KEY_VALUE.sub(lambda match: match["key"] + REDACTED, text)
     text = _KEY_VALUE.sub(lambda match: match["key"] + REDACTED, text)
-    text = _SSN.sub(REDACTED, text)
     return _PHONE.sub(REDACTED, text)
 
 

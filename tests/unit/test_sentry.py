@@ -66,7 +66,6 @@ def test_scrub_event_redacts_every_part_of_the_event() -> None:
             "data": {
                 "password": "hunter2",
                 "phone": "+15550109999",
-                "ssn": "123-45-6789",
             },
             "headers": {"x-refresh-token": "abc123", "accept": "application/json"},
             "query_string": f"token={JWT}&page=2",
@@ -81,7 +80,7 @@ def test_scrub_event_redacts_every_part_of_the_event() -> None:
     assert result == {
         "message": f"failed with {REDACTED}",
         "request": {
-            "data": {"password": REDACTED, "phone": REDACTED, "ssn": REDACTED},
+            "data": {"password": REDACTED, "phone": REDACTED},
             "headers": {"x-refresh-token": REDACTED, "accept": "application/json"},
             "query_string": f"token={REDACTED}&page=2",
         },
