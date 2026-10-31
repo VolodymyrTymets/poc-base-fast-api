@@ -1,7 +1,7 @@
 # ADR-0004 — SQLAlchemy 2 (async) with Alembic on PostgreSQL
 
 - **Date:** 2026-10-29
-- **Status:** accepted; the soft-delete bullet about mixins is superseded by [ADR-0014](ADR-0014-opt-in-column-mixins.md)
+- **Status:** accepted; the soft-delete bullet about mixins is superseded by [ADR-0014](ADR-0014-opt-in-column-mixins.md); the task 2.5 `pg_dump` proof is superseded by [ADR-0019](ADR-0019-schema-parity-not-diffed.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.1
 - **Supersedes:** the ORM half of Node ADR-0001 (Use Prisma as the ORM, with a Redis-backed read cache). The Redis cache half is not decided here; task 9.1 decides it. Decision D3 of the scope doc.

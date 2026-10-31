@@ -1,7 +1,7 @@
 # ADR-0015 — Drop `SSN` and `is18YearOld` from `AccountProfile` and the SSN log redaction
 
 - **Date:** 2026-10-31
-- **Status:** accepted
+- **Status:** accepted; the task 2.5 diff wording is superseded by [ADR-0019](ADR-0019-schema-parity-not-diffed.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-2.2
 - **Amends:** the schema-parity target of [ADR-0004](ADR-0004-data-layer-sqlalchemy-alembic.md) by two columns, and the redaction list of [ADR-0013](ADR-0013-sentry-error-reporting.md) by SSN. Both otherwise stand.
