@@ -16,7 +16,6 @@ domain and does not repurpose these names. Python identifiers are decided for al
 | File | `File` | A tracked upload: bytes in a Postgres `bytea` column, mime type, size. | an external object store; bytes live in the database |
 | Notification | `Notification`, `NotificationRecipient` | A message plus the accounts it was sent to. | — |
 | Deletion record | `DeletedHistory` | A bookkeeping row naming a record that was deleted (`relationId`), by whom (`deletedBy`, optional) and a `deletedAt` flag. No code writes it yet. | Soft delete: the `deleted` column on domain tables is what marks a row deleted |
-| Data migration record | `Migration` | A row recording one run of an application-level data migration: name, `successful`, `result`, `description`. | An Alembic revision, which is tracked in `alembic_version` and is a schema change |
 | Sign-in code / OTP | OTP code | The one-time code sent to a phone number to authenticate; hashed at rest, 2 minute TTL, never logged. | JWT tokens, issued after verification |
 | Password reset token | `resetTokenHash` | A random single-use token valid 30 minutes, stored only as a sha256 hash and sent to the account's email. | OTP code, refresh token |
 | Refresh token | `refreshToken` | A long-lived JWT used only to get a new access token. Stored as sha256 (decision D5), not bcrypt. | Access token (short-lived, 15 min default) |
@@ -30,7 +29,8 @@ domain and does not repurpose these names. Python identifiers are decided for al
 - Task 2.3 relationship names, same rule: `Account.files` (the files an account created) with `File.created_by`; `File.account_profiles` with `AccountProfile.avatar`;
   `Account.notification_recipients` and `Notification.notification_recipients` with `NotificationRecipient.account` and `.notification`.
 - `DeletedHistory.deletedAt` is a boolean flag despite its name, kept for schema parity like `dataOfBirth`; the Python attribute is `deleted_at`.
-  `DeletedHistory` and `Migration` carry no `deleted` column, as in the Node schema, so "Delete always means a soft delete" does not apply to rows of those two tables.
+  `DeletedHistory` carries no `deleted` column, as in the Node schema, so "Delete always means a soft delete" does not apply to its rows.
+- The Node `Migration` table is not part of this base (ADR-0018): applied schema revisions are recorded by Alembic in `alembic_version`; do not add it back.
 - The Node columns `"SSN"` and `"is18YearOld"` of `AccountProfile` are not part of this base (ADR-0015); do not add them back.
 - The Node column `"dataOfBirth"` is a typo kept for schema parity (ADR-0004); the Python attribute is `date_of_birth`. It holds text, not a date.
 - `refreshToken` and `resetTokenHash` keep their Node column names on `AccountIdentity`; both hold a sha256, never the token (rule P5).

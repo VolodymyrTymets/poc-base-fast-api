@@ -14,7 +14,7 @@ the Prisma schema a parity target, proven by task 2.5, so leaving them out is a 
 - The `AccountProfile` model, the first Alembic revision (2.4) and the REST contract have no `SSN` and no `is18YearOld`.
 - Every other `AccountProfile` column keeps its Prisma name and shape, including `dataOfBirth`.
 - Log and Sentry redaction no longer treats SSN specially: no `ssn` key-name match and no `123-45-6789` shape match (`app/core/logging.py`, and so Sentry, which reuses it). Tokens, passwords, DOB and phone numbers stay redacted.
-- Task 2.5's `pg_dump --schema-only` diff expects exactly these two columns to differ; any further difference is still a finding.
+- Task 2.5's `pg_dump --schema-only` diff expects exactly these two columns to differ (and, since [ADR-0018](ADR-0018-drop-migration-table.md), the absent `Migration` table); any further difference is still a finding.
 
 ## Rejected alternatives
 | Alternative | Why not |

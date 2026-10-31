@@ -4,6 +4,7 @@
 - **Status:** accepted; the console-script target (`app:main`) is superseded by ADR-0012
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.3
+- **Extended by:** [ADR-0017](ADR-0017-alembic-migrations-directory.md), which adds `migrations/` beside `app/` and the import rule for `migrations/env.py`.
 - **Supersedes:** the package location in ADR-0010 (`src/poc_base_fast_api/`). The rest of ADR-0010 stands: API only, `APP_ENV`, the environment variable names and the single `JWT_SECRET`. Task 1.3 of the scope doc (row text of rev 114).
 
 ## Context

@@ -1,43 +1,34 @@
-"""DeletedHistory and Migration against the DDL of ../poc-base (init migration). No database."""
+"""DeletedHistory against the DDL of ../poc-base (init migration). No database.
+
+The Node `Migration` table is deliberately not mapped (ADR-0018); that the metadata holds no such table is
+asserted by the exact table set in test_db_base.py.
+"""
 
 import importlib
 from typing import Any
 
-import pytest
 from sqlalchemy import Column, Table
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.schema import ColumnDefault, CreateIndex, CreateTable, DefaultClause
+from sqlalchemy.schema import CreateIndex, CreateTable, DefaultClause
 
 from app.core.db import Base
 
 POSTGRES = create_async_engine("postgresql+asyncpg://").dialect
 
-TS = "TIMESTAMP(3) WITHOUT TIME ZONE"
-
-# column name -> (compiled type, nullable, server default). Column order is not compared.
-COLUMNS: dict[str, dict[str, tuple[str, bool, str | None]]] = {
-    "DeletedHistory": {
-        "id": ("TEXT", False, None),
-        "relationId": ("TEXT", False, None),
-        "deletedAt": ("BOOLEAN", False, None),
-        "deletedBy": ("TEXT", True, None),
-    },
-    "Migration": {
-        "id": ("TEXT", False, None),
-        "name": ("TEXT", False, None),
-        "successful": ("BOOLEAN", False, "false"),
-        "result": ("TEXT", True, None),
-        "description": ("TEXT", True, None),
-        "createdAt": (TS, True, "CURRENT_TIMESTAMP"),
-        "updatedAt": (TS, True, None),
-    },
+# column name -> (compiled type, nullable, server default). Column order is pinned by
+# test_initial_revision.py, which renders the revision.
+DELETED_HISTORY_COLUMNS: dict[str, tuple[str, bool, str | None]] = {
+    "id": ("TEXT", False, None),
+    "relationId": ("TEXT", False, None),
+    "deletedAt": ("BOOLEAN", False, None),
+    "deletedBy": ("TEXT", True, None),
 }
 
 
-def table(name: str) -> Table:
+def deleted_history() -> Table:
     # Importing the package is what registers the tables on Base.metadata.
     importlib.import_module("app.models")
-    return Base.metadata.tables[name]
+    return Base.metadata.tables["DeletedHistory"]
 
 
 def server_default(column: Column[Any]) -> str | None:
@@ -48,34 +39,32 @@ def server_default(column: Column[Any]) -> str | None:
     return str(default.arg)
 
 
-@pytest.mark.parametrize("name", COLUMNS)
-def test_a_table_has_the_prisma_columns_types_nullability_and_defaults(
-    name: str,
-) -> None:
+def test_deleted_history_has_the_prisma_columns_types_nullability_and_defaults() -> (
+    None
+):
     actual = {
         column.name: (
             column.type.compile(dialect=POSTGRES),
             column.nullable,
             server_default(column),
         )
-        for column in table(name).columns
+        for column in deleted_history().columns
     }
 
-    assert actual == COLUMNS[name]
+    assert actual == DELETED_HISTORY_COLUMNS
 
 
-@pytest.mark.parametrize("name", COLUMNS)
-def test_a_table_has_the_prisma_primary_key(name: str) -> None:
-    primary_key = table(name).primary_key
+def test_deleted_history_has_the_prisma_primary_key() -> None:
+    primary_key = deleted_history().primary_key
 
     assert (primary_key.name, [c.name for c in primary_key.columns]) == (
-        f"{name}_pkey",
+        "DeletedHistory_pkey",
         ["id"],
     )
 
 
 def test_deleted_history_has_only_the_relation_id_index() -> None:
-    (index,) = table("DeletedHistory").indexes
+    (index,) = deleted_history().indexes
 
     assert (index.name, [c.name for c in index.columns], bool(index.unique)) == (
         "DeletedHistory_relationId_idx",
@@ -87,43 +76,22 @@ def test_deleted_history_has_only_the_relation_id_index() -> None:
     )
 
 
-def test_migration_has_no_index() -> None:
-    assert list(table("Migration").indexes) == []
-
-
-@pytest.mark.parametrize("name", COLUMNS)
-def test_a_table_has_no_foreign_key_and_no_unique_constraint(name: str) -> None:
+def test_deleted_history_has_no_foreign_key_and_no_unique_constraint() -> None:
     uniques = [
-        c for c in table(name).constraints if type(c).__name__ == "UniqueConstraint"
+        c
+        for c in deleted_history().constraints
+        if type(c).__name__ == "UniqueConstraint"
     ]
 
-    assert list(table(name).foreign_key_constraints) == []
+    assert list(deleted_history().foreign_key_constraints) == []
     assert uniques == []
 
 
-@pytest.mark.parametrize("name", COLUMNS)
-def test_neither_table_has_a_soft_delete_column(name: str) -> None:
-    assert "deleted" not in table(name).c
+def test_deleted_history_has_no_soft_delete_column() -> None:
+    assert "deleted" not in deleted_history().c
 
 
-@pytest.mark.parametrize("name", COLUMNS)
-def test_create_table_compiles_with_quoted_mixed_case_names(name: str) -> None:
-    sql = str(CreateTable(table(name)).compile(dialect=POSTGRES))
+def test_create_table_compiles_with_quoted_mixed_case_names() -> None:
+    sql = str(CreateTable(deleted_history()).compile(dialect=POSTGRES))
 
-    assert sql.startswith(f'\nCREATE TABLE "{name}" (')
-
-
-def test_migration_updated_at_is_filled_on_insert_and_on_update_like_the_mixin() -> (
-    None
-):
-    # SQLAlchemy wraps each callable per column, so the callables themselves never compare
-    # equal; what the mixin guarantees is that a Python callable fills it both times.
-    def fills(column: Column[Any]) -> tuple[bool, bool]:
-        assert isinstance(column.default, ColumnDefault)
-        assert isinstance(column.onupdate, ColumnDefault)
-        return column.default.is_callable, column.onupdate.is_callable
-
-    assert fills(table("Migration").c["updatedAt"]) == fills(
-        table("Account").c["updatedAt"]
-    )
-    assert fills(table("Migration").c["updatedAt"]) == (True, True)
+    assert sql.startswith('\nCREATE TABLE "DeletedHistory" (')
