@@ -18,7 +18,7 @@ into `dist/` (gitignored). Settings come from the environment first and `.env` s
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
 ## Logging, errors and shutdown
-- Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, SSN, DOB and
+- Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, DOB and
   phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
 - Sentry starts only when `APP_ENV` is not `local` and `SENTRY_DSN` is set; with no DSN nothing is sent. See ADR-0013.
 - Redaction and the JSON format are set up by `uv run poc-base-fast-api` (`app.main:run`). Starting the app another way, for example

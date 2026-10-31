@@ -20,7 +20,7 @@ Carried over from `poc-base`; confirmed by volodymyr on 2026-10-29 (POC-1.1).
 3. **Test base** — a real-database test setup that keeps working and is easy to extend.
 
 ## Non-negotiables (never trade these for speed)
-- No tokens, passwords, SSN, DOB or phone numbers in logs.
+- No tokens, passwords, DOB or phone numbers in logs.
 - Refresh tokens are stored as a sha256 hash, never as bcrypt of the whole JWT.
 - Tests use a real Postgres, never a mocked database.
 - Soft deletes only on domain tables.
