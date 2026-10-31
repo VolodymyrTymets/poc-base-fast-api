@@ -16,6 +16,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
 | `app/workers/`, `app/seeds/` | the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | `unit/` and `e2e/`, a working layout until task 3.3 sets the real one | — | backend |
+| `alembic.ini`, `migrations/` | the Alembic setup (task 2.4, [ADR-0017](decisions/ADR-0017-alembic-migrations-directory.md)): `env.py` is async, takes the URL from `Settings` and compares models with the database; `versions/0001_init.py` is the final state of the four Prisma migrations, hand-written and frozen. Tooling beside `app/`, not part of the wheel | — | backend |
 | `pyproject.toml` | project metadata, `requires-python >=3.14`, runtime `dependencies` (fastapi, uvicorn, pydantic-settings, sentry-sdk, sqlalchemy[asyncio], asyncpg), a `dev` group (ruff, mypy, pytest and plugins, httpx), the tool settings for ruff, mypy and pytest, script `poc-base-fast-api` (`app.main:run`, ADR-0012), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |
 | `uv.lock`, `.python-version` | lockfile (uv-owned) and the interpreter pin (3.14) | — | generated / backend |
 | `.env.example`, `.env.development.example` | env templates with placeholders only; a real `.env` is gitignored | — | backend |
@@ -24,7 +25,8 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 There is a single root-level `app/` package, laid out by layer ([ADR-0011](decisions/ADR-0011-project-structure.md), rule file `.claude/rules/project-structure.md`). No `src/`, `api/` or `web/` directory is part of the repo.
 
 ### Where data truth lives
-Nothing is persisted yet: no migration exists (Alembic is task 2.4), so no real database holds a table. The account, file, notification and
+No application code writes to a database yet, but the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
+types and the `postgis` extension on an empty database, and `alembic check` fails when the models and the revisions drift apart. The account, file, notification and
 system models are mapped (tasks 2.2 and 2.3) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
 `AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient`, `DeletedHistory` and `Migration`, plus the
 `AccountRoleType` and `FileType` enums. `FileType` is tied to the metadata directly because no column uses it; without that `create_all` and Alembic
@@ -48,13 +50,16 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0015, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0017, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
   with a stale-spec test ([ADR-0003](decisions/ADR-0003-rest-api-fastapi-openapi.md)).
 - SQLAlchemy 2 async + asyncpg + Alembic on Postgres/PostGIS, Prisma table and column names as a target proven by task 2.5
   ([ADR-0004](decisions/ADR-0004-data-layer-sqlalchemy-alembic.md)).
+- Alembic in `migrations/` with `alembic.ini` at the repo root, the URL from `Settings`, hand-written frozen revisions that import nothing from `app`,
+  `alembic check` with type and default comparison on; it extends ADR-0011 with the import rule for `env.py`
+  ([ADR-0017](decisions/ADR-0017-alembic-migrations-directory.md)).
 - arq worker on Redis, a separate process; retries by `Retry(defer=...)`
   ([ADR-0005](decisions/ADR-0005-job-queue-arq.md)).
 - Tests on a real PostGIS Postgres through testcontainers, one template database per run

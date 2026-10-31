@@ -114,4 +114,7 @@ output (compiled UI resources, stubs, bundled model files) next to these, each l
 **/tox.ini
 **/ruff.toml
 **/.python-version
+migrations/versions/**
 ```
+
+`migrations/versions/**` is root-only (ADR-0017): an applied Alembic revision is never edited, a schema change is a new revision.

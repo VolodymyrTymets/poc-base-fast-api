@@ -16,6 +16,8 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | build | `uv build` |
 | dev server | `uv run poc-base-fast-api` |
 | e2e | `uv run pytest tests/e2e` |
+| migrate | `uv run alembic upgrade head` (needs `DATABASE_URL`, a PostGIS database) |
+| migration check | `uv run alembic check` (same database; fails if models and revisions differ) |
 
 `lint` is the static check: when the map holds a real command it is a B1 gate. `none` means the repo has no such task (never invent one). A repo that runs a type checker or a formatter check may add a `typecheck` or `format` row: each is then a gate too.
 
