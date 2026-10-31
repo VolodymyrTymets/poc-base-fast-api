@@ -24,12 +24,12 @@ class AccountRole(IdMixin, SoftDeleteMixin, Base):
         Enum(AccountRoleType, name="AccountRoleType")
     )
 
-    AccountOnRole: Mapped[list[AccountOnRole]] = relationship(
-        "AccountOnRole", back_populates="AccountRole"
+    account_on_roles: Mapped[list[AccountOnRole]] = relationship(
+        back_populates="account_role"
     )
-    # Prisma's own lower-case name: the accounts whose last used role this is.
-    accounts: Mapped[list[Account]] = relationship(
-        "Account", back_populates="LastAccountRole"
+    # The accounts whose last used role this is (Prisma calls it `accounts`, which reads as all of them).
+    last_role_accounts: Mapped[list[Account]] = relationship(
+        back_populates="last_account_role"
     )
 
     # Prisma makes a unique with CREATE UNIQUE INDEX, not a UNIQUE constraint, so the
@@ -58,9 +58,7 @@ class AccountOnRole(SoftDeleteMixin, Base):
         primary_key=True,
     )
 
-    AccountRole: Mapped[AccountRole] = relationship(
-        "AccountRole", back_populates="AccountOnRole"
-    )
-    Account: Mapped[Account] = relationship("Account", back_populates="AccountOnRole")
+    account_role: Mapped[AccountRole] = relationship(back_populates="account_on_roles")
+    account: Mapped[Account] = relationship(back_populates="account_on_roles")
 
     __table_args__ = (Index("AccountOnRole_deleted_idx", "deleted"),)

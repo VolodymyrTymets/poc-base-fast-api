@@ -31,11 +31,11 @@ class AccountProfile(IdMixin, SoftDeleteMixin, Base):
     # The Node column is spelled "dataOfBirth"; the name stays for schema parity (ADR-0004)
     # and only the Python attribute is spelled correctly. It holds text, not a date.
     date_of_birth: Mapped[str | None] = mapped_column("dataOfBirth", Text)
-    # A plain column for now: the foreign key to "File" and the Avatar relationship
+    # A plain column for now: the foreign key to "File" and the avatar relationship
     # arrive with task 2.3, which creates the File table.
     avatar_id: Mapped[str | None] = mapped_column("avatarId", Text)
 
-    Account: Mapped[Account] = relationship("Account", back_populates="AccountProfile")
+    account: Mapped[Account] = relationship(back_populates="profile")
 
     __table_args__ = (
         Index("AccountProfile_accountId_key", "accountId", unique=True),

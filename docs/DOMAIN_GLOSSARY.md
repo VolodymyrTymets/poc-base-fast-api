@@ -21,8 +21,9 @@ domain and does not repurpose these names. Python identifiers are decided for th
 
 ## Naming rules that follow from the above
 - "Delete" always means a soft delete (`deleted` flag); there is no hard-delete vocabulary.
-- Python class names and relationship names are the Node names, PascalCase (`Account.AccountProfile`, `AccountOnRole.AccountRole`),
-  confirmed for SQLAlchemy in task 2.2; Prisma's own lower-case `AccountRole.accounts` stays as it is. Column attributes are snake_case
+- Python class names are the Node names (`Account`, `AccountOnRole`). Relationship attributes follow SQLAlchemy convention, not Prisma's
+  PascalCase (ADR-0016): snake_case, singular for one row, plural for a collection (`Account.profile`, `Account.account_on_roles`,
+  `AccountOnRole.account_role`; Prisma's `AccountRole.accounts`, which really means the accounts whose last role this is, is `last_role_accounts`). Column attributes are snake_case
   over the unchanged quoted column name (`first_name` for `"firstName"`, `is_phone_verified` for `"isPhoneVerified"`).
 - The Node columns `"SSN"` and `"is18YearOld"` of `AccountProfile` are not part of this base (ADR-0015); do not add them back.
 - The Node column `"dataOfBirth"` is a typo kept for schema parity (ADR-0004); the Python attribute is `date_of_birth`. It holds text, not a date.

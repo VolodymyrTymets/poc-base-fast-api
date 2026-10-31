@@ -27,21 +27,13 @@ class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
         ForeignKey("AccountRole.id", ondelete="SET NULL", onupdate="CASCADE"),
     )
 
-    # Relationship names are Prisma's, PascalCase (scope decision P1); the column
-    # attributes stay snake_case.
-    # The target is also given as a string because inside the class body a bare
-    # `AccountIdentity` in an annotation would resolve to the attribute of that name.
-    AccountIdentity: Mapped[AccountIdentity | None] = relationship(
-        "AccountIdentity", back_populates="Account"
+    identity: Mapped[AccountIdentity | None] = relationship(back_populates="account")
+    profile: Mapped[AccountProfile | None] = relationship(back_populates="account")
+    account_on_roles: Mapped[list[AccountOnRole]] = relationship(
+        back_populates="account"
     )
-    AccountProfile: Mapped[AccountProfile | None] = relationship(
-        "AccountProfile", back_populates="Account"
-    )
-    AccountOnRole: Mapped[list[AccountOnRole]] = relationship(
-        "AccountOnRole", back_populates="Account"
-    )
-    LastAccountRole: Mapped[AccountRole | None] = relationship(
-        "AccountRole", back_populates="accounts"
+    last_account_role: Mapped[AccountRole | None] = relationship(
+        back_populates="last_role_accounts"
     )
 
 
@@ -73,7 +65,7 @@ class AccountIdentity(IdMixin, SoftDeleteMixin, Base):
     # The column keeps the Node name `refreshToken` for schema parity.
     refresh_token: Mapped[str | None] = mapped_column("refreshToken", Text)
 
-    Account: Mapped[Account] = relationship("Account", back_populates="AccountIdentity")
+    account: Mapped[Account] = relationship(back_populates="identity")
 
     __table_args__ = (
         Index("AccountIdentity_accountId_key", "accountId", unique=True),

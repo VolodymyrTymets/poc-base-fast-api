@@ -29,7 +29,7 @@ mapped (task 2.2) and importing `app.models` registers five tables on `Base.meta
 `AccountIdentity` and `AccountProfile`, plus the `AccountRoleType` enum. Names, column types, primary keys, foreign-key actions and
 indexes follow the Prisma DDL, except that `AccountProfile` has no `SSN` or `is18YearOld` column ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)); every unique is a unique index (as Prisma emits it) and `Account_createdAt_idx` is `DESC`. Attributes
 are snake_case over the quoted column names (`created_at` for `"createdAt"`, `date_of_birth` for the Node column `"dataOfBirth"`),
-relationships keep the Node names (`Account.AccountIdentity`, `AccountRole.accounts`, ...). `AccountProfile.avatarId` is a plain
+relationships are snake_case, plural for a collection, not Prisma's PascalCase ([ADR-0016](decisions/ADR-0016-snake-case-relationship-names.md); `Account.identity`, `Account.account_on_roles`, ...). `AccountProfile.avatarId` is a plain
 column until task 2.3 adds `File` and its foreign key. `File` and `Notification*` are not mapped yet (task 2.3). The data layer plumbing is built: with
 `DATABASE_URL` set, `create_app` builds one SQLAlchemy async engine (asyncpg, session time zone UTC) and the lifespan disposes it;
 `get_session` gives each request its own `AsyncSession`, which never commits by itself. Without `DATABASE_URL` the app boots and
@@ -59,6 +59,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - ruff, mypy strict, pytest, installed in task 1.4 and in use ([ADR-0007](decisions/ADR-0007-quality-tooling-ruff-mypy-pytest.md)).
 - Opt-in column mixins (`id` as `text`, `createdAt`/`updatedAt` as UTC `timestamp(3)`, `deleted`) and Prisma-shaped constraint names, built in
   task 2.1; it supersedes one bullet of ADR-0004 ([ADR-0014](decisions/ADR-0014-opt-in-column-mixins.md)).
+- Relationship attributes follow SQLAlchemy convention (snake_case, plural collections), not the Node base's PascalCase
+  ([ADR-0016](decisions/ADR-0016-snake-case-relationship-names.md)).
 - `AccountProfile` omits the Node columns `SSN` and `is18YearOld`; the parity diff of task 2.5 expects exactly those two differences
   ([ADR-0015](decisions/ADR-0015-drop-ssn-and-is18yearold.md)).
 - Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).

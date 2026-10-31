@@ -251,18 +251,18 @@ MODELS: list[type[Base]] = [
 ]
 
 # (class, relationship name) -> (target class, name on the other side, is a list).
-# The names are Prisma's (scope decision P1), including the lower-case `accounts`.
+# snake_case, singular for one row and plural for a collection (ADR-0016); not Prisma's PascalCase.
 RELATIONSHIPS: dict[tuple[type[Base], str], tuple[type[Base], str, bool]] = {
-    (Account, "AccountIdentity"): (AccountIdentity, "Account", False),
-    (Account, "AccountProfile"): (AccountProfile, "Account", False),
-    (Account, "AccountOnRole"): (AccountOnRole, "Account", True),
-    (Account, "LastAccountRole"): (AccountRole, "accounts", False),
-    (AccountRole, "AccountOnRole"): (AccountOnRole, "AccountRole", True),
-    (AccountRole, "accounts"): (Account, "LastAccountRole", True),
-    (AccountOnRole, "AccountRole"): (AccountRole, "AccountOnRole", False),
-    (AccountOnRole, "Account"): (Account, "AccountOnRole", False),
-    (AccountIdentity, "Account"): (Account, "AccountIdentity", False),
-    (AccountProfile, "Account"): (Account, "AccountProfile", False),
+    (Account, "identity"): (AccountIdentity, "account", False),
+    (Account, "profile"): (AccountProfile, "account", False),
+    (Account, "account_on_roles"): (AccountOnRole, "account", True),
+    (Account, "last_account_role"): (AccountRole, "last_role_accounts", False),
+    (AccountRole, "account_on_roles"): (AccountOnRole, "account_role", True),
+    (AccountRole, "last_role_accounts"): (Account, "last_account_role", True),
+    (AccountOnRole, "account_role"): (AccountRole, "account_on_roles", False),
+    (AccountOnRole, "account"): (Account, "account_on_roles", False),
+    (AccountIdentity, "account"): (Account, "identity", False),
+    (AccountProfile, "account"): (Account, "profile", False),
 }
 
 
@@ -270,7 +270,7 @@ def test_the_mappers_configure_without_an_ambiguous_join() -> None:
     configure_mappers()
 
 
-def test_each_model_has_exactly_the_prisma_relationships() -> None:
+def test_each_model_has_exactly_the_expected_relationships() -> None:
     configure_mappers()
 
     actual = {
@@ -308,14 +308,14 @@ def test_a_relationship_points_at_its_target_and_back(
 
 def test_linking_one_side_fills_the_other_side_in_memory() -> None:
     account = Account()
-    identity = AccountIdentity(Account=account)
-    profile = AccountProfile(Account=account)
+    identity = AccountIdentity(account=account)
+    profile = AccountProfile(account=account)
     role = AccountRole(type=AccountRoleType.CUSTOMER)
-    link = AccountOnRole(Account=account, AccountRole=role)
-    account.LastAccountRole = role
+    link = AccountOnRole(account=account, account_role=role)
+    account.last_account_role = role
 
-    assert account.AccountIdentity is identity
-    assert account.AccountProfile is profile
-    assert account.AccountOnRole == [link]
-    assert role.AccountOnRole == [link]
-    assert role.accounts == [account]
+    assert account.identity is identity
+    assert account.profile is profile
+    assert account.account_on_roles == [link]
+    assert role.account_on_roles == [link]
+    assert role.last_role_accounts == [account]

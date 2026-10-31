@@ -170,14 +170,14 @@ async def seeded(database: Database) -> Seeded:
     factory = create_session_factory(database.engine)
     async with factory() as session:
         role = AccountRole(type=AccountRoleType.CUSTOMER)
-        account = Account(last_login_at=utc_now(), LastAccountRole=role)
+        account = Account(last_login_at=utc_now(), last_account_role=role)
         session.add_all(
             [
                 account,
                 role,
-                AccountIdentity(Account=account, reset_token_hash=FIRST_RESET),
-                AccountProfile(Account=account, email="first@example.com"),
-                AccountOnRole(Account=account, AccountRole=role),
+                AccountIdentity(account=account, reset_token_hash=FIRST_RESET),
+                AccountProfile(account=account, email="first@example.com"),
+                AccountOnRole(account=account, account_role=role),
             ]
         )
         await session.commit()
@@ -194,25 +194,25 @@ async def test_an_account_graph_is_stored_and_read_back_through_its_relationship
             Account,
             seeded.account_id,
             options=[
-                selectinload(Account.AccountIdentity),
-                selectinload(Account.AccountProfile),
-                selectinload(Account.AccountOnRole).selectinload(
-                    AccountOnRole.AccountRole
+                selectinload(Account.identity),
+                selectinload(Account.profile),
+                selectinload(Account.account_on_roles).selectinload(
+                    AccountOnRole.account_role
                 ),
-                selectinload(Account.LastAccountRole),
+                selectinload(Account.last_account_role),
             ],
         )
 
         assert account is not None
-        assert account.AccountIdentity is not None
-        assert account.AccountIdentity.reset_token_hash == FIRST_RESET
-        assert account.AccountProfile is not None
-        assert account.AccountProfile.email == "first@example.com"
-        assert [link.AccountRole.type for link in account.AccountOnRole] == [
+        assert account.identity is not None
+        assert account.identity.reset_token_hash == FIRST_RESET
+        assert account.profile is not None
+        assert account.profile.email == "first@example.com"
+        assert [link.account_role.type for link in account.account_on_roles] == [
             AccountRoleType.CUSTOMER
         ]
-        assert account.LastAccountRole is not None
-        assert account.LastAccountRole.id == seeded.role_id
+        assert account.last_account_role is not None
+        assert account.last_account_role.id == seeded.role_id
 
 
 async def test_a_new_account_gets_its_defaults_and_an_update_time(
@@ -238,12 +238,12 @@ def _account_with(**profile_or_identity: object) -> list[object]:
     rows: list[object] = [other]
     if "email" in profile_or_identity:
         rows.append(
-            AccountProfile(Account=other, email=str(profile_or_identity["email"]))
+            AccountProfile(account=other, email=str(profile_or_identity["email"]))
         )
     if "reset_token_hash" in profile_or_identity:
         rows.append(
             AccountIdentity(
-                Account=other,
+                account=other,
                 reset_token_hash=str(profile_or_identity["reset_token_hash"]),
             )
         )
