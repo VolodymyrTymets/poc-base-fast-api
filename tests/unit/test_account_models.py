@@ -16,6 +16,8 @@ from app.models import (
     AccountProfile,
     AccountRole,
     AccountRoleType,
+    File,
+    NotificationRecipient,
 )
 
 # The dialect the DDL is compiled for; an engine opens no connection until it is used.
@@ -127,6 +129,36 @@ FOREIGN_KEYS = {
     ),
     "AccountProfile_accountId_fkey": (
         "AccountProfile",
+        "accountId",
+        "Account",
+        "RESTRICT",
+        "CASCADE",
+    ),
+    # Task 2.3: the foreign keys that point at File and from it. This dict is the closed set for
+    # every table on Base (test_the_tables_have_no_foreign_key_beyond_the_prisma_ones).
+    "AccountProfile_avatarId_fkey": (
+        "AccountProfile",
+        "avatarId",
+        "File",
+        "SET NULL",
+        "CASCADE",
+    ),
+    "File_createdById_fkey": (
+        "File",
+        "createdById",
+        "Account",
+        "RESTRICT",
+        "CASCADE",
+    ),
+    "NotificationRecipient_notificationId_fkey": (
+        "NotificationRecipient",
+        "notificationId",
+        "Notification",
+        "RESTRICT",
+        "CASCADE",
+    ),
+    "NotificationRecipient_accountId_fkey": (
+        "NotificationRecipient",
         "accountId",
         "Account",
         "RESTRICT",
@@ -257,12 +289,15 @@ RELATIONSHIPS: dict[tuple[type[Base], str], tuple[type[Base], str, bool]] = {
     (Account, "profile"): (AccountProfile, "account", False),
     (Account, "account_on_roles"): (AccountOnRole, "account", True),
     (Account, "last_account_role"): (AccountRole, "last_role_accounts", False),
+    (Account, "files"): (File, "created_by", True),
+    (Account, "notification_recipients"): (NotificationRecipient, "account", True),
     (AccountRole, "account_on_roles"): (AccountOnRole, "account_role", True),
     (AccountRole, "last_role_accounts"): (Account, "last_account_role", True),
     (AccountOnRole, "account_role"): (AccountRole, "account_on_roles", False),
     (AccountOnRole, "account"): (Account, "account_on_roles", False),
     (AccountIdentity, "account"): (Account, "identity", False),
     (AccountProfile, "account"): (Account, "profile", False),
+    (AccountProfile, "avatar"): (File, "account_profiles", False),
 }
 
 
