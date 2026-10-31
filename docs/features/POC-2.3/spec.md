@@ -26,20 +26,29 @@ Goal 1 (scaffolding): a fork gets the whole data model of the Node base. Goal 2 
   a new dependency.
 
 ## Acceptance criteria
-- [ ] AC1 Given `import app.models`, then `Base.metadata.tables` also holds `File`, `Notification`, `NotificationRecipient`, `DeletedHistory`, `Migration`, with the
+- [x] AC1 Given `import app.models`, then `Base.metadata.tables` also holds `File`, `Notification`, `NotificationRecipient`, `DeletedHistory`, `Migration`, with the
   Prisma column names, types, nullability and defaults of the final DDL (`File.content` is `BYTEA` and nullable, `File.size` is `INTEGER NOT NULL DEFAULT 0`).
-- [ ] AC2 Given the metadata, then the indexes and keys are exactly Prisma's: `File_createdAt_mimeType_idx` (`createdAt DESC, mimeType`),
+- [x] AC2 Given the metadata, then the indexes and keys are exactly Prisma's: `File_createdAt_mimeType_idx` (`createdAt DESC, mimeType`),
   `DeletedHistory_relationId_idx`, primary keys `<Table>_pkey` (`NotificationRecipient` composite `notificationId, accountId`), and no other index or unique on the five tables.
-- [ ] AC3 Given the foreign keys, then they carry Prisma's actions: `AccountProfile_avatarId_fkey` `ON DELETE SET NULL`; `File_createdById_fkey`,
+- [x] AC3 Given the foreign keys, then they carry Prisma's actions: `AccountProfile_avatarId_fkey` `ON DELETE SET NULL`; `File_createdById_fkey`,
   `NotificationRecipient_notificationId_fkey` and `NotificationRecipient_accountId_fkey` `ON DELETE RESTRICT`; all `ON UPDATE CASCADE`.
-- [ ] AC4 Given a real Postgres, when the tables are created from the metadata, then `pg_indexes`, `pg_constraint` and `pg_type` show the AC2 and AC3 objects, including the `FileType` type.
-- [ ] AC5 Given the relationships, then `configure_mappers()` passes and the names are `File.created_by`, `File.account_profiles`; `Account.files`,
+- [x] AC4 Given a real Postgres, when the tables are created from the metadata, then `pg_indexes`, `pg_constraint` and `pg_type` show the AC2 and AC3 objects, including the `FileType` type.
+- [x] AC5 Given the relationships, then `configure_mappers()` passes and the names are `File.created_by`, `File.account_profiles`; `Account.files`,
   `Account.notification_recipients`; `AccountProfile.avatar`; `Notification.notification_recipients`; `NotificationRecipient.notification`, `.account`, each pair linked both ways.
-- [ ] AC6 Given one account with a file set as its profile avatar and one notification sent to it, when inserted and read back on a real Postgres, then `AccountProfile.avatar`
+- [x] AC6 Given one account with a file set as its profile avatar and one notification sent to it, when inserted and read back on a real Postgres, then `AccountProfile.avatar`
   loads the file with its bytes, `Account.files` and `Account.notification_recipients` load, and `updatedAt` is set; a file naming a missing creator, an avatar naming a missing file, a recipient
   naming a missing notification or account, and a second recipient row for the same pair are each refused by the database.
-- [ ] AC7 `uv run mypy` (strict), ruff and the unit suite pass; the set in `tests/unit/test_db_base.py` lists all ten tables.
-- [ ] AC8 Docs match: ARCHITECTURE, DOMAIN_GLOSSARY.
+- [x] AC7 `uv run mypy` (strict), ruff and the unit suite pass; the set in `tests/unit/test_db_base.py` lists all ten tables.
+- [x] AC8 Docs match: ARCHITECTURE, DOMAIN_GLOSSARY.
+
+## Built differently from the plan
+- AC4's `pg_indexes`, `pg_constraint` and `pg_type` checks are rows added to the existing whole-schema assertions in `tests/e2e/test_db_account_models.py`
+  (`INDEX_DEFINITIONS`, `FOREIGN_KEY_ACTIONS`, and a new enum-label test), not a second copy in `test_db_file_models.py`, which holds only the round trip and the refusals (testing.md rule 2).
+- The `FileType` experiment ran at the end of R1 as planned: the type is created inside the throwaway schema under `schema_translate_map`, so no fallback was needed.
+- The unit test for `FileType` runs `create_all` against a mock engine and looks for `CREATE TYPE "FileType"`, because no column carries the type.
+- `tests/e2e/test_db_file_models.py` ignores leftover `poc_account_models_*` schemas of the sibling suite (they are test leftovers, not a developer's tables);
+  the sibling's guard is unchanged, so a leftover `poc_file_models_*` schema would still block it.
+- The scratch database already held 11 `poc_account_models_*` schemas from earlier crashed runs before this task started; a count before and after a run showed the suite does not add to them. They were not dropped (rule C4).
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
