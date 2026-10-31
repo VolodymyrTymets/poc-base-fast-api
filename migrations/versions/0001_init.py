@@ -124,11 +124,13 @@ def upgrade() -> None:
         sa.Column("otpHash", sa.Text(), nullable=True),
         sa.Column("otpSalt", sa.Text(), nullable=True),
         sa.Column("otpExpiresAt", TIMESTAMP_3, nullable=True),
-        # sha256 of the reset token and of the refresh token, never the tokens (rule P5).
-        sa.Column("resetTokenHash", sa.Text(), nullable=True),
-        sa.Column("resetTokenExpiresAt", TIMESTAMP_3, nullable=True),
+        # sha256 of the refresh token and of the reset token, never the tokens (rule P5).
         sa.Column("refreshToken", sa.Text(), nullable=True),
         deleted_column(),
+        # Last, in this order: the Node `kan_12_password_auth` migration appended them to the existing
+        # table, and pg_dump (the parity diff of task 2.5) prints columns in their physical order.
+        sa.Column("resetTokenExpiresAt", TIMESTAMP_3, nullable=True),
+        sa.Column("resetTokenHash", sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint("id", name="AccountIdentity_pkey"),
         foreign_key("AccountIdentity", "accountId", "Account", on_delete="RESTRICT"),
     )

@@ -46,19 +46,25 @@ async def empty_database(
     # Generated here, never taken from input: the only name this fixture ever drops.
     name = f"{DATABASE_PREFIX}{uuid.uuid4().hex[:8]}"
     admin = create_async_engine(base, isolation_level="AUTOCOMMIT")
-    async with admin.connect() as connection:
-        await connection.execute(text(f'CREATE DATABASE "{name}"'))
-    url = base.set(database=name).render_as_string(hide_password=False)
-    monkeypatch.setenv("DATABASE_URL", url)
-    get_settings.cache_clear()
-    engine = create_engine(Settings(database_url=url))
-    assert engine is not None
+    # The try opens before the database exists, so a failure at any later step still drops it
+    # (IF EXISTS: the drop also runs when the create itself failed).
     try:
-        yield EmptyDatabase(engine=engine, name=name)
-    finally:
-        await engine.dispose()
         async with admin.connect() as connection:
-            await connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
+            await connection.execute(text(f'CREATE DATABASE "{name}"'))
+        url = base.set(database=name).render_as_string(hide_password=False)
+        monkeypatch.setenv("DATABASE_URL", url)
+        get_settings.cache_clear()
+        engine = create_engine(Settings(database_url=url))
+        assert engine is not None
+        try:
+            yield EmptyDatabase(engine=engine, name=name)
+        finally:
+            await engine.dispose()
+    finally:
+        async with admin.connect() as connection:
+            await connection.execute(
+                text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+            )
         await admin.dispose()
 
 

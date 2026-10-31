@@ -46,7 +46,7 @@ nothing in the revision issues a `DELETE`; `DROP TABLE` in the downgrade is a sc
 | The downgrade and the extension | tables and enums are dropped, the extension is left (objects in the database may depend on it); the docstring says so | Q3 |
 | `asyncio.run` inside the env while a test is already in an event loop | the real-Postgres test calls `command.*` in a worker thread (`asyncio.to_thread`) | Alembic async cookbook |
 | An applied revision is edited later | forbidden: `migrations/versions/**` becomes ask-first so a change is a new revision | Q5 |
-| Columns are listed in a different order than the Node migrations (`File.content` last) | not compared; `check` and 2.5 compare names and types | 2.3 Q4 |
+| Column order of the revision versus the Node tables | the revision follows the Node physical order (the later migrations applied, `SSN` / `is18YearOld` removed), because `pg_dump` prints columns in that order and ADR-0015 expects task 2.5's diff to differ in exactly two columns. `alembic check` does not compare order; a unit test pins it for all ten tables. The models' declaration order may differ | ADR-0015, review finding |
 
 ## Open questions
 | # | Question | My assumed answer | Needs a human? |

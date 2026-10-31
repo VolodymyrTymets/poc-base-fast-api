@@ -154,6 +154,40 @@ def test_upgrade_installs_postgis_before_the_types_and_the_types_before_the_tabl
     assert extension < first_type < first_table
 
 
+# Column order of the final Node tables: the init migration with the later ones applied (kan_6: `File.key` and
+# `File.status` dropped, `content` added; kan_12: the two reset columns appended to `AccountIdentity`), and without
+# the two columns this base drops (ADR-0015). pg_dump prints columns in this physical order, so task 2.5's diff sees it.
+NODE_COLUMN_ORDER = {
+    "Account": "id createdAt updatedAt deleted lastLoginAt lastAccountRoleId",
+    "AccountIdentity": "id accountId hash salt otpHash otpSalt otpExpiresAt refreshToken deleted "
+    "resetTokenExpiresAt resetTokenHash",
+    "AccountOnRole": "roleId accountId deleted",
+    "AccountProfile": "id accountId email phoneNumber isPhoneVerified firstName lastName middleName "
+    "dataOfBirth deleted avatarId",
+    "AccountRole": "id type deleted",
+    "DeletedHistory": "id relationId deletedAt deletedBy",
+    "File": "id createdAt updatedAt deleted name mimeType size createdById content",
+    "Migration": "id name successful result description createdAt updatedAt",
+    "Notification": "id createdAt updatedAt deleted message type",
+    "NotificationRecipient": "notificationId accountId deleted",
+}
+
+
+def test_upgrade_creates_the_columns_in_the_order_of_the_node_tables() -> None:
+    created: dict[str, str] = {}
+    for table, body in re.findall(
+        r'CREATE TABLE "([^"]+)" \((.*?)\n\)', render(upgrade=True), re.DOTALL
+    ):
+        lines = (line.strip() for line in body.split("\n"))
+        created[table] = " ".join(
+            line.split()[0].strip('"')
+            for line in lines
+            if line and not line.startswith("CONSTRAINT")
+        )
+
+    assert created == NODE_COLUMN_ORDER
+
+
 def test_upgrade_leaves_out_the_columns_this_base_dropped() -> None:
     sql = render(upgrade=True)
     file_table = sql[sql.index('CREATE TABLE "File"') :].split(");", 1)[0]
