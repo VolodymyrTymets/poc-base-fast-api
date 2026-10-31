@@ -50,7 +50,7 @@ as a hash (the `refreshToken` column holds `sha256`, ADR-0008, never bcrypt).
 | `lastLoginAt` has no default in Prisma (`NOT NULL`) | required column, the service supplies it; no default invented | Prisma DDL |
 | `Account.updatedAt` nullable but set by the app | `TimestampMixin` already does this | ADR-0014 |
 | Prisma's unique is `CREATE UNIQUE INDEX`, not a `UNIQUE` constraint | declare `Index(..., unique=True)` with the `_key` name so `pg_dump` matches in 2.5 | Prisma DDL |
-| Two foreign-key paths between `Account` and `AccountRole` (`lastAccountRoleId` and `AccountOnRole`) | each relationship names its `foreign_keys` | SQLAlchemy |
+| Two foreign-key paths between `Account` and `AccountRole` (`lastAccountRoleId` and `AccountOnRole`) | the join is unambiguous (each pair of tables has one direct foreign key), so no `foreign_keys=` is needed; `configure_mappers()` is the check | SQLAlchemy |
 | `dataOfBirth` (sic) holds a date as text | column keeps the name for parity; Python attribute is `date_of_birth`; no type change | Q3 |
 | Column holding secrets (`hash`, `salt`, `otpHash`, `refreshToken`, `resetTokenHash`, `SSN`) | no `__repr__` or log line lists model columns (rule D8, P4) | CLAUDE.md |
 

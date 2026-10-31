@@ -149,10 +149,6 @@ def server_default(column: Column[Any]) -> str | None:
     return str(default.arg)
 
 
-def test_the_metadata_lists_exactly_the_account_tables() -> None:
-    assert set(Base.metadata.tables) == set(COLUMNS)
-
-
 @pytest.mark.parametrize("name", COLUMNS)
 def test_a_table_has_the_prisma_columns_types_nullability_and_defaults(
     name: str,

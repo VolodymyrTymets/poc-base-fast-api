@@ -7,6 +7,7 @@ nothing is dropped except that schema.
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import text
@@ -26,6 +27,9 @@ from app.models import (
     AccountRoleType,
 )
 
+OWN_SCHEMA_PREFIX = "poc_account_models_"
+OWN_SCHEMAS = f"{OWN_SCHEMA_PREFIX}%"
+
 # A value the seeded identity stores and the offending rows try to repeat.
 FIRST_RESET = "reset-1"
 
@@ -42,16 +46,24 @@ async def database(database_url: str) -> AsyncIterator[Database]:
     base_engine = create_engine(Settings(database_url=database_url))
     assert base_engine is not None
     async with base_engine.connect() as connection:
+        # A schema left by a crashed earlier run of this suite is its own leftover, not a
+        # developer's table, so it must not make every later run fail.
         found_tables = (
             await connection.execute(
                 text(
-                    "select table_schema from information_schema.tables where table_name like 'Account%'"
-                )
+                    "select table_schema from information_schema.tables "
+                    "where table_name like 'Account%' and table_schema not like :own"
+                ),
+                {"own": OWN_SCHEMAS},
             )
         ).all()
         found_types = (
             await connection.execute(
-                text("select typname from pg_type where typname = 'AccountRoleType'")
+                text(
+                    "select n.nspname from pg_type t join pg_namespace n on n.oid = t.typnamespace "
+                    "where t.typname = 'AccountRoleType' and n.nspname not like :own"
+                ),
+                {"own": OWN_SCHEMAS},
             )
         ).all()
     if found_tables or found_types:
@@ -62,7 +74,7 @@ async def database(database_url: str) -> AsyncIterator[Database]:
             pytrace=False,
         )
 
-    schema = f"poc_account_models_{uuid.uuid4().hex[:8]}"
+    schema = f"{OWN_SCHEMA_PREFIX}{uuid.uuid4().hex[:8]}"
     async with base_engine.begin() as connection:
         await connection.execute(CreateSchema(schema))
     engine = base_engine.execution_options(schema_translate_map={None: schema})
@@ -212,15 +224,12 @@ async def test_a_new_account_gets_its_defaults_and_an_update_time(
         account = await session.get(Account, seeded.account_id)
 
         assert account is not None
-        assert (
-            account.deleted,
-            account.created_at is not None,
-            account.updated_at is not None,
-        ) == (
-            False,
-            True,
-            True,
-        )
+        assert account.deleted is False
+        assert account.created_at is not None
+        assert account.updated_at is not None
+        # Both are UTC "now" (the session time zone is UTC); a wide window keeps this clock-proof.
+        assert abs(utc_now() - account.created_at) < timedelta(minutes=5)
+        assert abs(utc_now() - account.updated_at) < timedelta(minutes=5)
 
 
 def _account_with(**profile_or_identity: object) -> list[object]:
