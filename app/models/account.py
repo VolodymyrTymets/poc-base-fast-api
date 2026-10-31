@@ -12,6 +12,7 @@ from app.core.db import Base, IdMixin, SoftDeleteMixin, TimestampMixin
 if TYPE_CHECKING:
     from app.models.account_profile import AccountProfile
     from app.models.account_role import AccountOnRole, AccountRole
+    from app.models.file import File
 
 
 class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -35,6 +36,7 @@ class Account(IdMixin, TimestampMixin, SoftDeleteMixin, Base):
     last_account_role: Mapped[AccountRole | None] = relationship(
         back_populates="last_role_accounts"
     )
+    files: Mapped[list[File]] = relationship(back_populates="created_by")
 
 
 # Declared after the class: the descending index needs the mapped column.

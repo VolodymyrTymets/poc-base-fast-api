@@ -106,6 +106,9 @@ INDEX_DEFINITIONS = {
     "AccountProfile_accountId_key": 'CREATE UNIQUE INDEX "AccountProfile_accountId_key" ON "AccountProfile" USING btree ("accountId")',
     "AccountProfile_email_key": 'CREATE UNIQUE INDEX "AccountProfile_email_key" ON "AccountProfile" USING btree (email)',
     "AccountProfile_deleted_idx": 'CREATE INDEX "AccountProfile_deleted_idx" ON "AccountProfile" USING btree (deleted)',
+    # Task 2.3
+    "File_pkey": 'CREATE UNIQUE INDEX "File_pkey" ON "File" USING btree (id)',
+    "File_createdAt_mimeType_idx": 'CREATE INDEX "File_createdAt_mimeType_idx" ON "File" USING btree ("createdAt" DESC, "mimeType")',
 }
 
 # pg_constraint codes: r = RESTRICT, c = CASCADE, n = SET NULL.
@@ -115,6 +118,9 @@ FOREIGN_KEY_ACTIONS = {
     "AccountOnRole_accountId_fkey": ("r", "c"),
     "AccountIdentity_accountId_fkey": ("r", "c"),
     "AccountProfile_accountId_fkey": ("r", "c"),
+    # Task 2.3
+    "AccountProfile_avatarId_fkey": ("n", "c"),
+    "File_createdById_fkey": ("r", "c"),
 }
 
 
@@ -156,6 +162,31 @@ async def test_the_database_holds_the_prisma_foreign_key_actions(
     assert {
         name: (on_delete, on_update) for name, on_delete, on_update in rows
     } == FOREIGN_KEY_ACTIONS
+
+
+async def test_the_database_holds_the_enum_types_with_their_labels(
+    database: Database,
+) -> None:
+    """FileType has no column, so only the metadata registration (Enum(metadata=)) creates it (POC-2.3)."""
+    async with database.engine.connect() as connection:
+        rows = (
+            await connection.execute(
+                text(
+                    "select t.typname, e.enumlabel from pg_type t "
+                    "join pg_namespace n on n.oid = t.typnamespace "
+                    "join pg_enum e on e.enumtypid = t.oid "
+                    "where n.nspname = :schema order by t.typname, e.enumsortorder"
+                ),
+                {"schema": database.schema},
+            )
+        ).all()
+
+    assert [(name, label) for name, label in rows] == [
+        ("AccountRoleType", "CUSTOMER"),
+        ("AccountRoleType", "ADMIN"),
+        ("FileType", "IMG"),
+        ("FileType", "VIDEO"),
+    ]
 
 
 @dataclass

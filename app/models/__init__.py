@@ -4,6 +4,7 @@
 from app.models.account import Account, AccountIdentity
 from app.models.account_profile import AccountProfile
 from app.models.account_role import AccountOnRole, AccountRole, AccountRoleType
+from app.models.file import File, FileType
 
 __all__ = [
     "Account",
@@ -12,4 +13,6 @@ __all__ = [
     "AccountProfile",
     "AccountRole",
     "AccountRoleType",
+    "File",
+    "FileType",
 ]
