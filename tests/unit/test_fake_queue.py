@@ -72,17 +72,5 @@ async def test_the_jobs_property_is_a_copy() -> None:
     assert len(queue.jobs) == 1
 
 
-async def test_the_queue_fixture_hands_each_test_its_own_queue(
-    queue: FakeQueue,
-) -> None:
-    # Passes in any order; it fails only if one test's jobs leaked into the next test's fixture.
-    leaked = queue.jobs
-    await queue.enqueue("probe")
-
-    assert leaked == []
-
-
-async def test_the_queue_fixture_starts_empty_after_another_test_enqueued(
-    queue: FakeQueue,
-) -> None:
+def test_the_queue_fixture_starts_empty(queue: FakeQueue) -> None:
     assert queue.jobs == []

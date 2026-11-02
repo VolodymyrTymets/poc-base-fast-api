@@ -64,6 +64,8 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
 - `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to
   expire a token or code instead of sleeping. `datetime.now(UTC)` and `utc_now()` (the same instant, naive) follow it; `time.monotonic` does not.
   **It moves this process only:** a database default such as `CURRENT_TIMESTAMP` still reads Postgres's clock, so code under test must pass `utc_now()`.
+  List `frozen_clock` after the database fixtures in a test's arguments: the first database test of a session starts the container and
+  builds the template, and that wait should run on the real clock.
 
 ## Migrations
 Alembic (ADR-0004, ADR-0017): `alembic.ini` and `migrations/` at the repo root; revision `0001_init` is the final state of the

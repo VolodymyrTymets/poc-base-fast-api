@@ -22,12 +22,21 @@ async def test_the_lifespan_starts_before_the_call_and_stops_after_the_client_cl
     asgi_app: FastAPI, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.INFO, logger=LIFESPAN_LOGGER)
+
+    def lifespan_messages() -> list[str]:
+        # Only the app's own logger: other INFO lines (httpx, SQLAlchemy) are not what this test is about.
+        return [
+            record.getMessage()
+            for record in caplog.records
+            if record.name == LIFESPAN_LOGGER
+        ]
+
     seen: list[list[str]] = []
 
     async with running_client(asgi_app) as client:
         await client.get("/api/v1/health")
-        seen.append([record.getMessage() for record in caplog.records])
-    after = [record.getMessage() for record in caplog.records]
+        seen.append(lifespan_messages())
+    after = lifespan_messages()
 
     assert seen == [["application startup"]]
     assert after == ["application startup", "application shutdown"]
