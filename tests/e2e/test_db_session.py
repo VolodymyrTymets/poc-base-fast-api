@@ -2,23 +2,18 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 from unittest.mock import create_autospec
 
-import httpx
 import pytest
 from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import QueuePool
+from utils.client import client_for
 
 from app.config import Settings
 from app.core.db import get_session
 from app.main import create_app
 
 Session = Annotated[AsyncSession, Depends(get_session)]
-
-
-def client_for(app: FastAPI, *, raise_app_exceptions: bool = True) -> httpx.AsyncClient:
-    transport = httpx.ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
 def connections_checked_out(app: FastAPI) -> int:
