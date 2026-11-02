@@ -64,8 +64,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   ([ADR-0018](decisions/ADR-0018-drop-migration-table.md)).
 - arq worker on Redis, a separate process; retries by `Retry(defer=...)`
   ([ADR-0005](decisions/ADR-0005-job-queue-arq.md)).
-- Tests on a real PostGIS Postgres through testcontainers, one template database per run
-  ([ADR-0006](decisions/ADR-0006-test-database-testcontainers.md)).
+- Tests on a real PostGIS Postgres through testcontainers, one template database per run; built in task 3.1 and in use, the seeds join the
+  template in task 5.1 ([ADR-0006](decisions/ADR-0006-test-database-testcontainers.md)).
 - ruff, mypy strict, pytest, installed in task 1.4 and in use ([ADR-0007](decisions/ADR-0007-quality-tooling-ruff-mypy-pytest.md)).
 - Opt-in column mixins (`id` as `text`, `createdAt`/`updatedAt` as UTC `timestamp(3)`, `deleted`) and Prisma-shaped constraint names, built in
   task 2.1; it supersedes one bullet of ADR-0004 ([ADR-0014](decisions/ADR-0014-opt-in-column-mixins.md)).

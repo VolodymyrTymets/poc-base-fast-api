@@ -11,8 +11,8 @@ from utils.db import (
     database_url_for,
     drop_database,
     new_database_name,
+    new_postgis,
     resolve_server_url,
-    start_postgis,
 )
 
 from app.config import Settings, get_settings
@@ -38,8 +38,9 @@ def database_url() -> Iterator[str]:
     stack = ExitStack()
 
     def start() -> str:
-        container = start_postgis()
+        container = new_postgis()
         stack.callback(container.stop)
+        container.start()
         return container.get_connection_url()
 
     try:

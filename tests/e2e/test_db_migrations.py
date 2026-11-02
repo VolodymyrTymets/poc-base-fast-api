@@ -1,6 +1,6 @@
 """The initial revision on a real Postgres with PostGIS (rule P8): upgrade, check, downgrade.
 
-Each test gets a database of its own, created on the scratch server of TEST_DATABASE_URL and dropped afterwards:
+Each test gets a database of its own, created on the test server (a container, or TEST_DATABASE_URL; see `database_url`) and dropped afterwards:
 the extension and the enum types are database-wide, so a schema would not isolate them. Only a database this
 fixture generated the name of is ever dropped. A crash can leave a `poc_migrations_*` database behind; drop it by hand.
 """

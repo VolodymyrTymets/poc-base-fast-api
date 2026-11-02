@@ -40,9 +40,11 @@ The database tests run against a real Postgres (rule P8, ADR-0006). Where it com
 On that server the suite builds one template database per session with `alembic upgrade head` (`poc_test_template_<hex>`; seeds join it in
 task 5.1) and gives each test module a copy of it (`poc_test_module_<hex>`, made with `CREATE DATABASE ... TEMPLATE`, dropped after the
 module). Fixtures in `tests/conftest.py`: `database_url` (the server), `template_database`, `module_database_url`, `db_engine` (the app's
-engine on the module's database; commits stay for the module) and `db_session` (rolled back after each test, commits included).
-Only databases whose name starts with `poc_test_` are ever dropped. A killed run can leave a `poc_test_*` database on an existing server:
-drop it by hand; a container is reaped by testcontainers.
+engine on the module's database; commits stay for the module, so use it for checks across connections) and `db_session` (rolled back after
+each test, commits included; the default for a test that writes rows).
+The fixtures of `tests/conftest.py` only ever drop databases whose name starts with `poc_test_`; `tests/e2e/test_db_migrations.py` drops its own
+`poc_migrations_*` databases on the same server. A killed run can leave either kind on an existing server: drop it by hand. A container is
+reaped by testcontainers.
 
 The older tests `test_db_account_models.py`, `test_db_file_models.py`, `test_db_mixins.py` and `test_db_session.py` still make their own
 schema or tables on the server `database_url` gives, and drop only those. Postgres time zone does not matter: the app's engine sets the

@@ -30,11 +30,10 @@ DATABASE_PREFIX = "poc_test_"
 _OWN_DATABASE = re.compile(rf"^{DATABASE_PREFIX}[a-z0-9_]+$")
 
 
-def start_postgis() -> PostgresContainer:
-    """Start the PostGIS container; the caller stops it. The URL it gives uses the asyncpg driver."""
-    container = PostgresContainer(POSTGIS_IMAGE, driver="asyncpg")
-    container.start()
-    return container
+def new_postgis() -> PostgresContainer:
+    """A PostGIS container, not started. The caller registers `stop` first and then calls `start`,
+    so a container whose start times out is still stopped. Its URL uses the asyncpg driver."""
+    return PostgresContainer(POSTGIS_IMAGE, driver="asyncpg")
 
 
 def resolve_server_url(env_url: str | None, start: Callable[[], str]) -> str:
