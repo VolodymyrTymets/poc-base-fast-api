@@ -18,14 +18,14 @@ Goal 3 (Test base, BUSINESS_MODEL.md) and non-negotiable "tests use a real Postg
   fixtures (they keep working through `database_url`); CI (11.4); parallel runs (xdist).
 
 ## Acceptance criteria
-- [ ] AC1 Given Docker is running and `TEST_DATABASE_URL` is unset, when `uv run pytest tests/e2e` runs, then one PostGIS container starts for the session and is removed at the end.
-- [ ] AC2 Given `TEST_DATABASE_URL` is set, when the suite runs, then no container is started and the template is built on that server.
-- [ ] AC3 The template database is built by `alembic upgrade head` and holds the nine tables of `app.models`.
-- [ ] AC4 Given two modules, when module A inserts a row, then module B's database does not contain it.
-- [ ] AC5 Per-module setup (create from template, drop at the end) takes under 1 s after the first build; the measured time is in the PR.
-- [ ] AC6 `db_session` gives an `AsyncSession` on the module's database; what a test commits is gone for the next test in the same module.
-- [ ] AC7 Per-module databases are dropped at teardown; only names the fixture generated are ever dropped.
-- [ ] AC8 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no test weakened or skipped.
+- [x] AC1 Given Docker is running and `TEST_DATABASE_URL` is unset, when `uv run pytest tests/e2e` runs, then one PostGIS container starts for the session and is removed at the end.
+- [x] AC2 Given `TEST_DATABASE_URL` is set, when the suite runs, then no container is started and the template is built on that server.
+- [x] AC3 The template database is built by `alembic upgrade head` and holds the nine tables of `app.models`.
+- [x] AC4 Given two modules, when module A inserts a row, then module B's database does not contain it.
+- [x] AC5 Per-module setup (create from template, drop at the end) takes under 1 s after the first build; the measured time is in the PR.
+- [x] AC6 `db_session` gives an `AsyncSession` on the module's database; what a test commits is gone for the next test in the same module.
+- [x] AC7 Per-module databases are dropped at teardown; only names the fixture generated are ever dropped.
+- [x] AC8 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no test weakened or skipped.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

@@ -30,12 +30,23 @@ same file for a shared development host. A bad value (for example `PORT=abc`) st
   uvicorn behaves, not a crash.
 
 ## Database tests
-The tests in `tests/e2e/test_db_session.py` and `tests/e2e/test_db_mixins.py` run against a real Postgres (rule P8) and need
-`TEST_DATABASE_URL`. Copy `.env.test.example` to `.env.test` (gitignored) and point it at a scratch database, or export the
-variable, which wins over the file. Without it those tests fail with a message naming the variable; they are never skipped.
-They create and drop their own tables (`poc_session_rollback_probe`, `PocMixinProbe`), so never point them at a database whose
-tables you care about. Task 3.1 replaces this with a testcontainers PostGIS database and makes the variable optional.
-Postgres time zone does not matter: the app's engine sets the session to UTC.
+The database tests run against a real Postgres (rule P8, ADR-0006). Where it comes from:
+- **Docker (default):** with `TEST_DATABASE_URL` unset, the first database test starts one `postgis/postgis:16-3.4` container
+  (testcontainers) and removes it when the session ends. Docker must be running; otherwise those tests fail with a message naming Docker
+  and `TEST_DATABASE_URL`. They are never skipped.
+- **An existing server:** set `TEST_DATABASE_URL` (`postgresql+asyncpg://...`) in `.env.test` (copy `.env.test.example`, gitignored) or export it;
+  the variable wins over the file. No container is started. The role needs `CREATEDB` and, for the `postgis` extension, superuser rights.
+
+On that server the suite builds one template database per session with `alembic upgrade head` (`poc_test_template_<hex>`; seeds join it in
+task 5.1) and gives each test module a copy of it (`poc_test_module_<hex>`, made with `CREATE DATABASE ... TEMPLATE`, dropped after the
+module). Fixtures in `tests/conftest.py`: `database_url` (the server), `template_database`, `module_database_url`, `db_engine` (the app's
+engine on the module's database; commits stay for the module) and `db_session` (rolled back after each test, commits included).
+Only databases whose name starts with `poc_test_` are ever dropped. A killed run can leave a `poc_test_*` database on an existing server:
+drop it by hand; a container is reaped by testcontainers.
+
+The older tests `test_db_account_models.py`, `test_db_file_models.py`, `test_db_mixins.py` and `test_db_session.py` still make their own
+schema or tables on the server `database_url` gives, and drop only those. Postgres time zone does not matter: the app's engine sets the
+session to UTC.
 
 ## Migrations
 Alembic (ADR-0004, ADR-0017): `alembic.ini` and `migrations/` at the repo root; revision `0001_init` is the final state of the
@@ -48,7 +59,7 @@ Node base's four Prisma migrations. The database URL is read from `DATABASE_URL`
 - Point `DATABASE_URL` at the database you mean: `.env` is read when the variable is not exported, so check which one a bare
   `alembic upgrade head` will hit before running it.
 - A schema change is a new hand-written revision (`uv run alembic revision -m "<what>"`, then fill in `upgrade` and `downgrade`); an applied revision is never edited. Run `alembic check` after a model change: it names what the revision is missing.
-- The tests in `tests/e2e/test_db_migrations.py` create a database named `poc_migrations_<hex>` on the server of `TEST_DATABASE_URL` for each
+- The tests in `tests/e2e/test_db_migrations.py` create a database named `poc_migrations_<hex>` on the test server ("Database tests" above) for each
   test and drop it afterwards, so that role needs `CREATEDB` (and, for the extension, superuser rights). If a run is killed, drop any leftover `poc_migrations_*` database by hand.
 
 ## Commands
