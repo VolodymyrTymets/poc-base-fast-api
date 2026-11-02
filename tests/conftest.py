@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from utils.db import resolve_server_url, start_postgis
+from utils.db import (
+    build_template,
+    drop_database,
+    resolve_server_url,
+    start_postgis,
+)
 
 from app.config import get_settings
 
@@ -36,6 +41,21 @@ def database_url() -> Iterator[str]:
         yield resolve_server_url(DatabaseEnv().test_database_url, start)
     finally:
         stack.close()
+
+
+@pytest.fixture(scope="session")
+def template_database(
+    database_url: str, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[str]:
+    """The name of a database migrated with `alembic upgrade head`, built once per session (ADR-0006).
+
+    Seeds join it in task 5.1. It is only ever copied, never written to by a test.
+    """
+    name = build_template(database_url, tmp_path_factory.mktemp("alembic"))
+    try:
+        yield name
+    finally:
+        drop_database(database_url, name)
 
 
 @pytest.fixture(autouse=True)
