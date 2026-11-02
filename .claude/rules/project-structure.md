@@ -27,7 +27,7 @@ poc-base-fast-api/
 │   ├── core/             # cross-cutting: db, logging, errors, validation, security, cache, pagination
 │   ├── workers/          # arq settings and jobs
 │   └── seeds/            # seed runner and seed items
-└── tests/                # layout set by task 3.3
+└── tests/                # unit/ and e2e/, flat test_<subject>.py files, shared helpers in utils/ (testing-python.md)
 ```
 
 ## Modules and where a new feature goes
@@ -42,7 +42,7 @@ poc-base-fast-api/
 7. No module imports from `routers` except `main.py`. A circular import means the logic is in the wrong layer.
 
 ## Tests
-8. The layout inside `tests/` is not decided here: task 3.3 sets it, and the rules are in `testing.md` and `testing-python.md`. Note for 1.4 and 3.3: `testing-python.md` names a test file `tests/test_<module>.py`, which would collide for one module name across four layers (a router and a service both called `account`); the layout must separate them.
+8. `tests/unit/` needs no Docker, database or network; `tests/e2e/` runs against a real Postgres and the app over HTTP. Files are flat and named `test_<module>_<layer>.py` (a router and a service called `account` never collide), `test_<concern>.py` for `core/`, or for the flow in e2e; a name is unique across both directories. Helpers are in `tests/utils/`. The rules are in `testing.md` and `testing-python.md`, the quick path in the `test-conventions` skill.
 
 ## Migrations
 9. `migrations/` is tooling beside `app/`, not a layer (ADR-0017). `migrations/env.py` may import `app.config`, `app.core.db` and `app.models`; nothing in `app/` imports from `migrations/`. A revision in `migrations/versions/` imports nothing from `app`, names every table and column itself, and is never edited once merged: a schema change is a new revision.

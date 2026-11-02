@@ -18,12 +18,12 @@ Goal 3 (Test base, BUSINESS_MODEL.md): "easy to extend". Packages 4 to 9 add abo
   CI, new markers or plugins, any `app/` change, `pyproject.toml` change.
 
 ## Acceptance criteria
-- [ ] AC1 `testing-python.md` states: `tests/unit` (no Docker, no database, no network) vs `tests/e2e` (real Postgres and/or the app over HTTP, rule P8), flat `test_<area>.py` files, the fixtures of `tests/conftest.py` and when to use each, and the boundary list (clock, queue, network, SMS/email; never the database or the unit under test).
-- [ ] AC2 Hardware, GUI, serial and import-time-singleton rules are gone; no rule contradicts `testing.md` or CLAUDE.md (B3: no skip/xfail without `WHY:`).
-- [ ] AC3 `.claude/skills/test-conventions/SKILL.md` exists with valid frontmatter, a decision table (which level, which fixture) and one unit and one e2e example.
-- [ ] AC4 Both examples, copied verbatim into `tests/unit/` and `tests/e2e/`, pass under `uv run pytest`, `ruff check`, `ruff format --check` and `mypy` (copies removed afterwards).
-- [ ] AC5 No remaining "set by task 3.3" text in `project-structure.md`, `ARCHITECTURE.md`; every fixture and path the rules name exists (checked with grep).
-- [ ] AC6 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no existing test touched.
+- [x] AC1 `testing-python.md` states: `tests/unit` (no Docker, no database, no network) vs `tests/e2e` (real Postgres and/or the app over HTTP, rule P8), flat `test_<area>.py` files, the fixtures of `tests/conftest.py` and when to use each, and the boundary list (clock, queue, network, SMS/email; never the database or the unit under test).
+- [x] AC2 Hardware, GUI, serial and import-time-singleton rules are gone; no rule contradicts `testing.md` or CLAUDE.md (B3: no skip/xfail without `WHY:`).
+- [x] AC3 `.claude/skills/test-conventions/SKILL.md` exists with valid frontmatter, a decision table (which level, which fixture) and one unit and one e2e example.
+- [x] AC4 Both examples, copied verbatim into `tests/unit/` and `tests/e2e/`, pass under `uv run pytest`, `ruff check`, `ruff format --check` and `mypy` (copies removed afterwards).
+- [x] AC5 No remaining "set by task 3.3" text in `project-structure.md`, `ARCHITECTURE.md`; every fixture and path the rules name exists (checked with grep).
+- [x] AC6 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no existing test touched.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

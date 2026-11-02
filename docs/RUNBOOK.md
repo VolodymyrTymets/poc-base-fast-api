@@ -51,6 +51,8 @@ schema or tables on the server `database_url` gives, and drop only those. Postgr
 session to UTC.
 
 ## HTTP tests
+Which level and which fixture to use, with a unit and an e2e example, is in the `test-conventions` skill (`.claude/skills/test-conventions/SKILL.md`).
+
 Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
 - `asgi_app`: the real app from `create_app`, on the module's database. A test may add routes to it (`@asgi_app.get(...)`); they live for that test only.
 - `client`: an httpx `AsyncClient` on `asgi_app` with the lifespan started before the test and stopped after it (`ASGITransport` does not run
