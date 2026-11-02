@@ -50,6 +50,21 @@ The older tests `test_db_account_models.py`, `test_db_file_models.py`, `test_db_
 schema or tables on the server `database_url` gives, and drop only those. Postgres time zone does not matter: the app's engine sets the
 session to UTC.
 
+## HTTP tests
+Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
+- `asgi_app`: the real app from `create_app`, on the module's database. A test may add routes to it (`@asgi_app.get(...)`); they live for that test only.
+- `client`: an httpx `AsyncClient` on `asgi_app` with the lifespan started before the test and stopped after it (`ASGITransport` does not run
+  it by itself). It needs a database (Docker or `TEST_DATABASE_URL`). A test with no database uses `running_client(create_app(Settings()))`
+  from `utils.client`; `client_for(app)` is the same client without the lifespan.
+- `utils.auth`: `sign_up(client, email, password)` and `sign_in(...)` post to `/api/v1/auth/sign-up` (expects 201) and `/sign-in` (expects 200) and
+  return `AuthTokens`; `.headers` is the Bearer header, `.refresh_headers` the `x-refresh-token` one. A wrong status fails the test with the status
+  and the start of the body. Until tasks 4.4 and 7.3 exist only stub routes prove it, so its first real run is the 7.3 e2e suite.
+- `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. The real
+  queue protocol comes with task 6.1, which adapts the fake.
+- `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to
+  expire a token or code instead of sleeping. `datetime.now(UTC)` and `utc_now()` (the same instant, naive) follow it; `time.monotonic` does not.
+  **It moves this process only:** a database default such as `CURRENT_TIMESTAMP` still reads Postgres's clock, so code under test must pass `utc_now()`.
+
 ## Migrations
 Alembic (ADR-0004, ADR-0017): `alembic.ini` and `migrations/` at the repo root; revision `0001_init` is the final state of the
 Node base's four Prisma migrations. The database URL is read from `DATABASE_URL` (environment first, then `.env`), never from `alembic.ini`.

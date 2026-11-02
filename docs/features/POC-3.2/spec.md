@@ -17,12 +17,12 @@ Goal 3 (Test base, BUSINESS_MODEL.md): a test setup that "keeps working and is e
   real `QueueClient` protocol and arq (6.1), the test-conventions skill and rules (3.3), porting other tests (only `client_for` moves, behaviour unchanged), CI.
 
 ## Acceptance criteria
-- [ ] AC1 Given the `client` fixture, when a test calls `GET /api/v1/health`, then it gets 200 `{"status": "ok"}`; the app's lifespan startup ran before the call and shutdown ran after the test.
-- [ ] AC2 The auth helper posts `{email, password}` to `/api/v1/auth/sign-up` (expects 201) or `/sign-in` (expects 200), reads `{accessToken, refreshToken}` and returns headers; a stub authenticated route accepts them and answers 401 without them.
-- [ ] AC3 `FakeQueue` records each enqueued job (name, args, kwargs) in order and a test can read, filter and clear them; nothing reaches Redis.
-- [ ] AC4 Under the clock fixture `datetime.now(UTC)` returns the frozen instant and `app.core.db.utc_now()` the same instant without `tzinfo` (it is naive by design); both move only when the test moves them; no `sleep` is used.
-- [ ] AC5 `test_db_session.py` uses the moved `client_for` and its tests still pass unchanged.
-- [ ] AC6 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no test weakened or skipped.
+- [x] AC1 Given the `client` fixture, when a test calls `GET /api/v1/health`, then it gets 200 `{"status": "ok"}`; the app's lifespan startup ran before the call and shutdown ran after the test.
+- [x] AC2 The auth helper posts `{email, password}` to `/api/v1/auth/sign-up` (expects 201) or `/sign-in` (expects 200), reads `{accessToken, refreshToken}` and returns headers; a stub authenticated route accepts them and answers 401 without them.
+- [x] AC3 `FakeQueue` records each enqueued job (name, args, kwargs) in order and a test can read, filter and clear them; nothing reaches Redis.
+- [x] AC4 Under the clock fixture `datetime.now(UTC)` returns the frozen instant and `app.core.db.utc_now()` the same instant without `tzinfo` (it is naive by design); both move only when the test moves them; no `sleep` is used.
+- [x] AC5 `test_db_session.py` uses the moved `client_for` and its tests still pass unchanged.
+- [x] AC6 `ruff check`, `ruff format --check`, `mypy`, `pytest tests/unit` and `pytest tests/e2e` pass; no test weakened or skipped.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
