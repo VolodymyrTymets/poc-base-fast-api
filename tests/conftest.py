@@ -7,7 +7,9 @@ import pytest
 from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from time_machine import TimeMachineFixture
 from utils.client import running_client
+from utils.clock import FROZEN_NOW
 from utils.db import (
     build_template,
     create_database,
@@ -109,6 +111,18 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await outer.rollback()
+
+
+@pytest.fixture
+def frozen_clock(time_machine: TimeMachineFixture) -> TimeMachineFixture:
+    """The process clock stopped at FROZEN_NOW; `frozen_clock.shift(timedelta(...))` moves it, nothing else does.
+
+    For expiry tests: shift past the limit instead of sleeping. It moves this process only, so a database default such as
+    CURRENT_TIMESTAMP still reads the server's clock; services pass `utc_now()` themselves. It does not touch
+    `time.monotonic`, so the event loop and the database drivers keep real time.
+    """
+    time_machine.move_to(FROZEN_NOW, tick=False)
+    return time_machine
 
 
 @pytest.fixture
