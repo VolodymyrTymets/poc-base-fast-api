@@ -2,9 +2,12 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import ExitStack
 from pathlib import Path
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from utils.client import running_client
 from utils.db import (
     build_template,
     create_database,
@@ -17,6 +20,7 @@ from utils.db import (
 
 from app.config import Settings, get_settings
 from app.core.db import create_engine
+from app.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,6 +108,23 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await outer.rollback()
+
+
+@pytest.fixture
+def asgi_app(module_database_url: str) -> FastAPI:
+    """The real app from `create_app`, on this module's database. Routes a test adds to it live for that test only."""
+    return create_app(Settings(database_url=module_database_url))
+
+
+@pytest.fixture
+async def client(asgi_app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    """An HTTP client on `asgi_app`, with the lifespan started before the test and stopped after it.
+
+    It needs a database (Docker or TEST_DATABASE_URL). A test without one uses
+    `running_client(create_app(Settings()))` directly.
+    """
+    async with running_client(asgi_app) as http_client:
+        yield http_client
 
 
 @pytest.fixture(autouse=True)
