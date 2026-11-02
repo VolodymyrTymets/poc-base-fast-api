@@ -1,8 +1,10 @@
 from collections.abc import Iterator
+from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from utils.db import resolve_server_url, start_postgis
 
 from app.config import get_settings
 
@@ -17,18 +19,23 @@ class DatabaseEnv(BaseSettings):
     test_database_url: str | None = None
 
 
-@pytest.fixture
-def database_url() -> str:
-    """The real Postgres the database tests run against (rule P8); task 3.1 adds testcontainers."""
-    url = DatabaseEnv().test_database_url
-    if not url:
-        # A failure, not a skip: a skipped database test would pass without proving anything.
-        pytest.fail(
-            "TEST_DATABASE_URL is not set; put it in .env.test (copy .env.test.example) "
-            "or export it (see docs/RUNBOOK.md)",
-            pytrace=False,
-        )
-    return url
+@pytest.fixture(scope="session")
+def database_url() -> Iterator[str]:
+    """The URL of the real Postgres server the database tests run against (rule P8).
+
+    `TEST_DATABASE_URL` wins; without it one PostGIS container lives for the whole session (ADR-0006).
+    """
+    stack = ExitStack()
+
+    def start() -> str:
+        container = start_postgis()
+        stack.callback(container.stop)
+        return container.get_connection_url()
+
+    try:
+        yield resolve_server_url(DatabaseEnv().test_database_url, start)
+    finally:
+        stack.close()
 
 
 @pytest.fixture(autouse=True)
