@@ -17,7 +17,7 @@ from alembic.config import Config
 from docker.errors import DockerException
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
 from app.config import get_settings
@@ -97,6 +97,21 @@ def drop_database(server_url: str, name: str) -> None:
     _run_on_server(
         server_url, f'DROP DATABASE IF EXISTS "{_require_own(name)}" WITH (FORCE)'
     )
+
+
+async def commit_marker_account(engine: AsyncEngine, marker: str) -> list[str]:
+    """Commit one Account with id `marker`, then return the ids of every Account in that database."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            text(
+                'INSERT INTO "Account" (id, "lastLoginAt", "updatedAt") '
+                "VALUES (:id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+            ),
+            {"id": marker},
+        )
+    async with engine.connect() as connection:
+        rows = await connection.execute(text('SELECT id FROM "Account" ORDER BY id'))
+        return list(rows.scalars().all())
 
 
 def build_template(server_url: str, workdir: Path) -> str:
