@@ -17,6 +17,7 @@ from utils.db import (
     new_postgis,
     resolve_server_url,
 )
+from utils.queue import FakeQueue
 
 from app.config import Settings, get_settings
 from app.core.db import create_engine
@@ -108,6 +109,12 @@ async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await outer.rollback()
+
+
+@pytest.fixture
+def queue() -> FakeQueue:
+    """A fresh queue that records enqueued jobs; pass it to the code under test where the real queue goes."""
+    return FakeQueue()
 
 
 @pytest.fixture
