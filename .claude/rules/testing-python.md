@@ -25,10 +25,11 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
    a query, a constraint, a transaction or a migration is e2e.
 4. Files are flat under `tests/unit/` and `tests/e2e/`, named `test_<subject>.py`. A test of one module of a layer is
    `test_<module>_<layer>.py` (`test_account_service.py`, `test_account_models.py`), so a router and a service called `account`
-   never collide, and a file name is unique across both directories (there are no `__init__.py` files; a duplicate basename
-   stops collection). A `core/` concern is `test_<concern>.py` (`test_logging.py`). An e2e flow is named for the flow
+   never collide. In e2e the same module gets a `db_` prefix (`test_db_account_models.py` beside the unit `test_account_models.py`)
+   and an HTTP test of it an `http_` one (`test_http_client.py`). A file name is unique across both directories: `tests/`,
+   `tests/unit/` and `tests/e2e/` have no `__init__.py`, so a duplicate basename stops collection. A `core/` concern is `test_<concern>.py` (`test_logging.py`). An e2e flow is named for the flow
    (`test_sign_in.py`, `test_refresh_token.py`). Split a directory by area only when it passes about 20 files, in its own PR.
-5. Shared helpers live in `tests/utils/` and are imported as `utils.<module>` (rootdir `conftest.py`, no `__init__.py` files);
+5. Shared helpers live in `tests/utils/` and are imported as `utils.<module>` (rootdir `conftest.py`; `tests/utils/` is the only package, it has an `__init__.py`);
    fixtures used by several files live in `tests/conftest.py`; a fixture used once stays beside its test.
 6. **Tests are `async def` when they await.** `asyncio_mode = "auto"` is set: no `@pytest.mark.asyncio`, no event-loop fixture.
 

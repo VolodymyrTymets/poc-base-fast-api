@@ -42,7 +42,7 @@ poc-base-fast-api/
 7. No module imports from `routers` except `main.py`. A circular import means the logic is in the wrong layer.
 
 ## Tests
-8. `tests/unit/` needs no Docker, database or network; `tests/e2e/` runs against a real Postgres and the app over HTTP. Files are flat and named `test_<module>_<layer>.py` (a router and a service called `account` never collide), `test_<concern>.py` for `core/`, or for the flow in e2e; a name is unique across both directories. Helpers are in `tests/utils/`. The rules are in `testing.md` and `testing-python.md`, the quick path in the `test-conventions` skill.
+8. `tests/unit/` needs no Docker, database or network; `tests/e2e/` runs against a real Postgres and the app over HTTP. Files are flat and named `test_<module>_<layer>.py` (a router and a service called `account` never collide), `test_<concern>.py` for `core/`, or for the flow in e2e (`test_db_<module>_<layer>.py` for database tests of a module, `test_http_<subject>.py` for the client); a name is unique across both directories. Helpers are in `tests/utils/`. The rules are in `testing.md` and `testing-python.md`, the quick path in the `test-conventions` skill.
 
 ## Migrations
 9. `migrations/` is tooling beside `app/`, not a layer (ADR-0017). `migrations/env.py` may import `app.config`, `app.core.db` and `app.models`; nothing in `app/` imports from `migrations/`. A revision in `migrations/versions/` imports nothing from `app`, names every table and column itself, and is never edited once merged: a schema change is a new revision.
