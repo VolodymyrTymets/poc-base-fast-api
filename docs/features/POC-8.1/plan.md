@@ -56,11 +56,11 @@ New here, not in Node: unknown id and soft-deleted file are 403 (Node let a dele
 All ported cases above pass. Anything not run goes under "Not verified".
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-8.1/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md: `services/file_assert.py` built; the two settings; `PayloadTooLargeError` in the `core/errors.py` row
-- [ ] docs/api/ERRORS.md: the 413 bullet names the class and that the upload limit is `FILE_MAX_SIZE`
-- [ ] docs/RUNBOOK.md: `FILE_MAX_SIZE` and `FILE_ALLOWED_MIME_TYPES` in the settings paragraph
-- [ ] docs/DOMAIN_GLOSSARY.md: no new term; docs/decisions: none
+- [x] docs/features/POC-8.1/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md: `services/file_assert.py` built; the two settings; `PayloadTooLargeError` in the `core/errors.py` row
+- [x] docs/api/ERRORS.md: the 413 bullet names the class and that the upload limit is `FILE_MAX_SIZE`
+- [x] docs/RUNBOOK.md: `FILE_MAX_SIZE` and `FILE_ALLOWED_MIME_TYPES` in the settings paragraph
+- [x] docs/DOMAIN_GLOSSARY.md: no new term; docs/decisions: none
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

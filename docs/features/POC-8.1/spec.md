@@ -16,13 +16,13 @@ Goal 2 (a reusable, understandable pipeline) and goal 1 (one place for file rule
   (the mime type is the one the client declares, as in Node), a new error code (ADR-0003).
 
 ## Acceptance criteria
-- [ ] AC1 Given a size over `FILE_MAX_SIZE`, `assert_upload` raises a 413 `VALIDATION_FAILED` whose `details` name the field `file`; a size equal to the limit passes.
-- [ ] AC2 Given a mime type outside `FILE_ALLOWED_MIME_TYPES`, or none, it raises a 422 `VALIDATION_FAILED` naming `file`; the comparison ignores case and any `; parameters`.
-- [ ] AC3 `get_owned_file` returns the file (metadata, not the bytes) when the account created it.
-- [ ] AC4 An unknown id, another account's file and a soft-deleted file all raise `ForbiddenError` (403), so a file's existence is not leaked (ENDPOINTS decision 3, rule P6).
-- [ ] AC5 `Settings` reads `FILE_MAX_SIZE` (default 10485760, must be above zero) and `FILE_ALLOWED_MIME_TYPES` (comma-separated, default jpeg and png; blank entries dropped; an empty list is refused at boot).
-- [ ] AC6 Error text and `details` never hold the file name, bytes or the submitted mime string (rules D8, P4); they name the limit and the field only.
-- [ ] AC7 `openapi.json` is unchanged (`--export-openapi --check`).
+- [x] AC1 Given a size over `FILE_MAX_SIZE`, `assert_upload` raises a 413 `VALIDATION_FAILED` whose `details` name the field `file`; a size equal to the limit passes.
+- [x] AC2 Given a mime type outside `FILE_ALLOWED_MIME_TYPES`, or none, it raises a 422 `VALIDATION_FAILED` naming `file`; the comparison ignores case and any `; parameters`.
+- [x] AC3 `get_owned_file` returns the file (metadata, not the bytes) when the account created it.
+- [x] AC4 An unknown id, another account's file and a soft-deleted file all raise `ForbiddenError` (403), so a file's existence is not leaked (ENDPOINTS decision 3, rule P6).
+- [x] AC5 `Settings` reads `FILE_MAX_SIZE` (default 10485760, must be above zero) and `FILE_ALLOWED_MIME_TYPES` (comma-separated, default jpeg and png; blank entries dropped; an empty list is refused at boot).
+- [x] AC6 Error text and `details` never hold the file name, bytes or the submitted mime string (rules D8, P4); they name the limit and the field only.
+- [x] AC7 `openapi.json` is unchanged (`--export-openapi --check`).
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
