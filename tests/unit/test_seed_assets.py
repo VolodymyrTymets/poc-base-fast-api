@@ -8,7 +8,7 @@ from app.seeds.items.init_admin import ADMINS
 from app.seeds.items.init_customer import CUSTOMERS
 
 PHONES = [sample["phone_number"] for sample in [*ADMINS, *CUSTOMERS]]
-EMAILS = [sample["email"] for sample in CUSTOMERS]
+EMAILS = [sample["email"] for sample in [*ADMINS, *CUSTOMERS]]
 
 
 def test_every_sample_phone_is_a_valid_phone_number() -> None:

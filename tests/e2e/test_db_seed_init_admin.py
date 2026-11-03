@@ -70,10 +70,16 @@ async def test_the_admin_profile_has_the_sample_names(
 
     async with unseeded_session_factory() as session:
         profile = (await session.scalars(select(AccountProfile))).one()
-    assert (profile.first_name, profile.last_name, profile.phone_number) == (
+    assert (
+        profile.first_name,
+        profile.last_name,
+        profile.phone_number,
+        profile.email,
+    ) == (
         ADMINS[0]["first_name"],
         ADMINS[0]["last_name"],
         ADMINS[0]["phone_number"],
+        ADMINS[0]["email"],
     )
 
 

@@ -18,7 +18,7 @@ Goal 1 (a fork starts with a usable local database) and goal 3 (the test templat
 - [x] AC1 Given a migrated, empty database, when the seed runner runs the registry for `local`, then the database holds 2 roles, 1 admin account and 3 customer accounts.
 - [x] AC2 Given a second run (or a second boot), then nothing is added and `SeedHistory` has one successful row per item.
 - [x] AC3 The admin holds the `ADMIN` role and not `CUSTOMER`; each customer holds `CUSTOMER` only. The admin check is by role type through the join, never by comparing a role id with the string `ADMIN` (issue I.4).
-- [x] AC4 Each account has a live profile with the sample names, and the customers also their email, middle name and date of birth, written through `AccountProfileService.update` (so they are validated and normalised like a request).
+- [x] AC4 Each account has a live profile with the sample names and email, and the customers also their middle name and date of birth, written through `AccountProfileService.update` (so they are validated and normalised like a request).
 - [x] AC5 `init.customer` runs even though the admin account already exists (Node's `account.count() === 0` check made it a no-op after the admin seed), and creates only the sample phones that are missing.
 - [x] AC6 `production` gets the roles only; `local`, `development` and `test` get all three items, in the order roles, admin, customer.
 - [x] AC7 Every sample phone is a valid number for the `PhoneNumber` type of task 4.3 and every sample email a valid `ProfileEmail`, so each seeded account can use OTP and profile routes (a unit test proves it).

@@ -33,13 +33,19 @@ class SampleAdminPhoneInUseError(RuntimeError):
 
 class AdminSample(TypedDict):
     phone_number: str
+    email: str
     first_name: str
     last_name: str
 
 
 # 555-0100 to 555-0199 is the NANP range reserved for fiction, so the number never belongs to a real person.
 ADMINS: list[AdminSample] = [
-    {"phone_number": "+12125550100", "first_name": "Admin", "last_name": "User"},
+    {
+        "phone_number": "+12125550100",
+        "email": "admin+d1@example.com",
+        "first_name": "Admin",
+        "last_name": "User",
+    },
 ]
 
 
@@ -92,6 +98,8 @@ class InitAdmin:
                 account.id,
                 account.id,
                 UpdateAccountProfileInput(
-                    first_name=sample["first_name"], last_name=sample["last_name"]
+                    first_name=sample["first_name"],
+                    last_name=sample["last_name"],
+                    email=sample["email"],
                 ),
             )
