@@ -1,8 +1,11 @@
 """The FastAPI application: create_app() with lifespan and CORS, a health route, and include_router for every module in routers/. Tasks: 1.5, 4.1."""
 
+import argparse
 import logging
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Literal
 
 import uvicorn
@@ -15,10 +18,13 @@ from app.config import Settings, get_settings
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.db import create_engine, create_session_factory
 from app.core.logging import configure_logging
+from app.core.openapi import is_current, render
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
 
 API_PREFIX = "/api/v1"
+# The committed contract at the repo root (ADR-0003); generated, never hand-edited.
+OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi.json"
 
 # One tag per feature router, in the order of the docs. Declared here so /docs lists
 # every module even while its router has no route yet.
@@ -97,3 +103,26 @@ def run() -> None:
         # uvicorn handles SIGTERM itself; the timeout bounds how long in-flight requests get.
         timeout_graceful_shutdown=settings.shutdown_timeout_seconds,
     )
+
+
+def export_openapi(path: Path = OPENAPI_PATH, *, check: bool = False) -> int:
+    """Write the OpenAPI contract to `path`, or with `check` only compare it. Returns the exit status."""
+    app = create_app(Settings())
+    if check:
+        if is_current(app, path):
+            return 0
+        sys.stderr.write(
+            f"{path.name} is stale: run `uv run python -m app.main --export-openapi`\n"
+        )
+        return 1
+    path.write_text(render(app), encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Export the OpenAPI contract.")
+    parser.add_argument("--export-openapi", action="store_true", required=True)
+    parser.add_argument("--check", action="store_true", help="compare, do not write")
+    parser.add_argument("--path", type=Path, default=OPENAPI_PATH)
+    options = parser.parse_args()
+    sys.exit(export_openapi(options.path, check=options.check))
