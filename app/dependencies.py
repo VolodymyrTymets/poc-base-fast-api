@@ -1,8 +1,8 @@
 """Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, and require_roles. Tasks: 4.4, 5.2.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
-loading the account (and rejecting a deleted one) comes with task 5.3, the refresh-hash check with
-task 7.4. Task 5.2 adds `require_roles`, the role layer of rule P7.
+loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
+(task 5.3, ADR-0022); the refresh-hash check comes with task 7.4. Task 5.2 adds `require_roles`, the role layer of rule P7.
 """
 
 from collections.abc import Awaitable, Callable

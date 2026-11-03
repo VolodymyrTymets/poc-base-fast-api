@@ -46,12 +46,12 @@ docstring-only), so this route sets the shape 5.4 copies; no new pattern, no ADR
 `uv run python -m app.cli --export-openapi --check`. Anything not run goes under "Not verified".
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-5.3/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md: `services/account.py`, `schemas/account.py`, the first real route; the "one route exists" sentence; the data-truth paragraph (the service writes Account rows)
-- [ ] docs/api/ENDPOINTS.md: the `account` row marked built; the Token checks bullet notes that this route rejects a missing or deleted account
-- [ ] docs/DOMAIN_GLOSSARY.md: no new term
-- [ ] docs/decisions/ADR-0022: P7's role layer is "any authenticated account" for self-scoped routes (Q1, decided by the human); the route has no `require_roles`
-- [ ] stale promises corrected in this PR: `app/dependencies.py` docstring (5.3 "will" reject a deleted account), ENDPOINTS line 14 ("403 until 5.3"), `app/schemas/account_profile.py` docstring (response model now exists)
+- [x] docs/features/POC-5.3/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md: `services/account.py`, `schemas/account.py`, the first real route; the "one route exists" sentence; the data-truth paragraph (the service writes Account rows)
+- [x] docs/api/ENDPOINTS.md: the `account` row marked built; the Token checks bullet notes that this route rejects a missing or deleted account
+- [x] docs/DOMAIN_GLOSSARY.md: no new term
+- [x] docs/decisions/ADR-0022: P7's role layer is "any authenticated account" for self-scoped routes (Q1, decided by the human); the route has no `require_roles`
+- [x] stale promises corrected in this PR: `app/dependencies.py` docstring (5.3 "will" reject a deleted account), ENDPOINTS line 14 ("403 until 5.3"), `app/schemas/account_profile.py` docstring (response model now exists)
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

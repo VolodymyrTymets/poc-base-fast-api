@@ -16,14 +16,14 @@ Goal 2 (authentication pipeline): the account layer every sign-in flow stands on
   deleted-account rejection in `current_account`/`require_roles` (this route only).
 
 ## Acceptance criteria
-- [ ] AC1 Given a valid access token of an existing account, when `GET /api/v1/account`, then 200 `{id, createdAt, updatedAt, profile}` with `profile.email` of that account.
-- [ ] AC2 Given a password account with no phone, then `profile.phoneNumber` is `null` (issue I.3).
-- [ ] AC3 Given a valid token whose account does not exist or is soft-deleted, then 401 `UNAUTHORIZED` with the same `WWW-Authenticate: Bearer` challenge as `current_account` (ENDPOINTS decisions 2 and 16; decision 16 is still marked "proposed", this approval confirms it).
-- [ ] AC4 Given no or a bad token, then 401 `UNAUTHORIZED` with `WWW-Authenticate: Bearer`; no database is needed to answer it (tested with an app that has no `DATABASE_URL`).
-- [ ] AC5 `get_by_id` / `get_by_phone` return the account with its live profile loaded; a soft-deleted account is not returned; a soft-deleted profile is `None`.
-- [ ] AC6 `create_customer(phone)` creates account, profile (phone) and the `CUSTOMER` role link in one flush; `create_password_account(email, hash, salt)` creates account, profile (email), identity and the `CUSTOMER` role link in one transaction; neither commits (ADR-0021).
-- [ ] AC7 A second password account with the same email raises `IntegrityError`; after the caller rolls back, no account, profile, identity or role link of the failed call remains. (`phoneNumber` has no unique index in `0001_init`; a unique phone would be a separate decision with a new revision and ADR, not part of this ticket.)
-- [ ] AC8 The response model holds no ORM class and carries no identity data (hash, salt, otp, tokens); `openapi.json` is regenerated and the stale test passes.
+- [x] AC1 Given a valid access token of an existing account, when `GET /api/v1/account`, then 200 `{id, createdAt, updatedAt, profile}` with `profile.email` of that account.
+- [x] AC2 Given a password account with no phone, then `profile.phoneNumber` is `null` (issue I.3).
+- [x] AC3 Given a valid token whose account does not exist or is soft-deleted, then 401 `UNAUTHORIZED` with the same `WWW-Authenticate: Bearer` challenge as `current_account` (ENDPOINTS decisions 2 and 16; decision 16 is still marked "proposed", this approval confirms it).
+- [x] AC4 Given no or a bad token, then 401 `UNAUTHORIZED` with `WWW-Authenticate: Bearer`; no database is needed to answer it (tested with an app that has no `DATABASE_URL`).
+- [x] AC5 `get_by_id` / `get_by_phone` return the account with its live profile loaded; a soft-deleted account is not returned; a soft-deleted profile is `None`.
+- [x] AC6 `create_customer(phone)` creates account, profile (phone) and the `CUSTOMER` role link in one flush; `create_password_account(email, hash, salt)` creates account, profile (email), identity and the `CUSTOMER` role link in one transaction; neither commits (ADR-0021).
+- [x] AC7 A second password account with the same email raises `IntegrityError`; after the caller rolls back, no account, profile, identity or role link of the failed call remains. (`phoneNumber` has no unique index in `0001_init`; a unique phone would be a separate decision with a new revision and ADR, not part of this ticket.)
+- [x] AC8 The response model holds no ORM class and carries no identity data (hash, salt, otp, tokens); `openapi.json` is regenerated and the stale test passes.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
