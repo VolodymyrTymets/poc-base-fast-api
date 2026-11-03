@@ -3,7 +3,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Literal
+from typing import Any, Literal
 
 import uvicorn
 from fastapi import APIRouter, FastAPI
@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.config import Settings, get_settings
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.db import create_engine, create_session_factory
-from app.core.errors import register_error_handlers
+from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
@@ -34,6 +34,14 @@ TAGS = [
     {"name": "files", "description": "File upload and download."},
     {"name": "notifier", "description": "Notifications (no public route)."},
 ]
+
+# Declared on the app so every route, including one added straight to `app`, documents the
+# contract body for 422 and 500 and FastAPI's own HTTPValidationError is not advertised.
+# WHY: `Any` is the value type of FastAPI's own `responses` parameter; the dict is passed through unchanged (POC-4.2).
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    422: {"model": ErrorResponse, "description": "Validation failed"},
+    500: {"model": ErrorResponse, "description": "Unexpected error"},
+}
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +67,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
-    app = FastAPI(title="poc-base-fast-api", lifespan=lifespan, openapi_tags=TAGS)
+    app = FastAPI(
+        title="poc-base-fast-api",
+        lifespan=lifespan,
+        openapi_tags=TAGS,
+        responses=ERROR_RESPONSES,
+    )
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine) if engine else None
