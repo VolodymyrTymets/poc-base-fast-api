@@ -7,7 +7,7 @@ soft-deleted file is not accessible (rule P6); an oversized upload is 413 and a 
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import load_only
+from sqlalchemy.orm import defer
 
 from app.config import Settings
 from app.core.errors import (
@@ -17,18 +17,6 @@ from app.core.errors import (
     ValidationFailedError,
 )
 from app.models import File
-
-# `File.content` is left out: it holds up to FILE_MAX_SIZE bytes, and an async session cannot lazy-load it later.
-_METADATA = (
-    File.id,
-    File.name,
-    File.mime_type,
-    File.size,
-    File.created_by_id,
-    File.created_at,
-    File.updated_at,
-    File.deleted,
-)
 
 
 def _upload_detail(message: str, error_type: str) -> list[ErrorDetail]:
@@ -49,6 +37,8 @@ class FileAssertService:
 
     def assert_upload(self, size: int, mime_type: str | None) -> None:
         """Raise unless an upload of `size` bytes declared as `mime_type` is allowed: 413 over the limit, 422 for a missing or disallowed type."""
+        if size < 0:
+            raise ValueError("size is a byte count and cannot be negative")
         if size > self._max_size:
             raise PayloadTooLargeError(
                 details=_upload_detail("File is too large", "file_too_large")
@@ -64,8 +54,9 @@ class FileAssertService:
         """The file the account created, with its metadata and without its bytes.
 
         An unknown id, another account's file and a soft-deleted file are the same `ForbiddenError`, so a file's
-        existence is not leaked (ENDPOINTS decision 3). Do not read `file.content` on the result: it is not loaded, and an
-        async session cannot load it lazily. A caller that needs the bytes selects them itself (task 8.3).
+        existence is not leaked (ENDPOINTS decision 3). `content` (up to FILE_MAX_SIZE bytes) is deferred with `raiseload`:
+        reading `file.content` on the result raises instead of loading, and every other column loads, so a column added
+        later is not silently missing. A caller that needs the bytes selects them itself (task 8.3).
         """
         result = await self._session.scalars(
             select(File)
@@ -74,7 +65,7 @@ class FileAssertService:
                 File.created_by_id == account_id,
                 File.deleted.is_(False),
             )
-            .options(load_only(*_METADATA))
+            .options(defer(File.content, raiseload=True))
         )
         file = result.one_or_none()
         if file is None:

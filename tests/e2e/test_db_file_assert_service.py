@@ -1,12 +1,12 @@
 """FileAssertService.get_owned_file on a real Postgres. Task: 8.1."""
 
-from datetime import UTC, datetime
-
 import pytest
 from sqlalchemy import inspect, update
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.core.db import utc_now
 from app.core.errors import ForbiddenError
 from app.models import Account, File
 from app.services.file_assert import FileAssertService
@@ -19,7 +19,7 @@ def service(session: AsyncSession) -> FileAssertService:
 
 
 async def make_account(session: AsyncSession) -> str:
-    account = Account(last_login_at=datetime.now(UTC).replace(tzinfo=None))
+    account = Account(last_login_at=utc_now())
     session.add(account)
     await session.flush()
     return account.id
@@ -56,6 +56,8 @@ async def test_the_owner_gets_the_file_without_its_bytes(
         3,
     )
     assert "content" in inspect(file).unloaded
+    with pytest.raises(InvalidRequestError, match="content"):
+        _ = file.content
 
 
 async def test_another_accounts_file_is_forbidden(db_session: AsyncSession) -> None:

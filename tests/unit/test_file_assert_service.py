@@ -74,3 +74,8 @@ def test_the_error_never_holds_the_submitted_type() -> None:
 def test_an_empty_upload_passes_the_size_check() -> None:
     # "A file is required" is the router's 422 (task 8.2), not this layer's.
     service().assert_upload(0, "image/png")
+
+
+def test_a_negative_size_is_a_programming_error() -> None:
+    with pytest.raises(ValueError, match="negative"):
+        service().assert_upload(-1, "image/png")

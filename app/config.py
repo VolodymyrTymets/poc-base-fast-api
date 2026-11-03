@@ -35,10 +35,19 @@ def parse_cors_origins(raw: str | None) -> list[str]:
 DEFAULT_FILE_ALLOWED_MIME_TYPES = ("image/jpeg", "image/png")
 
 
+def _normalise_mime_type(item: str) -> str:
+    # The same rule FileAssertService applies to an upload: `image/PNG; charset=x` is `image/png`.
+    media_type = item.split(";", 1)[0].strip().lower()
+    if "/" not in media_type:
+        # The message names the shape, never the value.
+        raise ValueError("each mime type must look like type/subtype")
+    return media_type
+
+
 def _mime_types_from_env(value: str | list[str] | None) -> list[str]:
     # NoDecode hands the raw string over; a list (from code) is normalised the same way.
     items = value.split(",") if isinstance(value, str) else (value or [])
-    return [item.strip().lower() for item in items if item.strip()]
+    return [_normalise_mime_type(item) for item in items if item.strip()]
 
 
 def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:

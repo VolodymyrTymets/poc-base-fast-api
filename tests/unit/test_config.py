@@ -284,3 +284,23 @@ def test_a_bad_file_limit_error_does_not_echo_the_value(
 
     assert "file_max_size" in str(caught.value)
     assert "7731" not in str(caught.value)
+
+
+def test_a_mime_type_entry_is_normalised_like_an_upload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FILE_ALLOWED_MIME_TYPES", "Image/PNG; charset=binary")
+
+    assert Settings().file_allowed_mime_types == ["image/png"]
+
+
+def test_a_mime_type_without_a_slash_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FILE_ALLOWED_MIME_TYPES", "png-7731")
+
+    with pytest.raises(ValidationError) as caught:
+        Settings()
+
+    assert "file_allowed_mime_types" in str(caught.value)
+    assert "7731" not in str(caught.value)
