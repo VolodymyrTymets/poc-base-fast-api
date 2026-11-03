@@ -1,7 +1,8 @@
 from pathlib import Path
 
+from app.cli import ContractSettings, contract_app, export_openapi
 from app.core.openapi import is_current, render
-from app.main import ContractSettings, contract_app, create_app, export_openapi
+from app.main import create_app
 
 
 def test_render_is_deterministic_and_ends_with_a_newline() -> None:

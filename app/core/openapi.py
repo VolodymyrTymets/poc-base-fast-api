@@ -1,6 +1,6 @@
 """Rendering and checking of the exported OpenAPI contract (ADR-0003). Task: 4.1.
 
-Pure helpers: the command that builds the app and calls them lives in `app/main.py`, because
+Pure helpers: the command that builds the app and calls them lives in `app/cli.py`, because
 `core` imports no layer.
 """
 

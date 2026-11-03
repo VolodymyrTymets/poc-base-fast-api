@@ -3,6 +3,7 @@
 <!-- A human writes this line to approve. Until it is here, guard-plan-approval blocks writes to code.
      Approved-by: <name> · <date> -->
 Approved-by: volodymyr · 2026-11-03
+<!-- Amended after review, with the owner's choice: the export command moved from app/main.py to a new app/cli.py (ADR-0020). Read `app/main.py` in R2 below as `app/cli.py`, `python -m app.main` as `python -m app.cli`. -->
 
 Pattern followed: `app/main.py` (health `APIRouter(prefix=API_PREFIX)` + `include_router`) and `app/core/*.py` (one module per concern); the
 `python -m` entry follows the `python -m app.seeds` style of ADR-0011, with the wiring in `main.py`. Rules: `.claude/rules/project-structure.md` (routers: no logic, schemas not ORM, only `main.py` imports routers).
@@ -11,7 +12,7 @@ Layer files exist as docstring-only, so this fills them rather than inventing a 
 ## Contract changes
 - boundary: additive. `/api/v1/health` unchanged; no new paths (tags only). New committed contract file `openapi.json`.
 - data: none.
-- generated output: `openapi.json` at the repo root, by `uv run python -m app.main --export-openapi`; never hand-edited.
+- generated output: `openapi.json` at the repo root, by `uv run python -m app.cli --export-openapi`; never hand-edited.
 
 ## Requirements (ordered; branch `feat/POC-4.1-router-layout`, one draft PR, one commit each)
 
@@ -26,14 +27,14 @@ Layer files exist as docstring-only, so this fills them rather than inventing a 
 ### R2 — OpenAPI export command and committed `openapi.json` (M)
 - files: `app/core/openapi.py` (new, pure: `render(app: FastAPI) -> str` with sorted keys, indent 2, trailing newline; `is_current(app, path: Path) -> bool`; imports nothing from `app.main` or `routers`),
   `app/main.py` (change: `export_openapi(path=OPENAPI_PATH, check=False) -> int` builds `create_app(Settings())` and writes or checks; an `if __name__ == "__main__"` entry taking `--export-openapi [--check]`; wiring is allowed here),
-  `openapi.json` (new, generated). Command: `uv run python -m app.main --export-openapi` (and `--check`). No new top-level module, so no ADR (project-structure 4 and 7 hold).
+  `openapi.json` (new, generated). Command: `uv run python -m app.cli --export-openapi` (and `--check`). No new top-level module, so no ADR (project-structure 4 and 7 hold).
 - layer: core (pure helper), main (wiring), generated file at root.
 - test: `tests/unit/test_openapi_export.py` — render is deterministic (twice equal); `export_openapi(tmp_path/...)` writes what `render` returns; `--check` returns 1 against a modified temp copy and 0 against a current one; the spec is identical for two different `Settings`.
-- executed how: `uv run python -m app.main --export-openapi` (second run leaves `git diff openapi.json` empty), `--check` exit 0; exit 1 shown against a temp copy via the path argument, never by editing the root file.
+- executed how: `uv run python -m app.cli --export-openapi` (second run leaves `git diff openapi.json` empty), `--check` exit 0; exit 1 shown against a temp copy via the path argument, never by editing the root file.
 - risk: `python -m app.main` loads `app.main` as `__main__` too; harmless because only `export_openapi` runs. Cheapest check: run it in R2 before writing the tests.
 
 ### R3 — Stale-spec and response-model guard tests (S)
-- files: `tests/unit/test_openapi_stale.py` (new: committed `openapi.json` equals `render()`; failure message names `uv run python -m app.main --export-openapi`),
+- files: `tests/unit/test_openapi_stale.py` (new: committed `openapi.json` equals `render()`; failure message names `uv run python -m app.cli --export-openapi`),
   `tests/unit/test_response_models.py` (new: for every `APIRoute`, `response_model` is set and no class in it is a `Base` subclass; a test-local route returning an ORM class proves the check fails).
 - layer: tests (unit: no Docker, no network; the app is built with `Settings()` and no `DATABASE_URL`).
 - test: the files themselves. Failing-then-passing evidence for AC4: add a throwaway route, show the stale test red, regenerate, green, remove.

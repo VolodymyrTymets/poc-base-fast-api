@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0019 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0020 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -11,9 +11,9 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 ### Repo layout
 | Path | What lives here | Deployable? | Owner |
 |------|-----------------|-------------|-------|
-| `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, CORS, the tags, the six routers, `GET /api/v1/health`), `run()` and `export_openapi()` (the `python -m app.main --export-openapi` command, task 4.1); `config.py` has `Settings` and `get_settings()`; `dependencies.py` is docstring-only | yes, `uv run poc-base-fast-api` | backend |
+| `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, CORS, the tags, the six routers, `GET /api/v1/health`), and `run()`; `cli.py` has the project commands (`python -m app.cli --export-openapi`, task 4.1, [ADR-0020](decisions/ADR-0020-cli-module.md)); `config.py` has `Settings` and `get_settings()`; `dependencies.py` is docstring-only | yes, `uv run poc-base-fast-api` | backend |
 | `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` (task 2.2) and `file.py`, `notification.py` and `system.py` (task 2.3, below) are built, the rest are docstring-only. `models/system.py` holds `DeletedHistory` and has no counterpart in the other layers | — | backend |
-| `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `openapi.py` (`render` and `is_current` for the exported contract; the command is in `main.py` because `core` imports no layer), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
+| `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `openapi.py` (`render` and `is_current` for the exported contract; the command is in `cli.py` because `core` imports no layer), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
 | `app/workers/`, `app/seeds/` | the arq worker and jobs, the seed runner; docstring-only | — | backend |
 | `tests/` | `unit/` (no Docker, database or network) and `e2e/` (real Postgres, the app over HTTP), flat `test_<subject>.py` files with names unique across both; the conventions are in `.claude/rules/testing-python.md` and the `test-conventions` skill (task 3.3). `conftest.py` and `utils/db.py` (task 3.1, [ADR-0006](decisions/ADR-0006-test-database-testcontainers.md)): a PostGIS container per session (or `TEST_DATABASE_URL`), a template database built with `alembic upgrade head`, one copy per test module, and a `db_session` fixture. Task 3.2: `utils/client.py` (`client_for`, `running_client`), `utils/auth.py` (sign-up and sign-in helper), `utils/queue.py` (`FakeQueue`), `utils/clock.py` (`FROZEN_NOW`) and the fixtures `asgi_app`, `client`, `queue` and `frozen_clock`. `testcontainers[postgres]`, `types-docker` and `time-machine` are dev dependencies | — | backend |
 | `alembic.ini`, `migrations/` | the Alembic setup (task 2.4, [ADR-0017](decisions/ADR-0017-alembic-migrations-directory.md)): `env.py` is async, takes the URL from `Settings` and compares models with the database; `versions/0001_init.py` is the final state of the four Prisma migrations, hand-written and frozen. Tooling beside `app/`, not part of the wheel | — | backend |
@@ -41,7 +41,7 @@ foreign key to `File` (`AccountProfile.avatar`, `Account.files`, `Account.notifi
 only a route that needs a session fails. No cache or queue is wired.
 
 ### Boundaries and contracts
-The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; the six feature routers (`app/routers/<module>.py`, each an `APIRouter` with its own tag) are included under `/api/v1` and are still empty, and `/docs` lists their tags; CORS allows the origins in `CORS_ORIGINS`. A request body over `MAX_REQUEST_BODY_BYTES` gets 413 before routing (the body limit sits inside CORS, so the 413 carries CORS headers). Logs are JSON on stdout with tokens, passwords, DOB and phone numbers redacted; Sentry is off for `local` and without `SENTRY_DSN`. SIGTERM stops the server after `SHUTDOWN_TIMEOUT_SECONDS` at most. The one generated file is the root `openapi.json`, written by `uv run python -m app.main --export-openapi` and checked by `tests/unit/test_openapi_stale.py`; a test also fails when a route has no response model or a response model holds an ORM class.
+The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). One route exists, `GET /api/v1/health`; the six feature routers (`app/routers/<module>.py`, each an `APIRouter` with its own tag) are included under `/api/v1` and are still empty, and `/docs` lists their tags; CORS allows the origins in `CORS_ORIGINS`. A request body over `MAX_REQUEST_BODY_BYTES` gets 413 before routing (the body limit sits inside CORS, so the 413 carries CORS headers). Logs are JSON on stdout with tokens, passwords, DOB and phone numbers redacted; Sentry is off for `local` and without `SENTRY_DSN`. SIGTERM stops the server after `SHUTDOWN_TIMEOUT_SECONDS` at most. The one generated file is the root `openapi.json`, written by `uv run python -m app.cli --export-openapi` and checked by `tests/unit/test_openapi_stale.py`; a test also fails when a route has no response model or a response model holds an ORM class.
 
 ### Environments
 | Env | URL | Database | Who may touch it |
@@ -50,7 +50,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0019, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0020, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -76,6 +76,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - Schema parity with the Node base is a naming convention, not proven by a `pg_dump` diff; task 2.5 is a smoke run of `alembic upgrade head`, `alembic check` and the app
   ([ADR-0019](decisions/ADR-0019-schema-parity-not-diffed.md)).
 - Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).
+- `app/cli.py` holds the project commands that need the whole app, starting with the `openapi.json` export; `main.py` stays the app only
+  ([ADR-0020](decisions/ADR-0020-cli-module.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`
   ([ADR-0008](decisions/ADR-0008-auth-tokens-refresh-hash-and-transport.md)).

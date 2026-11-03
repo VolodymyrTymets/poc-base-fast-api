@@ -85,8 +85,8 @@ Node base's four Prisma migrations. The database URL is read from `DATABASE_URL`
 
 ## API contract
 The OpenAPI document is committed as `openapi.json` at the repo root (ADR-0003). It is generated, never edited by hand:
-- `uv run python -m app.main --export-openapi` rewrites it from `create_app()`; the output is sorted and stable, so a second run changes nothing.
-- `uv run python -m app.main --export-openapi --check` exits 1 without writing when the file is stale. `tests/unit/test_openapi_stale.py` does the same check, so
+- `uv run python -m app.cli --export-openapi` rewrites it from `create_app()`; the output is sorted and stable, so a second run changes nothing.
+- `uv run python -m app.cli --export-openapi --check` exits 1 without writing when the file is stale. `tests/unit/test_openapi_stale.py` does the same check, so
   a route added without regenerating fails `uv run pytest tests/unit`.
 - `/docs` (Swagger UI) and `/openapi.json` are served by the running app and list the six feature tags.
 

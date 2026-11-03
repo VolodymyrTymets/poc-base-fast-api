@@ -17,7 +17,7 @@ Goal 1 (scaffolding): a fork adds a route by editing one router file; the contra
 ## Acceptance criteria
 - [x] AC1 Given the running app, when `/docs` and `/openapi.json` are opened, then the six tags are listed and `GET /api/v1/health` is documented.
 - [x] AC2 Given each module in `routers/`, then it defines `router = APIRouter(prefix=..., tags=[...])`, and `create_app` includes it under `/api/v1`.
-- [x] AC3 Given `uv run python -m app.main --export-openapi`, then `openapi.json` is written deterministically (sorted keys, trailing newline); a second run changes nothing.
+- [x] AC3 Given `uv run python -m app.cli --export-openapi`, then `openapi.json` is written deterministically (sorted keys, trailing newline); a second run changes nothing.
 - [x] AC4 Given a route added without regenerating, then the stale-spec test fails with the command to run; with the file regenerated it passes.
 - [x] AC5 Given a route whose response model is a `Base` subclass, then the response-model test fails.
 - [x] AC6 Given the diff, then `openapi.json` is in `protected-paths.md` (never hand-edited) and ARCHITECTURE, RUNBOOK and CLAUDE.md command map are updated.
@@ -32,5 +32,5 @@ Goal 1 (scaffolding): a fork adds a route by editing one router file; the contra
 ## Open questions
 | # | Question | My assumed answer | Needs a human? |
 |---|----------|-------------------|----------------|
-| Q1 | Export command shape | `uv run python -m app.main --export-openapi` (`--check` verifies), like `python -m app.seeds`; no console script, so `pyproject.toml` is untouched | no, but CLAUDE.md gets a new map row |
+| Q1 | Export command shape | `uv run python -m app.cli --export-openapi` (`--check` verifies), like `python -m app.seeds`; no console script, so `pyproject.toml` is untouched | no, but CLAUDE.md gets a new map row |
 | Q2 | Router prefixes | module-level, e.g. `/auth`; `account_profile` uses `/accounts` (ENDPOINTS.md, 5.4); `account` `/account`, `account_role` none yet, `files` `/files`, `notifier` none: an empty router with its tag, included like the others (decided) | no |
