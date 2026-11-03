@@ -18,6 +18,13 @@ above; there is no cache or queue. `uv build` writes the wheel and sdist
 into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
+## Token secrets
+`JWT_SECRET` (access tokens) and `JWT_REFRESH_TOKEN_SECRET` (refresh tokens) sign the JWTs; `JWT_ACCESS_TOKEN_EXPIRES_IN` (default `15m`) and
+`JWT_REFRESH_TOKEN_EXPIRES_IN` (default `7d`) take `30s`, `15m`, `55min`, `2h` or `7d`. With `APP_ENV` `local` or `test` they may be unset: the
+app boots and only issuing or checking a token fails (500). With `development` or `production` the boot stops unless both are set, at least
+32 characters and different, so `.env.development.example` must be edited before use (`openssl rand -hex 32` makes a good value). Changing a
+secret logs everyone out.
+
 ## Logging, errors and shutdown
 - Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, DOB and
   phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
@@ -60,7 +67,7 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
   from `utils.client`; `client_for(app)` is the same client without the lifespan.
 - `utils.auth`: `sign_up(client, email, password)` and `sign_in(...)` post to `/api/v1/auth/sign-up` (expects 201) and `/sign-in` (expects 200) and
   return `AuthTokens`; `.headers` is the Bearer header, `.refresh_headers` the `x-refresh-token` one. A wrong status fails the test with the status
-  and the start of the body. Until tasks 4.4 and 7.3 exist only stub routes prove it, so its first real run is the 7.3 e2e suite.
+  and the start of the body. Until task 7.3 exists only stub routes prove it, so its first real run is the 7.3 e2e suite.
 - `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. The real
   queue protocol comes with task 6.1, which adapts the fake.
 - `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to

@@ -42,11 +42,11 @@ a token codec, but it stays inside ADR-0008 and ADR-0010, so no ADR. Layers: `co
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` (Docker or `TEST_DATABASE_URL` needed by the older tests; the new one needs neither), `uv run python -m app.cli --export-openapi --check`. Anything not run goes under "Not verified".
 
 ## Docs (same PR, rule E1)
-- [ ] docs/features/POC-4.4/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md — `security.py` and the dependencies built, `pyjwt` runtime dependency, JWT settings
-- [ ] docs/RUNBOOK.md — the four settings; `development` and `production` refuse to boot without real secrets (so `.env.development.example` needs editing before use)
-- [ ] docs/api/ENDPOINTS.md — Authentication section: the dependency behaviour, 401 header; docs/api/ERRORS.md only if wording changes
-- [ ] DOMAIN_GLOSSARY: no new term; ADR: none (inside ADR-0008/0010)
+- [x] docs/features/POC-4.4/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md — `security.py` and the dependencies built, `pyjwt` runtime dependency, JWT settings
+- [x] docs/RUNBOOK.md — the four settings; `development` and `production` refuse to boot without real secrets (so `.env.development.example` needs editing before use)
+- [x] docs/api/ENDPOINTS.md — Authentication section: the dependency behaviour, 401 header; docs/api/ERRORS.md only if wording changes
+- [x] DOMAIN_GLOSSARY: no new term; ADR: none (inside ADR-0008/0010)
 
 ## Risks and unknowns
 | Risk | Impact | Cheapest way to find out early |

@@ -18,14 +18,14 @@ transport), ADR-0010 (one secret per token type, 15m default) and ENDPOINTS.md d
   any route; a new error code (`UnauthorizedError` exists).
 
 ## Acceptance criteria
-- [ ] AC1 Given no `Authorization` header, a non-Bearer scheme, an empty token, an expired token or a tampered token, when a route uses `current_account`, then 401 `UNAUTHORIZED` in the contract body.
-- [ ] AC2 Given a valid access token, when the route runs, then the handler receives `TokenClaims` with the token's `sub` and `jti`.
-- [ ] AC3 Same three cases for `refresh_account` with `x-refresh-token`.
-- [ ] AC4 An access token is rejected by `refresh_account` and a refresh token by `current_account` (secret differs and `typ` differs; test both separately).
-- [ ] AC5 A token signed with `alg=none` or HS384, or missing `sub`, `jti`, `typ` or `exp`, is rejected.
-- [ ] AC6 `parse_duration` accepts `s`, `m`, `min`, `h`, `d` and raises on anything else (`15`, `1w`, `-5m`, `0m`, empty).
-- [ ] AC7 No token or secret is logged or put in an error body or `details` (rules D8, P4); a secret never appears in `repr(Settings)`.
-- [ ] AC8 A missing secret fails loudly (see Q1), never signs with an empty or default key.
+- [x] AC1 Given no `Authorization` header, a non-Bearer scheme, an empty token, an expired token or a tampered token, when a route uses `current_account`, then 401 `UNAUTHORIZED` in the contract body.
+- [x] AC2 Given a valid access token, when the route runs, then the handler receives `TokenClaims` with the token's `sub` and `jti`.
+- [x] AC3 Same three cases for `refresh_account` with `x-refresh-token`.
+- [x] AC4 An access token is rejected by `refresh_account` and a refresh token by `current_account` (secret differs and `typ` differs; test both separately).
+- [x] AC5 A token signed with `alg=none` or HS384, or missing `sub`, `jti`, `typ` or `exp`, is rejected.
+- [x] AC6 `parse_duration` accepts `s`, `m`, `min`, `h`, `d` and raises on anything else (`15`, `1w`, `-5m`, `0m`, empty).
+- [x] AC7 No token or secret is logged or put in an error body or `details` (rules D8, P4); a secret never appears in `repr(Settings)`.
+- [x] AC8 A missing secret fails loudly (see Q1), never signs with an empty or default key.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
