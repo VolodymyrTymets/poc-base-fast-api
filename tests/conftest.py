@@ -6,7 +6,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from time_machine import TimeMachineFixture
 from utils.client import running_client
 from utils.clock import FROZEN_NOW
@@ -22,7 +22,7 @@ from utils.db import (
 from utils.queue import FakeQueue
 
 from app.config import Settings, get_settings
-from app.core.db import create_engine
+from app.core.db import create_engine, create_session_factory
 from app.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -80,6 +80,29 @@ def module_database_url(database_url: str, template_database: str) -> Iterator[s
         yield database_url_for(database_url, name)
     finally:
         drop_database(database_url, name)
+
+
+@pytest.fixture
+def unseeded_database_url(database_url: str, template_database: str) -> Iterator[str]:
+    """A migrated database that no seed has touched, one per test (the seed tests commit and may not delete rows, rule P6)."""
+    name = new_database_name("unseeded")
+    create_database(database_url, name, template=template_database)
+    try:
+        yield database_url_for(database_url, name)
+    finally:
+        drop_database(database_url, name)
+
+
+@pytest.fixture
+async def unseeded_session_factory(
+    unseeded_database_url: str,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    engine = create_engine(Settings(database_url=unseeded_database_url))
+    assert engine is not None
+    try:
+        yield create_session_factory(engine)
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture
