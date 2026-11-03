@@ -5,6 +5,7 @@ from typing import Any
 
 import jwt
 import pytest
+from pydantic import SecretStr
 from utils.clock import FROZEN_NOW
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
@@ -196,3 +197,16 @@ def test_a_missing_secret_fails_loudly_and_names_the_setting(
         issue_token(unset, ACCOUNT_ID, token_type)
     with pytest.raises(AuthConfigurationError, match=name):
         verify_token(unset, "a.b.c", token_type)
+
+
+@pytest.mark.parametrize("token_type", list(TokenType))
+def test_an_empty_secret_is_a_configuration_error_not_a_401(
+    token_type: TokenType,
+) -> None:
+    # Built in code: the environment path already turns a blank value into None.
+    empty = Settings(jwt_secret=SecretStr(""), jwt_refresh_token_secret=SecretStr(""))
+
+    with pytest.raises(AuthConfigurationError):
+        issue_token(empty, ACCOUNT_ID, token_type)
+    with pytest.raises(AuthConfigurationError):
+        verify_token(empty, "a.b.c", token_type)

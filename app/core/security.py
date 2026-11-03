@@ -45,7 +45,7 @@ def _secret_for(settings: Settings, token_type: TokenType) -> str:
     else:
         secret, name = settings.jwt_refresh_token_secret, "JWT_REFRESH_TOKEN_SECRET"
     # Never fall back to a default key: an unset secret must not sign or verify anything.
-    if secret is None:
+    if secret is None or not secret.get_secret_value():
         raise AuthConfigurationError(f"{name} is not set")
     return secret.get_secret_value()
 
