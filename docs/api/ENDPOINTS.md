@@ -3,7 +3,7 @@
 > Reference for tasks 4.x to 8.x. It maps each of the 14 operations of the Node base's `api/schema.gql` to a REST route, and records
 > the behaviour each one must keep. Source of behaviour: the Node repo (`poc-base`, read-only), cited as `file:line` in the
 > last column; paths are relative to `api/src/`. Contract decisions: ADR-0003 (REST and errors), ADR-0008 (tokens),
-> ADR-0009 (files), ADR-0010 (configuration). Models, validation code and `openapi.json` come in tasks 4.1 to 4.3.
+> ADR-0009 (files), ADR-0010 (configuration). The exported contract is the root `openapi.json` (task 4.1, generated); models and validation code come in tasks 4.2 and 4.3.
 
 ## Conventions
 

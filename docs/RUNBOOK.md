@@ -83,6 +83,13 @@ Node base's four Prisma migrations. The database URL is read from `DATABASE_URL`
 - The tests in `tests/e2e/test_db_migrations.py` create a database named `poc_migrations_<hex>` on the test server ("Database tests" above) for each
   test and drop it afterwards, so that role needs `CREATEDB` (and, for the extension, superuser rights). If a run is killed, drop any leftover `poc_migrations_*` database by hand.
 
+## API contract
+The OpenAPI document is committed as `openapi.json` at the repo root (ADR-0003). It is generated, never edited by hand:
+- `uv run python -m app.main --export-openapi` rewrites it from `create_app()`; the output is sorted and stable, so a second run changes nothing.
+- `uv run python -m app.main --export-openapi --check` exits 1 without writing when the file is stale. `tests/unit/test_openapi_stale.py` does the same check, so
+  a route added without regenerating fails `uv run pytest tests/unit`.
+- `/docs` (Swagger UI) and `/openapi.json` are served by the running app and list the six feature tags.
+
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e`, `uv run poc-base-fast-api`, `uv run alembic upgrade head` and

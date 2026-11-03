@@ -15,12 +15,12 @@ Goal 1 (scaffolding): a fork adds a route by editing one router file; the contra
   a health router (not a module in ADR-0011).
 
 ## Acceptance criteria
-- [ ] AC1 Given the running app, when `/docs` and `/openapi.json` are opened, then the six tags are listed and `GET /api/v1/health` is documented.
-- [ ] AC2 Given each module in `routers/`, then it defines `router = APIRouter(prefix=..., tags=[...])`, and `create_app` includes it under `/api/v1`.
-- [ ] AC3 Given `uv run python -m app.main --export-openapi`, then `openapi.json` is written deterministically (sorted keys, trailing newline); a second run changes nothing.
-- [ ] AC4 Given a route added without regenerating, then the stale-spec test fails with the command to run; with the file regenerated it passes.
-- [ ] AC5 Given a route whose response model is a `Base` subclass, then the response-model test fails.
-- [ ] AC6 Given the diff, then `openapi.json` is in `protected-paths.md` (never hand-edited) and ARCHITECTURE, RUNBOOK and CLAUDE.md command map are updated.
+- [x] AC1 Given the running app, when `/docs` and `/openapi.json` are opened, then the six tags are listed and `GET /api/v1/health` is documented.
+- [x] AC2 Given each module in `routers/`, then it defines `router = APIRouter(prefix=..., tags=[...])`, and `create_app` includes it under `/api/v1`.
+- [x] AC3 Given `uv run python -m app.main --export-openapi`, then `openapi.json` is written deterministically (sorted keys, trailing newline); a second run changes nothing.
+- [x] AC4 Given a route added without regenerating, then the stale-spec test fails with the command to run; with the file regenerated it passes.
+- [x] AC5 Given a route whose response model is a `Base` subclass, then the response-model test fails.
+- [x] AC6 Given the diff, then `openapi.json` is in `protected-paths.md` (never hand-edited) and ARCHITECTURE, RUNBOOK and CLAUDE.md command map are updated.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
