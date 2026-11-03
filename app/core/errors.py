@@ -9,11 +9,12 @@ import logging
 import traceback
 from collections.abc import Sequence
 from enum import StrEnum, auto
+from http import HTTPStatus
 from typing import ClassVar, TypedDict
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -66,7 +67,7 @@ class ErrorEnvelope(TypedDict):
 
 
 def error_body(
-    code: str, message: str, details: Sequence[ErrorDetail] = ()
+    code: ErrorCode, message: str, details: Sequence[ErrorDetail] = ()
 ) -> ErrorEnvelope:
     """The single place the error body is built, also used by middleware that cannot raise."""
     return {"error": {"code": code, "message": message, "details": list(details)}}
@@ -155,21 +156,42 @@ _HTTP_STATUS_ERRORS: dict[int, type[AppError]] = {
 }
 
 
+# Types whose `msg` is written by our own validators (`raise ValueError(...)`), so it may
+# contain the submitted value. Their message is replaced by a fixed one (rules D8, P4).
+_CUSTOM_MESSAGE_TYPES = {
+    "value_error": "Invalid value",
+    "assertion_error": "Invalid value",
+}
+
+
+def _reason_phrase(status: int) -> str:
+    try:
+        return HTTPStatus(status).phrase
+    except ValueError:
+        # A status outside the standard registry has no phrase.
+        return "Error"
+
+
 def validation_details(exc: RequestValidationError) -> list[ErrorDetail]:
     """One entry per failed field: where it is, which field, why. Never the submitted value.
 
     Pydantic's own error dicts carry `input` (a password in a sign-up body) and `ctx`, so
-    only `loc`, `msg` and `type` are read (rules D8, P4).
+    only `loc`, `msg` and `type` are read, and `msg` is replaced where a validator of ours
+    wrote it. Limit: a key of a client-sent dict is part of `loc`, so a request model must
+    not take a dict whose keys are personal data.
     """
     details: list[ErrorDetail] = []
     for error in exc.errors():
         location = [str(part) for part in error["loc"]]
+        kind = str(error["type"])
+        # For malformed JSON FastAPI puts the character offset in `loc`: not a field.
+        field = "" if kind == "json_invalid" else ".".join(location[1:])
         details.append(
             {
                 "in": location[0] if location else "",
-                "field": ".".join(location[1:]),
-                "message": str(error["msg"]),
-                "type": str(error["type"]),
+                "field": field,
+                "message": _CUSTOM_MESSAGE_TYPES.get(kind, str(error["msg"])),
+                "type": kind,
             }
         )
     return details
@@ -196,13 +218,23 @@ def register_error_handlers(app: FastAPI, *, expose_trace: bool) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(
         _request: Request, exc: StarletteHTTPException
-    ) -> JSONResponse:
+    ) -> Response:
+        # HTTP forbids a body on these; Starlette's own handler sends none either.
+        if exc.status_code in {204, 304}:
+            return Response(status_code=exc.status_code, headers=exc.headers)
         known = _HTTP_STATUS_ERRORS.get(exc.status_code)
         if known is not None:
             error = known()
             status = error.status_code
         else:
-            error = ValidationFailedError(exc.detail)
+            # `detail` is Any in FastAPI: only a string is used, and an unknown status falls
+            # back to its reason phrase so `message` stays a string.
+            message = (
+                exc.detail
+                if isinstance(exc.detail, str)
+                else _reason_phrase(exc.status_code)
+            )
+            error = ValidationFailedError(message)
             status = exc.status_code
         # Headers matter: a 405 carries `Allow`, a 401 may carry `WWW-Authenticate`.
         return JSONResponse(error.body(), status_code=status, headers=exc.headers)

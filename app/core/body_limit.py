@@ -9,11 +9,11 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.errors import error_body
+from app.core.errors import ErrorCode, error_body
 
 # Pure ASGI middleware runs before routing and cannot raise into the exception handlers, so
 # it builds the same body with the same function (app/core/errors.py, ADR-0003).
-TOO_LARGE_BODY = error_body("VALIDATION_FAILED", "Request body too large")
+TOO_LARGE_BODY = error_body(ErrorCode.VALIDATION_FAILED, "Request body too large")
 
 
 class BodyLimitMiddleware:

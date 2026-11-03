@@ -11,6 +11,7 @@ class Payload(BaseModel):
     count: int
 
 
+# WHY: `Any` is the type FastAPI's `openapi()` returns: a JSON document of no fixed shape (POC-4.2).
 def spec_with_a_body_route() -> dict[str, Any]:
     app: FastAPI = create_app(Settings())
 

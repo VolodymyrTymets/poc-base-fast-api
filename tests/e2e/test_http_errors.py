@@ -4,7 +4,8 @@ from typing import Literal
 import httpx
 import pytest
 from fastapi import FastAPI
-from pydantic import BaseModel, Field
+from fastapi import HTTPException as FastAPIHTTPException
+from pydantic import BaseModel, Field, field_validator
 from starlette.exceptions import HTTPException
 from utils.client import running_client
 
@@ -29,6 +30,16 @@ INTERNAL_MESSAGE = "secret-internal-detail"
 class SignUp(BaseModel):
     email: str
     password: str = Field(min_length=8)
+
+
+class Coupon(BaseModel):
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def must_be_known(cls, value: str) -> str:
+        # What task 4.3 validators will do: put the value in the error text.
+        raise ValueError(f"unknown code {value}")
 
 
 class Profile(BaseModel):
@@ -69,6 +80,15 @@ def make_app(app_env: Literal["local", "test", "production"] = "test") -> FastAP
     @app.post("/api/v1/_sign-up")
     async def sign_up(payload: SignUp) -> None:
         return None
+
+    @app.post("/api/v1/_coupon")
+    async def coupon(payload: Coupon) -> None:
+        return None
+
+    @app.get("/api/v1/_http-detail")
+    async def raise_http_detail() -> None:
+        # FastAPI's class accepts any `detail`; Starlette's types it as a string.
+        raise FastAPIHTTPException(status_code=400, detail={"k": "v"})
 
     @app.post("/api/v1/_account")
     async def account(payload: Account) -> None:
@@ -111,10 +131,16 @@ async def test_domain_error_answers_with_its_status_and_code(
 ) -> None:
     response = await call(make_app(), "GET", f"/api/v1/_raise/{name}")
 
-    body = response.json()
-    assert (response.status_code, body["error"]["code"]) == (status, code)
-    assert set(body["error"]) == {"code", "message", "details"}
-    assert body["error"]["details"] == []
+    assert (response.status_code, response.json()) == (
+        status,
+        {
+            "error": {
+                "code": code,
+                "message": RAISED[name].default_message,
+                "details": [],
+            }
+        },
+    )
 
 
 async def test_bad_body_is_validation_failed_with_one_entry_per_field() -> None:
@@ -150,10 +176,34 @@ async def test_malformed_json_is_validation_failed() -> None:
         headers={"content-type": "application/json"},
     )
 
-    assert (response.status_code, response.json()["error"]["code"]) == (
+    assert (response.status_code, response.json()["error"]["details"]) == (
         422,
-        "VALIDATION_FAILED",
+        [
+            {
+                "in": "body",
+                "field": "",
+                "message": "JSON decode error",
+                "type": "json_invalid",
+            }
+        ],
     )
+
+
+async def test_validator_message_that_contains_the_value_is_not_returned() -> None:
+    response = await call(
+        make_app(), "POST", "/api/v1/_coupon", json={"code": "SECRET123"}
+    )
+
+    assert response.status_code == 422
+    assert "SECRET123" not in response.text
+    assert response.json()["error"]["details"] == [
+        {
+            "in": "body",
+            "field": "code",
+            "message": "Invalid value",
+            "type": "value_error",
+        }
+    ]
 
 
 async def test_validation_error_never_echoes_the_submitted_password(
@@ -220,7 +270,8 @@ async def test_unexpected_error_shows_the_trace_in_local() -> None:
     response = await call(make_app("local"), "GET", "/api/v1/_boom")
 
     (trace,) = response.json()["error"]["details"]
-    assert (response.status_code, "RuntimeError" in trace) == (500, True)
+    assert response.status_code == 500
+    assert "RuntimeError: secret-internal-detail" in trace
 
 
 @pytest.mark.parametrize("app_env", ["local", "production"])
@@ -233,3 +284,26 @@ async def test_unexpected_error_is_logged_with_its_stack(
     (record,) = [r for r in caplog.records if r.name == "app.core.errors"]
     assert record.exc_info is not None
     assert record.exc_info[0] is RuntimeError
+
+
+async def test_http_exception_with_a_non_string_detail_still_has_a_string_message() -> (
+    None
+):
+    response = await call(make_app(), "GET", "/api/v1/_http-detail")
+
+    assert (response.status_code, response.json()) == (
+        400,
+        {
+            "error": {
+                "code": "VALIDATION_FAILED",
+                "message": "Bad Request",
+                "details": [],
+            }
+        },
+    )
+
+
+async def test_not_modified_is_sent_without_a_body() -> None:
+    response = await call(make_app(), "GET", "/api/v1/_http/304")
+
+    assert (response.status_code, response.content) == (304, b"")

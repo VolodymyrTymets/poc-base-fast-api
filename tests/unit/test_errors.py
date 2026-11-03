@@ -37,7 +37,7 @@ def test_error_class_carries_its_status_and_code(
 
 
 def test_error_body_has_the_three_keys() -> None:
-    body = error_body("NOT_FOUND", "Nothing here", [{"field": "id"}])
+    body = error_body(ErrorCode.NOT_FOUND, "Nothing here", [{"field": "id"}])
 
     assert body == {
         "error": {

@@ -13,7 +13,7 @@ Goal 2 (authentication): the web client tells "token rejected, refresh" (`UNAUTH
 ## Acceptance criteria
 - [x] AC1 Each of the eight codes (`UNAUTHORIZED` 401, `INVALID_CREDENTIALS` 401, `INVALID_RESET_TOKEN` 400, `EMAIL_ALREADY_REGISTERED` 409, `FORBIDDEN` 403, `NOT_FOUND` 404, `VALIDATION_FAILED` 422, `INTERNAL_SERVER_ERROR` 500) has a test that raises it and asserts status and body `{"error": {"code", "message", "details"}}`.
 - [x] AC2 A body failing Pydantic validation returns 422 `VALIDATION_FAILED` with one `details` entry per field (`field`, `message`, `type`); the FastAPI `{"detail": [...]}` body never appears.
-- [x] AC3 `details` never contains the submitted value (a password in a bad sign-up body stays out of the response and the logs, rules D8, P4).
+- [x] AC3 `details` never contains the submitted value of a field (a password in a bad sign-up body, or a value a validator puts in its error text, stays out of the response and the logs, rules D8, P4). Limit: a client-sent dict key is part of `field`; documented in ERRORS.md.
 - [x] AC4 An unexpected exception returns 500 `INTERNAL_SERVER_ERROR` with a generic message and no traceback when `APP_ENV` is not `local`; in `local` the traceback is in `details`. It is logged with the stack either way.
 - [x] AC5 An unknown path answers 404 `NOT_FOUND` in the contract shape, not `{"detail": "Not Found"}`.
 - [x] AC6 The 413 of the body limit and the handlers build the body with the same function.
