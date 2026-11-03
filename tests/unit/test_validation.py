@@ -81,7 +81,7 @@ def test_email_at_the_254_character_limit_is_not_rejected_for_length() -> None:
 
 @pytest.mark.parametrize(
     ("value", "stored"),
-    [("+380671234567", "+380671234567"), ("+1 202 555 0123", "+12025550123")],
+    [("+12025550100", "+12025550100"), ("+1 202 555 0123", "+12025550123")],
 )
 def test_phone_is_stored_as_e164(value: str, stored: str) -> None:
     assert TypeAdapter(PhoneNumber).validate_python(value) == stored
