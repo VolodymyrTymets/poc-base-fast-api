@@ -104,6 +104,8 @@ async def test_adding_the_same_role_twice_is_not_swallowed(
     service = AccountRoleService(db_session)
     account_id = await make_account(db_session)
     await service.add_account_to_role(account_id, AccountRoleType.CUSTOMER)
+    # A fresh identity map, as a second request has: the same object twice would only trip an SQLAlchemy warning.
+    db_session.expunge_all()
 
     with pytest.raises(IntegrityError):
         await service.add_account_to_role(account_id, AccountRoleType.CUSTOMER)

@@ -13,7 +13,12 @@ question that matters most, who commits, would be answered differently per file.
 ## Decision
 - A service is a class built with an `AsyncSession`: `AccountRoleService(session)`. It receives no framework object (ADR-0011).
 - A service method may `flush` (to get ids and surface constraint errors) and never commits or rolls back. The caller owns the transaction: a route
-  commits through its session dependency, a test or seed through `session.begin()`. Two services on one session therefore share one transaction.
+  handler ends with `await session.commit()` (`get_session` never commits; it only closes, which rolls back), a test or seed uses `session.begin()`.
+  Two services on one session therefore share one transaction.
+- A route handler never uses `session.begin()`: a dependency (`require_roles`) may already have read on the request's session, which starts
+  its transaction, and `begin()` would then fail with "A transaction is already begun".
+- `dependencies` may import model enums such as `AccountRoleType` (an extension of ADR-0011 rule 4, which lists services, core and config); it
+  imports no model class to query with.
 - A failure the caller must not ignore is an exception: an `AppError` subclass when the client should see it (`core/errors.py`), a plain
   `RuntimeError` subclass named for the case when it is a server fault (it reaches the 500 handler). Never a `None` that means "failed" (rule D5).
 

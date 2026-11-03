@@ -13,7 +13,7 @@ from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
-from app.core.db import create_session_factory
+from app.core.db import create_session_factory, get_session
 from app.core.security import TokenClaims, TokenType, issue_token
 from app.dependencies import require_roles
 from app.main import create_app
@@ -45,6 +45,17 @@ def make_app(database_url: str) -> FastAPI:
         claims: Annotated[TokenClaims, Depends(require_roles(ADMIN, CUSTOMER))],
     ) -> dict[str, str]:
         return {"id": claims.account_id}
+
+    @app.post("/api/v1/_grant")
+    async def grant(
+        claims: Annotated[TokenClaims, Depends(require_roles(ADMIN))],
+        session: Annotated[AsyncSession, Depends(get_session)],
+    ) -> dict[str, str]:
+        # The pattern of ADR-0021: the guard has already read on this session, and the handler commits.
+        target = await _new_account(session)
+        await AccountRoleService(session).add_account_to_role(target, CUSTOMER)
+        await session.commit()
+        return {"id": target}
 
     return app
 
@@ -161,3 +172,19 @@ async def test_no_token_is_unauthorized_even_without_a_database() -> None:
         response = await client.get("/api/v1/_admin")
 
     assert response.status_code == 401
+
+
+async def test_a_guarded_route_can_write_and_commit_on_the_shared_session(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    admin = await account_with(db_engine, ADMIN)
+
+    async with running_client(make_app(module_database_url)) as client:
+        response = await client.post("/api/v1/_grant", headers=token_for(admin))
+
+    assert response.status_code == 200
+    async with create_session_factory(db_engine)() as session:
+        roles = await AccountRoleService(session).get_account_roles(
+            response.json()["id"]
+        )
+    assert roles == [CUSTOMER]
