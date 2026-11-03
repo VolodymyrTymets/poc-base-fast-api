@@ -5,6 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.core.db import utc_now
 from app.core.errors import EmailAlreadyRegisteredError, ForbiddenError, NotFoundError
 from app.models import Account, AccountProfile, File
 from app.schemas.account_profile import UpdateAccountProfileInput
@@ -246,7 +247,7 @@ async def test_a_null_avatar_removes_it(db_session: AsyncSession) -> None:
     assert (await stored(db_session, account_id)).avatar_id is None
 
 
-async def test_an_account_with_no_profile_is_not_found(
+async def test_a_soft_deleted_profile_is_not_found(
     db_session: AsyncSession,
 ) -> None:
     account_id = await make_account(db_session, "e1@example.com")
@@ -255,6 +256,19 @@ async def test_an_account_with_no_profile_is_not_found(
         .where(AccountProfile.account_id == account_id)
         .values(deleted=True)
     )
+
+    with pytest.raises(NotFoundError):
+        await service(db_session).update(account_id, account_id, changes())
+
+
+async def test_an_account_that_never_had_a_profile_is_not_found(
+    db_session: AsyncSession,
+) -> None:
+    bare = Account(last_login_at=utc_now())
+    db_session.add(bare)
+    await db_session.flush()
+    account_id = bare.id
+    db_session.expunge_all()
 
     with pytest.raises(NotFoundError):
         await service(db_session).update(account_id, account_id, changes())

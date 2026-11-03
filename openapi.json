@@ -356,17 +356,17 @@
         ]
       }
     },
-    "/api/v1/accounts/{account_id}/profile": {
+    "/api/v1/accounts/{accountId}/profile": {
       "patch": {
         "description": "Update the caller's own profile: only the fields sent change, `null` clears one.",
-        "operationId": "update_account_profile_api_v1_accounts__account_id__profile_patch",
+        "operationId": "update_account_profile_api_v1_accounts__accountId__profile_patch",
         "parameters": [
           {
             "in": "path",
-            "name": "account_id",
+            "name": "accountId",
             "required": true,
             "schema": {
-              "title": "Account Id",
+              "title": "Accountid",
               "type": "string"
             }
           }

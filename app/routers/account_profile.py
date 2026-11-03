@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
@@ -20,9 +20,10 @@ from app.services.file_assert import FileAssertService
 router = APIRouter(prefix="/accounts", tags=["account_profile"])
 
 
-@router.patch("/{account_id}/profile", response_model=AccountProfileResponse)
+@router.patch("/{accountId}/profile", response_model=AccountProfileResponse)
 async def update_account_profile(
-    account_id: str,
+    # The wire name is camelCase like every field of the contract (ENDPOINTS.md); the Python name stays snake_case.
+    account_id: Annotated[str, Path(alias="accountId")],
     body: UpdateAccountProfileInput,
     # Authenticate, then the role (rule P7); the third layer, that the caller owns `account_id`, is the service's.
     claims: Annotated[

@@ -8,7 +8,7 @@ import uuid
 from typing import Any
 
 from fastapi import FastAPI
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
@@ -17,8 +17,9 @@ from app.config import Settings
 from app.core.db import create_session_factory, utc_now
 from app.core.security import TokenType, issue_token
 from app.main import create_app
-from app.models import Account, AccountProfile, File
+from app.models import Account, AccountProfile, AccountRoleType, File
 from app.services.account import AccountService
+from app.services.account_role import AccountRoleService
 
 BEARER = {"WWW-Authenticate": "Bearer"}
 
@@ -62,6 +63,15 @@ async def bare_account(db_engine: AsyncEngine) -> str:
         session.add(account)
         await session.flush()
         return account.id
+
+
+async def stored_avatar(db_engine: AsyncEngine, account_id: str) -> str | None:
+    async with create_session_factory(db_engine)() as session:
+        return await session.scalar(
+            select(AccountProfile.avatar_id).where(
+                AccountProfile.account_id == account_id
+            )
+        )
 
 
 async def file_of(db_engine: AsyncEngine, owner_id: str) -> str:
@@ -164,7 +174,30 @@ async def test_an_account_with_no_role_is_forbidden(
 
     response = await patch(module_database_url, account_id, account_id, {})
 
-    assert response.status_code == 403
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        403,
+        "FORBIDDEN",
+    )
+
+
+async def test_an_admin_with_no_customer_role_may_update_their_own_profile(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    async with create_session_factory(db_engine)() as session, session.begin():
+        admin = Account(last_login_at=utc_now())
+        admin.profile = AccountProfile(email=fresh_email())
+        session.add(admin)
+        await session.flush()
+        account_id = admin.id
+        await AccountRoleService(session).add_account_to_role(
+            account_id, AccountRoleType.ADMIN
+        )
+
+    response = await patch(
+        module_database_url, account_id, account_id, {"firstName": "Admin"}
+    )
+
+    assert (response.status_code, response.json()["firstName"]) == (200, "Admin")
 
 
 async def test_a_token_of_an_unknown_account_is_forbidden(
@@ -174,7 +207,10 @@ async def test_a_token_of_an_unknown_account_is_forbidden(
 
     response = await patch(module_database_url, unknown, unknown, {})
 
-    assert response.status_code == 403
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        403,
+        "FORBIDDEN",
+    )
 
 
 async def test_an_account_with_a_role_but_no_live_profile_is_not_found(
@@ -237,6 +273,7 @@ async def test_an_avatar_of_another_account_is_forbidden(
     )
 
     assert response.status_code == 403
+    assert await stored_avatar(db_engine, account_id) is None
 
 
 async def test_an_owned_avatar_is_accepted_and_null_removes_it(
@@ -248,12 +285,16 @@ async def test_an_owned_avatar_is_accepted_and_null_removes_it(
         module_database_url, account_id, account_id, {"avatarId": file_id}
     )
 
+    after_set = await stored_avatar(db_engine, account_id)
+
     removed = await patch(
         module_database_url, account_id, account_id, {"avatarId": None}
     )
 
     assert set_it.status_code == 200
     assert removed.status_code == 200
+    assert after_set == file_id
+    assert await stored_avatar(db_engine, account_id) is None
 
 
 async def test_unknown_keys_and_a_null_email_are_validation_errors(
