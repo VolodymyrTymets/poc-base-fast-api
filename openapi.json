@@ -1,6 +1,141 @@
 {
   "components": {
     "schemas": {
+      "AccountProfileResponse": {
+        "description": "The profile as the API shows it; the wire names are camelCase, as in the contract.\n\nIt lists the fields one by one, so identity data (hash, salt, tokens) can never reach a response.",
+        "properties": {
+          "dataOfBirth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataofbirth"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstname"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "isPhoneVerified": {
+            "title": "Isphoneverified",
+            "type": "boolean"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastname"
+          },
+          "middleName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middlename"
+          },
+          "phoneNumber": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phonenumber"
+          }
+        },
+        "required": [
+          "id",
+          "phoneNumber",
+          "firstName",
+          "lastName",
+          "middleName",
+          "dataOfBirth",
+          "email",
+          "isPhoneVerified"
+        ],
+        "title": "AccountProfileResponse",
+        "type": "object"
+      },
+      "AccountResponse": {
+        "description": "The signed-in account with its profile. A fixed shape: no field selection (REST, ADR-0003).",
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountProfileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "updatedAt",
+          "profile"
+        ],
+        "title": "AccountResponse",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -80,6 +215,13 @@
         "title": "HealthResponse",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "description": "Access token from sign-in",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -88,6 +230,53 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/account": {
+      "get": {
+        "description": "The caller's own account, read from the token: authentication is the only layer (ADR-0022).",
+        "operationId": "read_account_api_v1_account_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Account",
+        "tags": [
+          "account"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
