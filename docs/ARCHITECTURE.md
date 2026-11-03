@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0020 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0021 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -11,8 +11,8 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 ### Repo layout
 | Path | What lives here | Deployable? | Owner |
 |------|-----------------|-------------|-------|
-| `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, which runs the seed items before serving when a database is configured, CORS, the error handlers, the tags, the six routers, `GET /api/v1/health`), and `run()`; `cli.py` has the project commands (`python -m app.cli --export-openapi`, task 4.1, [ADR-0020](decisions/ADR-0020-cli-module.md)); `config.py` has `Settings` (with the four JWT settings and `parse_duration`) and `get_settings()`; `dependencies.py` holds `current_account` and `refresh_account` (task 4.4; `create_app` stores the settings in `app.state.settings` for them) | yes, `uv run poc-base-fast-api` | backend |
-| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` (task 2.2) and `file.py`, `notification.py` and `system.py` (task 2.3, below) are built; in `schemas/` the request models of `auth.py` and `account_profile.py` (task 4.3) are built, the rest are docstring-only. `models/system.py` holds `DeletedHistory` and `SeedHistory` (task 5.1) and has no counterpart in the other layers | — | backend |
+| `app/` | the importable package; `__init__.py` holds only a docstring. `main.py` has `create_app()` (lifespan, which runs the seed items before serving when a database is configured, CORS, the error handlers, the tags, the six routers, `GET /api/v1/health`), and `run()`; `cli.py` has the project commands (`python -m app.cli --export-openapi`, task 4.1, [ADR-0020](decisions/ADR-0020-cli-module.md)); `config.py` has `Settings` (with the four JWT settings and `parse_duration`) and `get_settings()`; `dependencies.py` holds `current_account` and `refresh_account` (task 4.4; `create_app` stores the settings in `app.state.settings` for them) and `require_roles(*roles)` (task 5.2: authenticates, loads the caller's roles through `AccountRoleService`, 403 `FORBIDDEN` when none matches, 401 first) | yes, `uv run poc-base-fast-api` | backend |
+| `app/routers/`, `app/schemas/`, `app/models/`, `app/services/` | the layers: one file per module (`account`, `account_profile`, `account_role`, `auth`, `files`, `notifier`; in `models/` the last two are `file.py` and `notification.py`) in each; `models/account.py`, `account_profile.py` and `account_role.py` (task 2.2) and `file.py`, `notification.py` and `system.py` (task 2.3, below) are built; in `schemas/` the request models of `auth.py` and `account_profile.py` (task 4.3) are built, and `services/account_role.py` (task 5.2: `AccountRoleService`, `RoleNotFoundError`) is built; the rest of `services/` and `schemas/` is docstring-only. `models/system.py` holds `DeletedHistory` and `SeedHistory` (task 5.1) and has no counterpart in the other layers | — | backend |
 | `app/core/` | cross-cutting code, one module per concern. Built: `logging.py` (JSON formatter and the redaction functions), `sentry.py` (`init_sentry`, event and breadcrumb scrubbing), `body_limit.py` (the 413 middleware), `errors.py` (the `AppError` subclasses, `error_body`, `ErrorResponse` and `register_error_handlers`, task 4.2), `validation.py` (`StrictModel` and the field types for email, password, phone and UUID, task 4.3), `security.py` (the JWT codec: `issue_token`, `verify_token`, `TokenClaims`, `AuthConfigurationError`; task 4.4), `openapi.py` (`render` and `is_current` for the exported contract; the command is in `cli.py` because `core` imports no layer), `db.py` (`create_engine`, `create_session_factory`, the `get_session` dependency, `Base` with the Prisma-shaped naming convention, and the opt-in `IdMixin`, `TimestampMixin` and `SoftDeleteMixin` of ADR-0014). The rest is docstring-only | — | backend |
 | `app/workers/` | the arq worker and jobs; docstring-only | — | backend |
 | `app/seeds/` | the seed runner (task 5.1): `base.py` (`SeedItem`, `SeedError`), `runner.py` (`run_seeds`, `seed_database`), `registry.py` (`seed_items`: the base list, plus the development list for `local`, `development` and `test`), `items/init_roles.py` (the two roles), and `python -m app.seeds` (`__main__.py`). The development list is empty until task 5.5 | — | backend |
@@ -26,7 +26,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 There is a single root-level `app/` package, laid out by layer ([ADR-0011](decisions/ADR-0011-project-structure.md), rule file `.claude/rules/project-structure.md`). No `src/`, `api/` or `web/` directory is part of the repo.
 
 ### Where data truth lives
-Only the seed runner writes to a database so far (task 5.1), and the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
+Only the seed runner and `AccountRoleService.add_account_to_role` (task 5.2, no route calls it yet) write to a database so far, and the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
 types and the `postgis` extension on an empty database, and `alembic check` fails when the models and the revisions drift apart. The account, file, notification and
 system models are mapped (tasks 2.2, 2.3 and 5.1) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
 `AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient`, `DeletedHistory` and `SeedHistory`, plus the
@@ -51,7 +51,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0020, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0021, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -79,6 +79,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - Sentry as the error sink, off for `local` and without a DSN, with whole-event redaction ([ADR-0013](decisions/ADR-0013-sentry-error-reporting.md)).
 - `app/cli.py` holds the project commands that need the whole app, starting with the `openapi.json` export; `main.py` stays the app only
   ([ADR-0020](decisions/ADR-0020-cli-module.md)).
+- A service is a class over an `AsyncSession`; it flushes and never commits, the caller owns the transaction
+  ([ADR-0021](decisions/ADR-0021-service-shape-and-transactions.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`
   ([ADR-0008](decisions/ADR-0008-auth-tokens-refresh-hash-and-transport.md)).

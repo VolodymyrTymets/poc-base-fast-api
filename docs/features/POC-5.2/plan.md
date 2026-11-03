@@ -48,11 +48,11 @@ ADR-0011 says only what a service may import, so the shape is recorded in a new 
 `TEST_DATABASE_URL`), `uv run python -m app.cli --export-openapi --check`. Anything not run goes under "Not verified".
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-5.2/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md: `services/account_role.py` and `require_roles` built; the layout row no longer calls `services/` docstring-only; the sentence "Only the seed runner writes to a database so far" is reworded (the service writes `AccountOnRole`); ADR-0021 added to the Decided list
-- [ ] docs/api/ENDPOINTS.md: the Token checks bullet gains the role layer (403 `FORBIDDEN`, deleted links not counted)
-- [ ] docs/DOMAIN_GLOSSARY.md: no new term
-- [ ] docs/decisions/ADR-0021-service-shape-and-transactions.md (R1)
+- [x] docs/features/POC-5.2/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md: `services/account_role.py` and `require_roles` built; the layout row no longer calls `services/` docstring-only; the sentence "Only the seed runner writes to a database so far" is reworded (the service writes `AccountOnRole`); ADR-0021 added to the Decided list
+- [x] docs/api/ENDPOINTS.md: the Token checks bullet gains the role layer (403 `FORBIDDEN`, deleted links not counted)
+- [x] docs/DOMAIN_GLOSSARY.md: no new term
+- [x] docs/decisions/ADR-0021-service-shape-and-transactions.md (R1)
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

@@ -15,14 +15,14 @@ Goal 2 (authentication: roles are part of the pipeline a new POC relies on as-is
   admin screens or role-management endpoints, a read cache for roles (9.2), the ownership layer (5.4), changing `AccountRoleType`.
 
 ## Acceptance criteria
-- [ ] AC1 Given a customer's token, when a route declared with `require_roles(ADMIN)` is called, then 403 `FORBIDDEN` with the standard error body.
-- [ ] AC2 Given an admin's token on that route, then the handler runs and receives the caller's `TokenClaims`; `require_roles(ADMIN, CUSTOMER)` admits either role.
-- [ ] AC3 Given no token, or a bad one, then 401 `UNAUTHORIZED` (from `current_account`), never 403.
-- [ ] AC4 Given a valid token whose account holds no role, then 403.
-- [ ] AC5 `get_account_roles` returns the role types of the account's links; a soft-deleted link or a soft-deleted role is not counted (rule P6).
-- [ ] AC6 `add_account_to_role` links the account to the role by type; an unknown role type raises `RoleNotFoundError` (a 500, not swallowed, as Node's `Error`).
-- [ ] AC7 `require_roles()` with no roles raises `ValueError` when the route is declared (fail closed; Node logged and let the request through).
-- [ ] AC8 `openapi.json` is unchanged (`--export-openapi --check` passes).
+- [x] AC1 Given a customer's token, when a route declared with `require_roles(ADMIN)` is called, then 403 `FORBIDDEN` with the standard error body.
+- [x] AC2 Given an admin's token on that route, then the handler runs and receives the caller's `TokenClaims`; `require_roles(ADMIN, CUSTOMER)` admits either role.
+- [x] AC3 Given no token, or a bad one, then 401 `UNAUTHORIZED` (from `current_account`), never 403.
+- [x] AC4 Given a valid token whose account holds no role, then 403.
+- [x] AC5 `get_account_roles` returns the role types of the account's links; a soft-deleted link or a soft-deleted role is not counted (rule P6).
+- [x] AC6 `add_account_to_role` links the account to the role by type; an unknown role type raises `RoleNotFoundError` (a 500, not swallowed, as Node's `Error`).
+- [x] AC7 `require_roles()` with no roles raises `ValueError` when the route is declared (fail closed; Node logged and let the request through).
+- [x] AC8 `openapi.json` is unchanged (`--export-openapi --check` passes).
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
