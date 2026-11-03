@@ -16,8 +16,20 @@ from app.core.body_limit import BodyLimitMiddleware
 from app.core.db import create_engine, create_session_factory
 from app.core.logging import configure_logging
 from app.core.sentry import init_sentry
+from app.routers import account, account_profile, account_role, auth, files, notifier
 
 API_PREFIX = "/api/v1"
+
+# One tag per feature router, in the order of the docs. Declared here so /docs lists
+# every module even while its router has no route yet.
+TAGS = [
+    {"name": "account", "description": "The signed-in account."},
+    {"name": "account_profile", "description": "Profile of an account."},
+    {"name": "account_role", "description": "Roles of an account."},
+    {"name": "auth", "description": "Sign-in, tokens and passwords."},
+    {"name": "files", "description": "File upload and download."},
+    {"name": "notifier", "description": "Notifications (no public route)."},
+]
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
-    app = FastAPI(title="poc-base-fast-api", lifespan=lifespan)
+    app = FastAPI(title="poc-base-fast-api", lifespan=lifespan, openapi_tags=TAGS)
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine) if engine else None
@@ -64,6 +76,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @api.get("/health")
     async def health() -> HealthResponse:
         return HealthResponse(status="ok")
+
+    for module in (account, account_profile, account_role, auth, files, notifier):
+        api.include_router(module.router)
 
     app.include_router(api)
     return app
