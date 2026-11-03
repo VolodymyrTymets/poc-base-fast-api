@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models import DeletedHistory, SeedHistory
 from app.seeds.base import SeedError
-from app.seeds.runner import run_seeds
+from app.seeds.runner import record_failure, run_seeds
 
 type Factory = async_sessionmaker[AsyncSession]
 
@@ -174,3 +174,27 @@ async def test_two_runners_at_once_run_the_item_once(
     assert item.runs == 1
     assert await written(unseeded_session_factory) == ["shared"]
     assert await history(unseeded_session_factory) == {"shared": (True, None)}
+
+
+async def test_a_personal_value_in_the_error_text_is_redacted_in_the_history_row(
+    unseeded_session_factory: Factory,
+) -> None:
+    failing = FakeItem("validating", fail=ValueError("bad phone +380 50 123 4567"))
+
+    with pytest.raises(SeedError):
+        await run_seeds(unseeded_session_factory, [failing])
+
+    successful, result = (await history(unseeded_session_factory))["validating"]
+    assert successful is False
+    assert result == "ValueError: bad phone [REDACTED]"
+
+
+async def test_a_late_failure_record_does_not_overwrite_a_success(
+    unseeded_session_factory: Factory,
+) -> None:
+    # Another process ran the item after this one's attempt failed; this one's failure write then arrives last.
+    await run_seeds(unseeded_session_factory, [FakeItem("raced")])
+
+    await record_failure(unseeded_session_factory, "raced", RuntimeError("too late"))
+
+    assert await history(unseeded_session_factory) == {"raced": (True, None)}

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.core.db import create_engine, create_session_factory, new_id
+from app.core.logging import redact
 from app.models import SeedHistory
 from app.seeds.base import SeedError, SeedItem
 
@@ -32,15 +33,20 @@ def describe(error: Exception) -> str:
 
     A database error is described by the driver's own error: SQLAlchemy's wrapper adds the statement text, which
     is noise in a table column. (Its parameters are hidden by the engine, `hide_parameters` in app/core/db.py.)
+    The text then goes through the log redaction: a seed that validates a phone number or a date of birth may raise
+    an error that quotes it, and this column is not a log (rules D8, P4). Redaction is best effort, as in the log.
     """
     cause = error.orig if isinstance(error, DBAPIError) and error.orig else error
-    return f"{type(cause).__name__}: {cause}"[:MAX_RESULT_LENGTH]
+    return redact(f"{type(cause).__name__}: {cause}")[:MAX_RESULT_LENGTH]
 
 
 async def record(
     session: AsyncSession, name: str, *, successful: bool, result: str | None
 ) -> None:
-    """Insert the item's row, or update it when an earlier run left one (`name` is unique)."""
+    """Insert the item's row, or update it when an earlier run left one (`name` is unique).
+
+    A failure never overwrites a success: another process may have run the item after this one failed.
+    """
     insert_row = insert(SeedHistory).values(
         id=new_id(), name=name, successful=successful, result=result
     )
@@ -48,6 +54,7 @@ async def record(
         insert_row.on_conflict_do_update(
             index_elements=[SeedHistory.name],
             set_={"successful": successful, "result": result},
+            where=None if successful else SeedHistory.successful.is_(False),
         )
     )
 
@@ -74,6 +81,7 @@ async def record_failure(
     session_factory: async_sessionmaker[AsyncSession], name: str, error: Exception
 ) -> None:
     async with session_factory() as session, session.begin():
+        await session.execute(select(func.pg_advisory_xact_lock(SEED_LOCK_KEY)))
         await record(session, name, successful=False, result=describe(error))
 
 

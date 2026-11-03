@@ -28,7 +28,7 @@ There is a single root-level `app/` package, laid out by layer ([ADR-0011](decis
 ### Where data truth lives
 Only the seed runner writes to a database so far (task 5.1), and the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
 types and the `postgis` extension on an empty database, and `alembic check` fails when the models and the revisions drift apart. The account, file, notification and
-system models are mapped (tasks 2.2 and 2.3) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
+system models are mapped (tasks 2.2, 2.3 and 5.1) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
 `AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient`, `DeletedHistory` and `SeedHistory`, plus the
 `AccountRoleType` and `FileType` enums. `FileType` is tied to the metadata directly because no column uses it; without that `create_all` and Alembic
 would never emit the Postgres type. `File.content` is `bytea` (ADR-0009), plain and not deferred.

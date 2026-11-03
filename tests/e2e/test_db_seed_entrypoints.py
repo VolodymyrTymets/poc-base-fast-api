@@ -13,7 +13,7 @@ from utils.client import client_for
 
 from app.config import Settings
 from app.main import create_app
-from app.seeds.base import SeedItem
+from app.seeds.base import SeedError, SeedItem
 
 
 class BrokenItem:
@@ -74,7 +74,7 @@ async def test_a_failing_seed_stops_the_boot_and_is_recorded(
     app = create_app(Settings(database_url=unseeded_database_url))
 
     with pytest.raises(
-        Exception, match="seed broken failed: RuntimeError: seed exploded"
+        SeedError, match="seed broken failed: RuntimeError: seed exploded"
     ):
         async with app.router.lifespan_context(app):
             pytest.fail("the app must not start serving")
