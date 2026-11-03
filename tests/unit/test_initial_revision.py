@@ -38,7 +38,7 @@ def render(*, upgrade: bool) -> str:
     output = io.StringIO()
     config = Config(str(ALEMBIC_INI), output_buffer=output)
     if upgrade:
-        command.upgrade(config, "head", sql=True)
+        command.upgrade(config, "0001_init", sql=True)
     else:
         command.downgrade(config, "0001_init:base", sql=True)
     return output.getvalue()
@@ -48,15 +48,19 @@ def names(pattern: str, sql: str) -> set[str]:
     return set(re.findall(pattern, sql))
 
 
+# Built by revision 0002 (task 5.1), not by 0001_init, which this file checks.
+LATER_TABLES = {"SeedHistory"}
+
+
 def tables() -> list[str]:
     importlib.import_module("app.models")
-    return sorted(Base.metadata.tables)
+    return sorted(set(Base.metadata.tables) - LATER_TABLES)
 
 
-def test_the_history_has_one_head_and_it_is_the_initial_revision() -> None:
+def test_the_initial_revision_is_the_root_of_the_history() -> None:
     script = ScriptDirectory.from_config(Config(str(ALEMBIC_INI)))
 
-    assert script.get_heads() == ["0001_init"]
+    assert script.get_bases() == ["0001_init"]
     revision = script.get_revision("0001_init")
     assert revision is not None
     assert revision.down_revision is None
@@ -95,6 +99,7 @@ def test_upgrade_creates_exactly_the_indexes_of_the_models() -> None:
     expected = {
         str(index.name)
         for table in Base.metadata.tables.values()
+        if table.name not in LATER_TABLES
         for index in table.indexes
     }
 
@@ -108,6 +113,7 @@ def test_upgrade_creates_exactly_the_unique_indexes_of_the_models() -> None:
     expected = {
         str(index.name)
         for table in Base.metadata.tables.values()
+        if table.name not in LATER_TABLES
         for index in table.indexes
         if index.unique
     }

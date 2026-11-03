@@ -59,7 +59,7 @@ def create_table_sql(name: str) -> str:
 def test_only_the_app_models_are_on_the_real_base() -> None:
     # WHY: this asserted an empty Base.metadata until the first models landed (POC-2.2,
     # human-approved in the plan). It still fails if a scratch test model lands on the
-    # real Base, which Alembic (2.4) diffs; task 2.3 extends the set as its tables land.
+    # real Base, which Alembic (2.4) diffs; tasks 2.3 and 5.1 extend the set as their tables land.
     importlib.import_module("app.models")
 
     assert set(Base.metadata.tables) == {
@@ -72,6 +72,7 @@ def test_only_the_app_models_are_on_the_real_base() -> None:
         "Notification",
         "NotificationRecipient",
         "DeletedHistory",
+        "SeedHistory",
     }
 
 
