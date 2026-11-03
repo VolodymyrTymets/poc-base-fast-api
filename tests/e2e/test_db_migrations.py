@@ -142,7 +142,7 @@ async def test_upgrade_records_the_revision_and_installs_postgis(
     versions = await column(migrated.engine, "select version_num from alembic_version")
     extensions = await column(migrated.engine, "select extname from pg_extension")
 
-    assert versions == ["0001_init"]
+    assert versions == ["0002_seed_history"]
     assert "postgis" in extensions
 
 
@@ -199,3 +199,24 @@ async def test_the_schema_can_be_built_again_after_a_downgrade(
 
     assert await schema_objects(migrated.engine) == expected_objects()
     await run(command.check)
+
+
+async def test_downgrade_to_the_initial_revision_removes_only_seed_history(
+    migrated: EmptyDatabase,
+) -> None:
+    before = await schema_objects(migrated.engine)
+
+    await run(command.downgrade, "0001_init")
+
+    after = await schema_objects(migrated.engine)
+    versions = await column(migrated.engine, "select version_num from alembic_version")
+    assert versions == ["0001_init"]
+    assert {kind: before[kind] - after[kind] for kind in before} == {
+        "tables": {"SeedHistory"},
+        "enums": set(),
+        "indexes": {"SeedHistory_pkey", "SeedHistory_name_key"},
+        "foreign_keys": set(),
+    }
+    assert {kind: after[kind] - before[kind] for kind in before} == {
+        kind: set() for kind in before
+    }

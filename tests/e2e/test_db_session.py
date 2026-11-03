@@ -12,6 +12,7 @@ from utils.client import client_for
 from app.config import Settings
 from app.core.db import get_session
 from app.main import create_app
+from app.seeds.runner import run_seeds
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 
@@ -43,9 +44,12 @@ def add_session_routes(
 
 
 @pytest.fixture
-async def app(database_url: str) -> AsyncIterator[FastAPI]:
-    """The real app on the real database, with its lifespan running."""
-    app = create_app(Settings(database_url=database_url))
+async def app(module_database_url: str) -> AsyncIterator[FastAPI]:
+    """The real app on the real database, with its lifespan running.
+
+    The module's database, not the server's default one: the lifespan seeds (task 5.1), which needs the migrated schema.
+    """
+    app = create_app(Settings(database_url=module_database_url))
     seen: list[tuple[AsyncSession, bool]] = []
     app.state.seen = seen
     add_session_routes(app, seen)
@@ -54,9 +58,9 @@ async def app(database_url: str) -> AsyncIterator[FastAPI]:
 
 
 @pytest.fixture
-async def probe_table(database_url: str) -> AsyncIterator[AsyncEngine]:
+async def probe_table(module_database_url: str) -> AsyncIterator[AsyncEngine]:
     """A real table, made and dropped through a second engine, so the test reads what was committed."""
-    engine = create_async_engine(database_url)
+    engine = create_async_engine(module_database_url)
     async with engine.begin() as connection:
         await connection.execute(
             text("DROP TABLE IF EXISTS poc_session_rollback_probe")
@@ -148,6 +152,9 @@ async def test_the_lifespan_disposes_the_engine(
     engine = create_autospec(AsyncEngine, instance=True)
     # Patched where app.main looks the name up; nothing connects to a database.
     monkeypatch.setattr("app.main.create_engine", lambda _settings: engine)
+    # WHY: this test is about disposing the engine, and the mock engine cannot run SQL; seeding is tested in
+    # test_db_seed_entrypoints.py (POC-5.1).
+    monkeypatch.setattr("app.main.run_seeds", create_autospec(run_seeds))
     app = create_app(Settings(database_url="postgresql+asyncpg://u:p@localhost/db"))
 
     async with app.router.lifespan_context(app):

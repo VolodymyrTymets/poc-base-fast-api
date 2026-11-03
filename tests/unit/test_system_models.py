@@ -95,3 +95,42 @@ def test_create_table_compiles_with_quoted_mixed_case_names() -> None:
     sql = str(CreateTable(deleted_history()).compile(dialect=POSTGRES))
 
     assert sql.startswith('\nCREATE TABLE "DeletedHistory" (')
+
+
+def seed_history() -> Table:
+    importlib.import_module("app.models")
+    return Base.metadata.tables["SeedHistory"]
+
+
+def test_seed_history_has_the_columns_types_nullability_and_defaults() -> None:
+    actual = {
+        column.name: (
+            column.type.compile(dialect=POSTGRES),
+            column.nullable,
+            server_default(column),
+        )
+        for column in seed_history().columns
+    }
+
+    assert actual == {
+        "id": ("TEXT", False, None),
+        "name": ("TEXT", False, None),
+        "successful": ("BOOLEAN", False, "false"),
+        "result": ("TEXT", True, None),
+        "createdAt": ("TIMESTAMP(3) WITHOUT TIME ZONE", False, "CURRENT_TIMESTAMP"),
+    }
+
+
+def test_seed_history_name_is_a_unique_index_and_the_primary_key_is_id() -> None:
+    (index,) = seed_history().indexes
+
+    assert (index.name, [c.name for c in index.columns], bool(index.unique)) == (
+        "SeedHistory_name_key",
+        ["name"],
+        True,
+    )
+    assert [c.name for c in seed_history().primary_key.columns] == ["id"]
+
+
+def test_seed_history_has_no_soft_delete_column() -> None:
+    assert "deleted" not in seed_history().c
