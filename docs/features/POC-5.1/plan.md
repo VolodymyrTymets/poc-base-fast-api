@@ -52,11 +52,11 @@ No precedent for a runner; it stays inside ADR-0011 (`seeds` uses `models`, `cor
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` (Docker), `uv run alembic upgrade head` + `alembic check`, `uv run python -m app.cli --export-openapi --check`. Anything not run goes under "Not verified".
 
 ## Docs (same PR, rule E1)
-- [ ] docs/features/POC-5.1/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md — `seeds/` built, startup seeding, revision 0002; table count becomes ten; `SeedHistory` listed as an allowed extra table next to ADR-0015 and ADR-0018 (a schema difference from the Node base); ADR-0019 note goes in the PR body
-- [ ] docs/DOMAIN_GLOSSARY.md — terms: Seed item, Seed history
-- [ ] docs/RUNBOOK.md — `python -m app.seeds`, startup seeding and its failure mode (new: with `DATABASE_URL` set, an unreachable database or a failing seed now stops the boot), template now holds seeds (replaces "seeds join it in task 5.1")
-- [ ] docs/decisions: no ADR (no new pattern); fix the "seeds join the template in task 5.1" wording in ADR-0006 notes only if it states a future
+- [x] docs/features/POC-5.1/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md — `seeds/` built, startup seeding, revision 0002; table count becomes ten; `SeedHistory` listed as an allowed extra table next to ADR-0015 and ADR-0018 (a schema difference from the Node base); ADR-0019 note goes in the PR body
+- [x] docs/DOMAIN_GLOSSARY.md — terms: Seed item, Seed history
+- [x] docs/RUNBOOK.md — `python -m app.seeds`, startup seeding and its failure mode (new: with `DATABASE_URL` set, an unreachable database or a failing seed now stops the boot), template now holds seeds (replaces "seeds join it in task 5.1")
+- [x] docs/decisions: no ADR (no new pattern); fix the "seeds join the template in task 5.1" wording in ADR-0006 notes only if it states a future
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

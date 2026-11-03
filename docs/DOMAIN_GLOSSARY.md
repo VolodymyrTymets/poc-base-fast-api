@@ -18,6 +18,8 @@ domain and does not repurpose these names. Python identifiers are decided for al
 | Deletion record | `DeletedHistory` | A bookkeeping row naming a record that was deleted (`relationId`), by whom (`deletedBy`, optional) and a `deletedAt` flag. No code writes it yet. | Soft delete: the `deleted` column on domain tables is what marks a row deleted |
 | Sign-in code / OTP | OTP code | The one-time code sent to a phone number to authenticate; hashed at rest, 2 minute TTL, never logged. | JWT tokens, issued after verification |
 | Password reset token | `resetTokenHash` | A random single-use token valid 30 minutes, stored only as a sha256 hash and sent to the account's email. | OTP code, refresh token |
+| Seed item | none (Node: migration item) | One unit of base data the app creates for itself (today: the two roles). It has a unique name, a check for whether it is needed, and a run. Never a schema change. | Alembic revision, which changes the schema |
+| Seed history | `SeedHistory` (Node: `Migration`, a different table) | One row per seed item: whether its last run succeeded and, if not, the error text. Updated in place on a retry. | `alembic_version`, which records schema revisions |
 | Refresh token | `refreshToken` | A long-lived JWT used only to get a new access token. Stored as sha256 (decision D5), not bcrypt. | Access token (short-lived, 15 min default) |
 
 ## Naming rules that follow from the above
@@ -30,7 +32,7 @@ domain and does not repurpose these names. Python identifiers are decided for al
   `Account.notification_recipients` and `Notification.notification_recipients` with `NotificationRecipient.account` and `.notification`.
 - `DeletedHistory.deletedAt` is a boolean flag despite its name, kept for schema parity like `dataOfBirth`; the Python attribute is `deleted_at`.
   `DeletedHistory` carries no `deleted` column, as in the Node schema, so "Delete always means a soft delete" does not apply to its rows.
-- The Node `Migration` table is not part of this base (ADR-0018): applied schema revisions are recorded by Alembic in `alembic_version`; do not add it back.
+- The Node `Migration` table is not part of this base (ADR-0018): applied schema revisions are recorded by Alembic in `alembic_version`; do not add it back. The Node base also used it to record its seed items ("migrations" in its code); here that job belongs to `SeedHistory` (task 5.1), and "migration" means only a schema revision.
 - The Node columns `"SSN"` and `"is18YearOld"` of `AccountProfile` are not part of this base (ADR-0015); do not add them back.
 - The Node column `"dataOfBirth"` is a typo kept for schema parity (ADR-0004); the Python attribute is `date_of_birth`. It holds text, not a date.
 - `refreshToken` and `resetTokenHash` keep their Node column names on `AccountIdentity`; both hold a sha256, never the token (rule P5).

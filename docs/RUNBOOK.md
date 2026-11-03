@@ -44,8 +44,7 @@ The database tests run against a real Postgres (rule P8, ADR-0006). Where it com
 - **An existing server:** set `TEST_DATABASE_URL` (`postgresql+asyncpg://...`) in `.env.test` (copy `.env.test.example`, gitignored) or export it;
   the variable wins over the file. No container is started. The role needs `CREATEDB` and, for the `postgis` extension, superuser rights.
 
-On that server the suite builds one template database per session with `alembic upgrade head` (`poc_test_template_<hex>`; seeds join it in
-task 5.1) and gives each test module a copy of it (`poc_test_module_<hex>`, made with `CREATE DATABASE ... TEMPLATE`, dropped after the
+On that server the suite builds one template database per session with `alembic upgrade head` (`poc_test_template_<hex>`, with the seeds run on it) and gives each test module a copy of it (`poc_test_module_<hex>`, made with `CREATE DATABASE ... TEMPLATE`, dropped after the
 module). Fixtures in `tests/conftest.py`: `database_url` (the server), `template_database`, `module_database_url`, `db_engine` (the app's
 engine on the module's database; commits stay for the module, so use it for checks across connections) and `db_session` (rolled back after
 each test, commits included; the default for a test that writes rows).
@@ -76,9 +75,23 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
   List `frozen_clock` after the database fixtures in a test's arguments: the first database test of a session starts the container and
   builds the template, and that wait should run on the real clock.
 
+## Seeds
+Seed items are the base data the app creates for itself: today the two roles (`CUSTOMER`, `ADMIN`); the admin and customers come with task 5.5.
+- With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;
+  one that has nothing to do (the roles already exist) is skipped. A second start adds nothing.
+- `uv run python -m app.seeds` runs the same items and exits: 0 when done, 1 without `DATABASE_URL` or when an item fails. The development list
+  (sample data) is used for `APP_ENV` `local`, `development` and `test`, never for `production`.
+- **A failed seed stops the boot** (decision of POC-5.1), and so does an unreachable database or one that was never migrated (`relation "SeedHistory"
+  does not exist`: run `uv run alembic upgrade head`). Without `DATABASE_URL` the app still boots. The failure is in `SeedHistory`
+  (`select name, successful, result from "SeedHistory"`); fix the cause and start again, the same row is updated and the item runs again.
+- Two instances starting together take turns (an advisory lock), so nothing is seeded twice.
+- In tests the template database is already seeded. A test of the seeds themselves takes `unseeded_database_url` (a migrated, empty database, one per
+  test) and `unseeded_session_factory` from `tests/conftest.py`; it never deletes rows to get there.
+
 ## Migrations
 Alembic (ADR-0004, ADR-0017): `alembic.ini` and `migrations/` at the repo root; revision `0001_init` is the final state of the
-Node base's four Prisma migrations. The database URL is read from `DATABASE_URL` (environment first, then `.env`), never from `alembic.ini`.
+Node base's four Prisma migrations, and `0002_seed_history` adds the `SeedHistory` table of the seed runner (task 5.1;
+`uv run alembic downgrade 0001_init` removes only it, and the seed history with it). The database URL is read from `DATABASE_URL` (environment first, then `.env`), never from `alembic.ini`.
 - `uv run alembic upgrade head` builds the schema on an empty database; `uv run alembic check` fails if the models and the revisions
   differ; `uv run alembic downgrade base` removes the tables and the two enum types and leaves the `postgis` extension (the rows are gone for good).
 - `uv run alembic upgrade head --sql` prints the SQL without connecting (it still needs `DATABASE_URL`, to pick the dialect).
@@ -112,6 +125,7 @@ See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff 
 | `alembic` prints `FAILED: DATABASE_URL is not set` | no `DATABASE_URL` in the environment or in `.env` of the current directory | export it, or run from the repo root where `.env` lives |
 | `extension "postgis" is not available` (or permission denied to create it) | the server has no PostGIS files, or the role is not a superuser | use a PostGIS server (the `postgis/postgis` image) and a role that may create extensions |
 | `alembic check` lists tables such as `state` or `geocode_settings` as removed | the database is the default `postgres` database of the `postgis/postgis` image, where the image also installed `postgis_tiger_geocoder` and `postgis_topology` (seen in `pg_extension`) | run against a database made with `CREATE DATABASE`: it starts empty and the first revision adds `postgis` |
+| the app stops at startup with `seed init.roles failed: ... relation "SeedHistory" does not exist` | `DATABASE_URL` points at a database migrated before revision `0002_seed_history` (a developer's `.env` counts) | `uv run alembic upgrade head` against that database |
 | `uv sync` reports no interpreter satisfies `>=3.14` | no 3.14 installed and downloads are blocked | allow `uv python install 3.14`, or install 3.14 another way; do not lower the pin (rule T2) |
 
 ## Release

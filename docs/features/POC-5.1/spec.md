@@ -16,14 +16,14 @@ Goal 1 (scaffolding: a fork boots with its base data) and goal 3 (test base: the
   (no `--only`/`--force`); any endpoint; a `Migration` table (ADR-0018 stays: `SeedHistory` is a different table with a new name).
 
 ## Acceptance criteria
-- [ ] AC1 Given an empty migrated database, when the runner runs twice, then `AccountRole` holds exactly `CUSTOMER` and `ADMIN` once each and `SeedHistory` one successful `init.roles` row.
-- [ ] AC2 Given an item whose `run` raises, when the runner runs, then its writes are rolled back, `SeedHistory` has `successful=false` and `result` with the error text, the runner raises `SeedError`, and later items do not run.
-- [ ] AC3 Given a failed row, when the next run succeeds, then the same row (name unique) becomes `successful=true`, `result` cleared.
-- [ ] AC4 Given `APP_ENV=production`, when the list is built, then no dev-only item is in it; for `local`, `development`, `test` it is.
-- [ ] AC5 `uv run python -m app.seeds` with `DATABASE_URL` set seeds and exits 0; without it exits 1 with a message naming `DATABASE_URL`; a failing item exits 1.
-- [ ] AC6 App startup with a database seeds before serving; without `DATABASE_URL` it boots as today.
-- [ ] AC7 `alembic upgrade head`, `alembic check` (no diff) and `alembic downgrade 0001_init` work on a PostGIS database.
-- [ ] AC8 The test template database already contains the two roles; two modules still do not see each other's rows.
+- [x] AC1 Given an empty migrated database, when the runner runs twice, then `AccountRole` holds exactly `CUSTOMER` and `ADMIN` once each and `SeedHistory` one successful `init.roles` row.
+- [x] AC2 Given an item whose `run` raises, when the runner runs, then its writes are rolled back, `SeedHistory` has `successful=false` and `result` with the error text, the runner raises `SeedError`, and later items do not run.
+- [x] AC3 Given a failed row, when the next run succeeds, then the same row (name unique) becomes `successful=true`, `result` cleared.
+- [x] AC4 Given `APP_ENV=production`, when the list is built, then no dev-only item is in it; for `local`, `development`, `test` it is.
+- [x] AC5 `uv run python -m app.seeds` with `DATABASE_URL` set seeds and exits 0; without it exits 1 with a message naming `DATABASE_URL`; a failing item exits 1.
+- [x] AC6 App startup with a database seeds before serving; without `DATABASE_URL` it boots as today.
+- [x] AC7 `alembic upgrade head`, `alembic check` (no diff) and `alembic downgrade 0001_init` work on a PostGIS database.
+- [x] AC8 The test template database already contains the two roles; two modules still do not see each other's rows.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
