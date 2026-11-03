@@ -8,6 +8,7 @@ from app.core.errors import (
     InvalidCredentialsError,
     InvalidResetTokenError,
     NotFoundError,
+    PayloadTooLargeError,
     UnauthorizedError,
     ValidationFailedError,
     error_body,
@@ -21,6 +22,7 @@ CASES: list[tuple[type[AppError], int, ErrorCode]] = [
     (ForbiddenError, 403, ErrorCode.FORBIDDEN),
     (NotFoundError, 404, ErrorCode.NOT_FOUND),
     (ValidationFailedError, 422, ErrorCode.VALIDATION_FAILED),
+    (PayloadTooLargeError, 413, ErrorCode.VALIDATION_FAILED),
 ]
 
 

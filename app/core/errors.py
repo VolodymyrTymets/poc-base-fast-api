@@ -146,6 +146,13 @@ class ValidationFailedError(AppError):
     default_message = "Validation failed"
 
 
+class PayloadTooLargeError(ValidationFailedError):
+    """An upload over `FILE_MAX_SIZE`: 413 with the same code, no new code (ADR-0003)."""
+
+    status_code = 413
+    default_message = "Payload too large"
+
+
 # HTTP statuses raised by Starlette or a dependency (HTTPException) that have a code of
 # their own. Any other status keeps its number and is reported as VALIDATION_FAILED
 # (decided with the owner on 2026-11-03, no new code: ADR-0003).

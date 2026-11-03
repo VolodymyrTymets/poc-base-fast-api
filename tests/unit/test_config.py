@@ -238,3 +238,49 @@ def test_strict_environments_refuse_weak_or_missing_secrets(
     # The message names fields, never a secret value.
     assert GOOD_A not in str(error.value)
     assert "short" not in str(error.value)
+
+
+def test_file_limits_default_to_ten_megabytes_of_jpeg_and_png() -> None:
+    settings = Settings()
+
+    assert settings.file_max_size == 10_485_760
+    assert settings.file_allowed_mime_types == ["image/jpeg", "image/png"]
+
+
+def test_file_limits_come_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FILE_MAX_SIZE", "2048")
+    monkeypatch.setenv("FILE_ALLOWED_MIME_TYPES", " Image/PNG, ,image/webp ")
+
+    settings = Settings()
+
+    assert settings.file_max_size == 2048
+    assert settings.file_allowed_mime_types == ["image/png", "image/webp"]
+
+
+def test_an_empty_mime_type_list_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FILE_ALLOWED_MIME_TYPES", " , ")
+
+    with pytest.raises(ValidationError, match="file_allowed_mime_types"):
+        Settings()
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_file_size_limit_must_be_above_zero(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("FILE_MAX_SIZE", value)
+
+    with pytest.raises(ValidationError, match="file_max_size"):
+        Settings()
+
+
+def test_a_bad_file_limit_error_does_not_echo_the_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FILE_MAX_SIZE", "not-a-number-7731")
+
+    with pytest.raises(ValidationError) as caught:
+        Settings()
+
+    assert "file_max_size" in str(caught.value)
+    assert "7731" not in str(caught.value)

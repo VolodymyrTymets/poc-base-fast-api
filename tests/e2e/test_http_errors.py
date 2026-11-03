@@ -18,6 +18,7 @@ from app.core.errors import (
     InvalidCredentialsError,
     InvalidResetTokenError,
     NotFoundError,
+    PayloadTooLargeError,
     UnauthorizedError,
     ValidationFailedError,
 )
@@ -59,6 +60,7 @@ RAISED: dict[str, type[AppError]] = {
     "forbidden": ForbiddenError,
     "not-found": NotFoundError,
     "validation-failed": ValidationFailedError,
+    "payload-too-large": PayloadTooLargeError,
 }
 
 
@@ -131,6 +133,7 @@ async def call(
         ("forbidden", 403, "FORBIDDEN"),
         ("not-found", 404, "NOT_FOUND"),
         ("validation-failed", 422, "VALIDATION_FAILED"),
+        ("payload-too-large", 413, "VALIDATION_FAILED"),
     ],
 )
 async def test_domain_error_answers_with_its_status_and_code(
