@@ -3,19 +3,39 @@
 > How to run this project, and what goes wrong. Written for a human joining on day one — and read by the agent when the environment misbehaves.
 
 ## First run
+The order matters: **database, then migrate, then seed, then start.** Each step needs the one before it.
+
 ```bash
-# prerequisites: uv (>= 0.12), network access for the first interpreter download.
-# Python 3.14 is pinned in .python-version; uv fetches it if it is missing.
+# 0. prerequisites: uv (>= 0.12), Docker (or any PostGIS server), network access for the first interpreter download.
+#    Python 3.14 is pinned in .python-version; uv fetches it if it is missing.
 uv sync                      # creates .venv from uv.lock
-cp .env.example .env         # optional: every setting has a default; see the file for the variables
-uv run alembic upgrade head  # only with a database: DATABASE_URL set, PostGIS available (see "Migrations")
-uv run poc-base-fast-api     # serves the API on PORT (default 3001)
+cp .env.example .env         # every setting has a default; see the file for the variables
+
+# 1. a PostGIS database. Skip the container if you already have a PostGIS server; use a database of its own, not
+#    the image's default `postgres` one (see "Common failures").
+docker run -d --name poc-base-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgis/postgis:16-3.4
+docker exec poc-base-pg psql -U postgres -c 'CREATE DATABASE poc_base'
+#    then put this line in .env (or export it):
+#    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/poc_base
+
+# 2. the schema: the tables, the enum types, the postgis extension and SeedHistory (see "Migrations")
+uv run alembic upgrade head
+
+# 3. the base data: the roles CUSTOMER and ADMIN (see "Seeds"). Safe to repeat; a second run does nothing.
+uv run python -m app.seeds   # exit 0 when done
+
+# 4. the API, on PORT (default 3001)
+uv run poc-base-fast-api
 curl localhost:3001/api/v1/health    # {"status":"ok"}
 ```
-`DATABASE_URL` (`postgresql+asyncpg://...`, nothing else is accepted) is optional: unset or blank, the server still boots and
-`/api/v1/health` answers, and only a route that needs a database session fails. The tables exist only after the migration
-above; there is no cache or queue. `uv build` writes the wheel and sdist
-into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
+Step 3 is not strictly needed: with `DATABASE_URL` set, step 4 runs the same seeds before it serves. Run it by hand the first time anyway,
+because it reports a seed problem on its own, with an exit status, instead of as a failed startup. Step 4 stops at startup, and does not
+serve, when the database is unreachable, was never migrated (`relation "SeedHistory" does not exist`: go back to step 2) or a seed fails.
+After a `git pull` that adds a migration, run steps 2 and 3 again before starting.
+
+`DATABASE_URL` (`postgresql+asyncpg://...`, nothing else is accepted) is optional: unset or blank, steps 1 to 3 do not apply, the server still
+boots and `/api/v1/health` answers, and only a route that needs a database session fails. There is no cache or queue. `uv build` writes the
+wheel and sdist into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
 ## Token secrets
