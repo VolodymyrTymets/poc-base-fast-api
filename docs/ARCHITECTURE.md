@@ -26,7 +26,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 There is a single root-level `app/` package, laid out by layer ([ADR-0011](decisions/ADR-0011-project-structure.md), rule file `.claude/rules/project-structure.md`). No `src/`, `api/` or `web/` directory is part of the repo.
 
 ### Where data truth lives
-Only the seed runner, `AccountRoleService.add_account_to_role` (task 5.2) and `AccountService.create_customer` / `create_password_account` (task 5.3; no route calls them yet) `AccountProfileService.update` (task 5.4, through `PATCH /accounts/{accountId}/profile`) and the development seed items of task 5.5 (the admin and three customers) write to a database so far, and the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
+Only the seed runner, `AccountRoleService.add_account_to_role` (task 5.2) and `AccountService.create_customer` / `create_password_account` (task 5.3; no route calls them yet), `AccountProfileService.update` (task 5.4, through `PATCH /accounts/{accountId}/profile`) and the development seed items of task 5.5 (the admin and three customers) write to a database so far, and the schema has a home: revision `0001_init` (task 2.4) builds the tables below, the two enum
 types and the `postgis` extension on an empty database, and `alembic check` fails when the models and the revisions drift apart. The account, file, notification and
 system models are mapped (tasks 2.2, 2.3 and 5.1) and importing `app.models` registers ten tables on `Base.metadata`: `Account`, `AccountRole`,
 `AccountOnRole`, `AccountIdentity`, `AccountProfile`, `File`, `Notification`, `NotificationRecipient`, `DeletedHistory` and `SeedHistory`, plus the

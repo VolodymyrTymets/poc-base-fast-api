@@ -21,9 +21,14 @@ from app.models import (
     AccountRoleType,
 )
 from app.schemas.account_profile import UpdateAccountProfileInput
+from app.services.account import AccountService
 from app.services.account_profile import AccountProfileService
 from app.services.account_role import AccountRoleService
 from app.services.file_assert import FileAssertService
+
+
+class SampleAdminPhoneInUseError(RuntimeError):
+    """The sample admin's phone number already has an account, so the admin cannot be created without ambiguity."""
 
 
 class AdminSample(TypedDict):
@@ -66,6 +71,12 @@ class InitAdmin:
             session, FileAssertService(session, self._settings)
         )
         for sample in ADMINS:
+            # The phone has no unique index: a second account with it would make `get_by_phone` (the OTP sign-in of task 7.1)
+            # reach the older one. Fail with a fixed message rather than create it or skip it silently (rule D5).
+            if await AccountService(session).get_by_phone(sample["phone_number"]):
+                raise SampleAdminPhoneInUseError(
+                    "the sample admin phone already belongs to an account"
+                )
             # WHY: AccountService._create always grants CUSTOMER, and an admin must not hold it; this follows that
             # method (task 5.3): the identity is set to None because an unset relationship cannot lazy-load on an
             # async session, and the role is added after the flush. A change to _create must revisit this.

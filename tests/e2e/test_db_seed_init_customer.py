@@ -121,5 +121,8 @@ async def test_a_sample_email_held_by_another_profile_fails_the_item_and_is_reco
     recorded = await history(unseeded_session_factory)
     assert recorded["init.customer"][0] is False
     assert "EmailAlreadyRegisteredError" in str(recorded["init.customer"][1])
-    # Rolled back: no customer of this item exists.
-    assert sorted(await profiles_by_phone(unseeded_session_factory)) == ["None"]
+    # Rolled back: none of the sample customers exists (the only profile is the one the test made, which has no phone).
+    sample_phones = {sample["phone_number"] for sample in CUSTOMERS}
+    assert (
+        not sample_phones & (await profiles_by_phone(unseeded_session_factory)).keys()
+    )
