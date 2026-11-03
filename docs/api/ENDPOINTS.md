@@ -3,7 +3,7 @@
 > Reference for tasks 4.x to 8.x. It maps each of the 14 operations of the Node base's `api/schema.gql` to a REST route, and records
 > the behaviour each one must keep. Source of behaviour: the Node repo (`poc-base`, read-only), cited as `file:line` in the
 > last column; paths are relative to `api/src/`. Contract decisions: ADR-0003 (REST and errors), ADR-0008 (tokens),
-> ADR-0009 (files), ADR-0010 (configuration). The exported contract is the root `openapi.json` (task 4.1, generated); the error contract is built (task 4.2, [ERRORS.md](ERRORS.md)); validation models come in task 4.3.
+> ADR-0009 (files), ADR-0010 (configuration). The exported contract is the root `openapi.json` (task 4.1, generated); the error contract is built (task 4.2, [ERRORS.md](ERRORS.md)); the validation rules below are enforced by `app/core/validation.py` and the request models in `app/schemas/` (task 4.3).
 
 ## Conventions
 
@@ -23,8 +23,10 @@
   | `VALIDATION_FAILED` | 422 (413 for an oversized body) | body failed validation; `details` lists the fields. A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB) is 413 with an empty `details`, for any route, before routing (task 1.6); upload limits are stricter (`FILE_MAX_SIZE`) |
   | `INTERNAL_SERVER_ERROR` | 500 | unexpected; no stack trace outside local |
 
-- **Shared validation rules** (from the Node DTOs in `auth/dto/`, `common/`):
-  - email: valid address, at most 254 characters, validated first and then normalised by lowercasing (and trimming, a no-op after validation) before lookup and storage (`common/normalize-email.ts:3-4`); Node validates the raw value, so an address with surrounding spaces is rejected with 422, not trimmed. The profile email is validated without requiring a top-level domain (`account-profile/dto/update-account-profile.input.ts:28`) while sign-in and sign-up require one: kept as in Node, task 5.4 may align them;
+- **Shared validation rules** (from the Node DTOs in `auth/dto/`, `common/`; built in task 4.3: `app/core/validation.py` has the types `Email`, `NewPassword`, `CurrentPassword`, `PhoneNumber`, `UuidStr` and the base `StrictModel`, which rejects unknown keys; the models are in `app/schemas/auth.py` and `account_profile.py`):
+  - **deviation from Node (task 4.3):** the profile email also requires a top-level domain, like sign-in and sign-up; `email-validator` has no switch to allow `a@b`. Node allowed it only in the profile update. Task 5.4 may revisit it;
+  - phone numbers are stored in E.164 (`+12025550100`) after validation;
+  - email: valid address, at most 254 characters, validated first and then normalised by lowercasing (and trimming, a no-op after validation) before lookup and storage (`common/normalize-email.ts:3-4`); Node validates the raw value, so an address with surrounding spaces is rejected with 422, not trimmed. Node validated the profile email without requiring a top-level domain (`account-profile/dto/update-account-profile.input.ts:28`); this base does not, see the deviation above;
   - new password (sign-up, reset, change): 8 to 72 **bytes**, no control characters (`common/password-rules.ts:3`; the byte limits are in `auth/dto/sign-up.input.ts:13`, `auth/dto/reset-password.input.ts:20` and `auth/dto/change-password.input.ts:12`); current password and sign-in password: 1 to 72 bytes;
   - phone number: a valid phone number in international format.
 - **Success status:** 200, except 201 for `sign-up` and `POST /files`, and 204 (no body) for the operations that returned only `true` in GraphQL.
