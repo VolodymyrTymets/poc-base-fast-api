@@ -2,11 +2,13 @@ from typing import Any
 
 import pytest
 from sentry_sdk.utils import BadDsn
+from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
 from app.core import sentry
 from app.core.logging import REDACTED
 
+# Production refuses to boot without token secrets (task 4.4).
 DSN = "https://key@o1.ingest.sentry.io/1"
 JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
 
@@ -22,8 +24,18 @@ def init_calls(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     "settings",
     [
         Settings(app_env="local", sentry_dsn=DSN),
-        Settings(app_env="production", sentry_dsn=None),
-        Settings(app_env="production", sentry_dsn="  "),
+        Settings(
+            app_env="production",
+            sentry_dsn=None,
+            jwt_secret=ACCESS_KEY,
+            jwt_refresh_token_secret=REFRESH_KEY,
+        ),
+        Settings(
+            app_env="production",
+            sentry_dsn="  ",
+            jwt_secret=ACCESS_KEY,
+            jwt_refresh_token_secret=REFRESH_KEY,
+        ),
     ],
     ids=["local-with-dsn", "no-dsn", "blank-dsn"],
 )
@@ -35,7 +47,14 @@ def test_sentry_stays_off(settings: Settings, init_calls: list[dict[str, Any]]) 
 def test_sentry_starts_with_nothing_collected_by_default(
     init_calls: list[dict[str, Any]],
 ) -> None:
-    started = sentry.init_sentry(Settings(app_env="production", sentry_dsn=DSN))
+    started = sentry.init_sentry(
+        Settings(
+            app_env="production",
+            sentry_dsn=DSN,
+            jwt_secret=ACCESS_KEY,
+            jwt_refresh_token_secret=REFRESH_KEY,
+        )
+    )
 
     assert started is True
     assert len(init_calls) == 1
@@ -56,7 +75,14 @@ def test_sentry_starts_with_nothing_collected_by_default(
 
 def test_a_malformed_dsn_stops_the_boot() -> None:
     with pytest.raises(BadDsn):
-        sentry.init_sentry(Settings(app_env="production", sentry_dsn="not-a-dsn"))
+        sentry.init_sentry(
+            Settings(
+                app_env="production",
+                sentry_dsn="not-a-dsn",
+                jwt_secret=ACCESS_KEY,
+                jwt_refresh_token_secret=REFRESH_KEY,
+            )
+        )
 
 
 def test_scrub_event_redacts_every_part_of_the_event() -> None:

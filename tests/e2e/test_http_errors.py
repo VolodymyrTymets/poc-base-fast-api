@@ -8,6 +8,7 @@ from fastapi import HTTPException as FastAPIHTTPException
 from pydantic import BaseModel, Field, field_validator
 from starlette.exceptions import HTTPException
 from utils.client import running_client
+from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
 from app.core.errors import (
@@ -62,7 +63,13 @@ RAISED: dict[str, type[AppError]] = {
 
 
 def make_app(app_env: Literal["local", "test", "production"] = "test") -> FastAPI:
-    app = create_app(Settings(app_env=app_env))
+    app = create_app(
+        Settings(
+            app_env=app_env,
+            jwt_secret=ACCESS_KEY,
+            jwt_refresh_token_secret=REFRESH_KEY,
+        )
+    )
 
     # The app has no route that raises yet, so the test adds its own to this instance.
     @app.get("/api/v1/_raise/{name}")

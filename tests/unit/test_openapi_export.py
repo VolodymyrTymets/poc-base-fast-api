@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from utils.jwt import ACCESS_KEY, REFRESH_KEY
+
 from app.cli import ContractSettings, contract_app, export_openapi
 from app.core.openapi import is_current, render
 from app.main import create_app
@@ -19,6 +21,8 @@ def test_the_spec_does_not_depend_on_settings() -> None:
         create_app(
             ContractSettings(
                 app_env="production",
+                jwt_secret=ACCESS_KEY,
+                jwt_refresh_token_secret=REFRESH_KEY,
                 sentry_dsn=None,
                 cors_origins=["http://x.test"],
                 log_level="DEBUG",
