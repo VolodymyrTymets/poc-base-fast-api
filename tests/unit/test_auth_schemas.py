@@ -35,10 +35,13 @@ def test_sign_up_names_every_bad_field_and_the_unknown_key() -> None:
     assert fields == {"email", "password", "admin"}
 
 
-def test_sign_in_accepts_a_short_password_that_sign_up_refuses() -> None:
+def test_sign_in_accepts_a_short_password() -> None:
     body = SignInInput.model_validate({"email": "a@b.com", "password": "x"})
 
     assert len(body.password) == 1
+
+
+def test_sign_up_refuses_the_same_short_password() -> None:
     assert failed_fields(SignUpInput, {"email": "a@b.com", "password": "x"}) == {
         "password"
     }
@@ -50,21 +53,22 @@ def test_change_password_checks_the_new_password_only_for_strength() -> None:
     assert failed_fields(ChangePasswordInput, body) == {"newPassword"}
 
 
-def test_reset_password_token_is_one_to_200_characters() -> None:
-    assert failed_fields(
-        ResetPasswordInput, {"token": "", "newPassword": "longenough"}
-    ) == {"token"}
-    assert failed_fields(
-        ResetPasswordInput, {"token": "t" * 201, "newPassword": "longenough"}
-    ) == {"token"}
+@pytest.mark.parametrize("token", ["", "t" * 201])
+def test_reset_password_token_must_be_one_to_200_characters(token: str) -> None:
+    body = {"token": token, "newPassword": "longenough"}
+
+    assert failed_fields(ResetPasswordInput, body) == {"token"}
 
 
-def test_otp_verify_code_is_at_most_six_characters_and_the_phone_is_e164() -> None:
+def test_otp_verify_stores_the_phone_as_e164() -> None:
     ok = OtpVerifyInput.model_validate(
         {"phoneNumber": "+1 202 555 0123", "code": "123456"}
     )
 
     assert ok.phone_number == "+12025550123"
-    assert failed_fields(
-        OtpVerifyInput, {"phoneNumber": "+12025550123", "code": "1234567"}
-    ) == {"code"}
+
+
+def test_otp_verify_code_is_at_most_six_characters() -> None:
+    body = {"phoneNumber": "+12025550123", "code": "1234567"}
+
+    assert failed_fields(OtpVerifyInput, body) == {"code"}

@@ -24,14 +24,12 @@ async def test_a_bad_sign_up_body_names_every_bad_field(
             json={"email": "nope", "password": SUBMITTED_VALUE, "admin": True},
         )
 
-    body = response.json()
-    assert response.status_code == 422
-    assert body["error"]["code"] == "VALIDATION_FAILED"
-    assert {d["field"] for d in body["error"]["details"]} == {
-        "email",
-        "password",
-        "admin",
-    }
+    error = response.json()["error"]
+    assert (
+        response.status_code,
+        error["code"],
+        {d["field"] for d in error["details"]},
+    ) == (422, "VALIDATION_FAILED", {"email", "password", "admin"})
     assert SUBMITTED_VALUE not in response.text
     assert SUBMITTED_VALUE not in caplog.text
 

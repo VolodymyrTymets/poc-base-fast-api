@@ -5,7 +5,7 @@ from typing import Annotated
 from pydantic import Field, StringConstraints, field_validator
 from pydantic_core import PydanticCustomError
 
-from app.core.validation import Email, StrictModel, UuidStr
+from app.core.validation import ProfileEmail, StrictModel, UuidStr
 
 ProfileName = Annotated[str, StringConstraints(max_length=50)]
 
@@ -24,7 +24,7 @@ class UpdateAccountProfileInput(StrictModel):
     date_of_birth: Annotated[str, StringConstraints(max_length=10)] | None = Field(
         default=None, alias="dataOfBirth"
     )
-    email: Email | None = None
+    email: ProfileEmail | None = None
     avatar_id: UuidStr | None = None
 
     @field_validator("email", mode="before")

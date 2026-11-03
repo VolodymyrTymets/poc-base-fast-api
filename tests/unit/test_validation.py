@@ -6,11 +6,20 @@ from app.core.validation import (
     Email,
     NewPassword,
     PhoneNumber,
+    ProfileEmail,
     StrictModel,
     UuidStr,
 )
 
 VALID_UUID = "123e4567-e89b-12d3-a456-426614174000"
+AT_LIMIT_ADDRESS = "a" * 64 + "@" + ".".join(["b" * 61] * 3) + ".com"  # 64+1+183+2+4
+OVER_LIMIT_ADDRESS = "a@" + "b" * 250 + ".com"
+
+
+def leaked_slices(value: str, text: str) -> list[str]:
+    """The 4-character slices of `value` found in `text` (one letter alone is too weak a signal)."""
+    slices = [value[i : i + 4] for i in range(len(value) - 3)]
+    return [piece for piece in slices if piece in text]
 
 
 def error_types(adapter: TypeAdapter[str], value: object) -> list[str]:
@@ -40,12 +49,18 @@ def test_new_password_accepts_the_byte_range(value: str) -> None:
     assert TypeAdapter(NewPassword).validate_python(value) == value
 
 
-def test_current_password_takes_one_to_72_bytes() -> None:
-    adapter = TypeAdapter(CurrentPassword)
+@pytest.mark.parametrize("value", ["x", "a" * 72])
+def test_current_password_accepts_one_to_72_bytes(value: str) -> None:
+    assert TypeAdapter(CurrentPassword).validate_python(value) == value
 
-    assert adapter.validate_python("x") == "x"
-    assert error_types(adapter, "") == ["password_too_short"]
-    assert error_types(adapter, "a" * 73) == ["password_too_long"]
+
+@pytest.mark.parametrize(
+    ("value", "kind"), [("", "password_too_short"), ("a" * 73, "password_too_long")]
+)
+def test_current_password_rejects_outside_one_to_72_bytes(
+    value: str, kind: str
+) -> None:
+    assert error_types(TypeAdapter(CurrentPassword), value) == [kind]
 
 
 def test_email_is_lowercased_after_validation() -> None:
@@ -56,27 +71,41 @@ def test_email_is_lowercased_after_validation() -> None:
 
 
 @pytest.mark.parametrize(
-    "value",
+    ("value", "kinds"),
     [
-        " a@b.com",
-        "a@b.com ",
-        "Name <a@b.com>",
-        "a@b",
-        "nope",
-        "a@" + "b" * 250 + ".com",
+        (" a@b.com", ["email_invalid"]),
+        ("a@b.com ", ["email_invalid"]),
+        ("Name <a@b.com>", ["email_invalid"]),
+        ("a@b", ["email_invalid"]),
+        ("nope", ["email_invalid"]),
+        (OVER_LIMIT_ADDRESS, ["string_too_long"]),
     ],
 )
-def test_email_rejects_malformed_or_padded_or_long_values(value: str) -> None:
-    assert error_types(TypeAdapter(Email), value)
+def test_email_rejects_malformed_padded_or_long_values(
+    value: str, kinds: list[str]
+) -> None:
+    assert error_types(TypeAdapter(Email), value) == kinds
 
 
-def test_email_at_the_254_character_limit_is_not_rejected_for_length() -> None:
-    local = "a" * 64
-    domain = ".".join(["b" * 61] * 3) + ".com"  # 64 + 1 + 183 + 2 + 4 = 254
-    address = f"{local}@{domain}"
-    assert len(address) == 254
+def test_email_at_the_254_character_limit_is_accepted() -> None:
+    assert TypeAdapter(Email).validate_python(AT_LIMIT_ADDRESS) == AT_LIMIT_ADDRESS
 
-    assert TypeAdapter(Email).validate_python(address) == address
+
+def test_address_fixture_is_254_characters() -> None:
+    assert len(AT_LIMIT_ADDRESS) == 254
+
+
+def test_profile_email_accepts_a_domain_without_a_suffix() -> None:
+    assert TypeAdapter(ProfileEmail).validate_python("A@B") == "a@b"
+
+
+def test_email_refuses_the_same_domain_without_a_suffix() -> None:
+    assert error_types(TypeAdapter(Email), "a@b") == ["email_invalid"]
+
+
+@pytest.mark.parametrize("value", [" a@b", "a@b ", "Name <a@b>", "nope"])
+def test_profile_email_still_rejects_malformed_values(value: str) -> None:
+    assert error_types(TypeAdapter(ProfileEmail), value) == ["email_invalid"]
 
 
 @pytest.mark.parametrize(
@@ -107,6 +136,7 @@ def test_uuid_rejects_other_strings(value: str) -> None:
         (TypeAdapter(NewPassword), "Zq7Xk9wv\t"),
         (TypeAdapter(NewPassword), "Zq7Xk9"),
         (TypeAdapter(Email), "Zq7Xk9wv"),
+        (TypeAdapter(ProfileEmail), "Zq7Xk9wv"),
         (TypeAdapter(PhoneNumber), "Zq7Xk9wv"),
         (TypeAdapter(UuidStr), "Zq7Xk9wv"),
     ],
@@ -117,19 +147,20 @@ def test_error_messages_never_contain_the_submitted_value(
     with pytest.raises(ValidationError) as info:
         adapter.validate_python(value)
 
-    # The first letter alone would leak, so look for any 4-character slice of the input.
     text = " ".join(str(error["msg"]) for error in info.value.errors())
-    leaked = [
-        value[i : i + 4] for i in range(len(value) - 3) if value[i : i + 4] in text
-    ]
-    assert leaked == []
+    assert leaked_slices(value, text) == []
 
 
-def test_strict_model_rejects_unknown_keys_and_reads_camel_case() -> None:
-    class Body(StrictModel):
-        first_name: str
+class _Body(StrictModel):
+    first_name: str
 
-    assert Body.model_validate({"firstName": "Ann"}).first_name == "Ann"
+
+def test_strict_model_reads_camel_case_keys() -> None:
+    assert _Body.model_validate({"firstName": "Ann"}).first_name == "Ann"
+
+
+def test_strict_model_rejects_unknown_keys() -> None:
     with pytest.raises(ValidationError) as info:
-        Body.model_validate({"firstName": "Ann", "nickname": "x"})
+        _Body.model_validate({"firstName": "Ann", "nickname": "x"})
+
     assert [str(e["type"]) for e in info.value.errors()] == ["extra_forbidden"]

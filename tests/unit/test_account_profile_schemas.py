@@ -65,3 +65,9 @@ def test_limits_and_unknown_keys_name_the_field(
         UpdateAccountProfileInput.model_validate(body)
 
     assert [e["loc"] for e in info.value.errors()] == [(field,)]
+
+
+def test_the_profile_email_may_lack_a_domain_suffix() -> None:
+    body = UpdateAccountProfileInput.model_validate({"email": "Ann@Host"})
+
+    assert body.email == "ann@host"

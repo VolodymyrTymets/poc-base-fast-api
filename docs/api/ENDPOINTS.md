@@ -24,9 +24,9 @@
   | `INTERNAL_SERVER_ERROR` | 500 | unexpected; no stack trace outside local |
 
 - **Shared validation rules** (from the Node DTOs in `auth/dto/`, `common/`; built in task 4.3: `app/core/validation.py` has the types `Email`, `NewPassword`, `CurrentPassword`, `PhoneNumber`, `UuidStr` and the base `StrictModel`, which rejects unknown keys; the models are in `app/schemas/auth.py` and `account_profile.py`):
-  - **deviation from Node (task 4.3):** the profile email also requires a top-level domain, like sign-in and sign-up; `email-validator` has no switch to allow `a@b`. Node allowed it only in the profile update. Task 5.4 may revisit it;
-  - phone numbers are stored in E.164 (`+12025550100`) after validation;
-  - email: valid address, at most 254 characters, validated first and then normalised by lowercasing (and trimming, a no-op after validation) before lookup and storage (`common/normalize-email.ts:3-4`); Node validates the raw value, so an address with surrounding spaces is rejected with 422, not trimmed. Node validated the profile email without requiring a top-level domain (`account-profile/dto/update-account-profile.input.ts:28`); this base does not, see the deviation above;
+  - the profile email is validated without requiring a top-level domain, as in Node (`ProfileEmail`, so `a@b` is accepted there); sign-in, sign-up and restore use `Email`, which requires one;
+  - phone numbers are stored in E.164 (`+12025550100`) after validation; an extension such as `ext. 5` is dropped, not rejected;
+  - email: valid address, at most 254 characters, validated first and then normalised by lowercasing (and trimming, a no-op after validation) before lookup and storage (`common/normalize-email.ts:3-4`); Node validates the raw value, so an address with surrounding spaces is rejected with 422, not trimmed. The profile email is validated without requiring a top-level domain (`account-profile/dto/update-account-profile.input.ts:28`) while sign-in and sign-up require one: kept as in Node, task 5.4 may align them;
   - new password (sign-up, reset, change): 8 to 72 **bytes**, no control characters (`common/password-rules.ts:3`; the byte limits are in `auth/dto/sign-up.input.ts:13`, `auth/dto/reset-password.input.ts:20` and `auth/dto/change-password.input.ts:12`); current password and sign-in password: 1 to 72 bytes;
   - phone number: a valid phone number in international format.
 - **Success status:** 200, except 201 for `sign-up` and `POST /files`, and 204 (no body) for the operations that returned only `true` in GraphQL.

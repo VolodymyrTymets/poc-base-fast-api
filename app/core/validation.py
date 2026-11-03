@@ -27,6 +27,8 @@ NEW_PASSWORD_MIN_BYTES = 8
 class StrictModel(BaseModel):
     """Base of every request model: unknown keys are a 422, the wire names are camelCase."""
 
+    # populate_by_name lets Python code build a model with attribute names; the contract and
+    # OpenAPI still show only the camelCase aliases.
     model_config = ConfigDict(
         extra="forbid", alias_generator=to_camel, populate_by_name=True
     )
@@ -76,17 +78,30 @@ def _current_password(value: str) -> str:
     return _check_password_bytes(value, 1)
 
 
-def _email(value: str) -> str:
+def _normalised_email(value: str, *, require_domain_suffix: bool) -> str:
     # Validated as sent (an address with surrounding spaces is rejected, as in Node), then
     # lowercased: the whole address is normalised before lookup and storage.
     try:
-        result = validate_email(value, check_deliverability=False)
+        result = validate_email(
+            value,
+            check_deliverability=False,
+            globally_deliverable=require_domain_suffix,
+        )
     except EmailNotValidError:
         # The library's message quotes the input, so it is dropped.
         raise PydanticCustomError(
             "email_invalid", "Must be a valid email address"
         ) from None
     return result.normalized.lower()
+
+
+def _email(value: str) -> str:
+    return _normalised_email(value, require_domain_suffix=True)
+
+
+def _profile_email(value: str) -> str:
+    # Node's profile update did not require a top-level domain; kept so `a@b` still works there.
+    return _normalised_email(value, require_domain_suffix=False)
 
 
 def _phone_number(value: str) -> str:
@@ -114,6 +129,9 @@ def _uuid(value: str) -> str:
 # The length limits count characters; the byte limits of the passwords are in the validators.
 Email = Annotated[
     str, StringConstraints(max_length=EMAIL_MAX_LENGTH), AfterValidator(_email)
+]
+ProfileEmail = Annotated[
+    str, StringConstraints(max_length=EMAIL_MAX_LENGTH), AfterValidator(_profile_email)
 ]
 NewPassword = Annotated[str, AfterValidator(_new_password)]
 CurrentPassword = Annotated[str, AfterValidator(_current_password)]
