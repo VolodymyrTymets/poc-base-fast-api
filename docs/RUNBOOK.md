@@ -97,9 +97,9 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
   builds the template, and that wait should run on the real clock.
 
 ## Seeds
-Seed items are the base data the app creates for itself: today the two roles (`CUSTOMER`, `ADMIN`); the admin and customers come with task 5.5.
+Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
 - With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;
-  one that has nothing to do (the roles already exist) is skipped. A second start adds nothing.
+  one that has nothing to do (the roles already exist) is skipped. A second start adds nothing. The customer item creates only the sample phones that have no account yet, so it also runs on a database that already has the admin.
 - `uv run python -m app.seeds` runs the same items and exits: 0 when done, 1 without `DATABASE_URL` or when an item fails. The development list
   (sample data) is used for `APP_ENV` `local`, `development` and `test`, never for `production`.
 - **A failed seed stops the boot** (decision of POC-5.1), and so does an unreachable database or one that was never migrated (`relation "SeedHistory"

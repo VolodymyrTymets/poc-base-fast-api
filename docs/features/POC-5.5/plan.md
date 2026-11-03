@@ -56,11 +56,11 @@ Anything not run goes under "Not verified".
 | admin in the base list (every environment) | development list only (decided in session) |
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-5.5/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md: `app/seeds/` row (the development list is no longer empty; the two items) and the data-truth paragraph; the status line and the "Decided (ADR-0003 to ADR-0021 ...)" heading go to ADR-0023, with bullets for ADR-0022 (self-scoped routes) and ADR-0023 (seeds may import schemas)
-- [ ] docs/RUNBOOK.md: "Seeds" section (the admin and the three sample customers, their phones and emails, the OTP-only sign-in; none of them exists in production)
-- [ ] docs/DOMAIN_GLOSSARY.md: the seed item row names the admin and the customers
-- [ ] docs/decisions/ADR-0023 (R1); the import line of `.claude/rules/project-structure.md` rule 4; the Status line of ADR-0011
+- [x] docs/features/POC-5.5/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md: `app/seeds/` row (the development list is no longer empty; the two items) and the data-truth paragraph; the status line and the "Decided (ADR-0003 to ADR-0021 ...)" heading go to ADR-0023, with bullets for ADR-0022 (self-scoped routes) and ADR-0023 (seeds may import schemas)
+- [x] docs/RUNBOOK.md: "Seeds" section (the admin and the three sample customers, their phones and emails, the OTP-only sign-in; none of them exists in production)
+- [x] docs/DOMAIN_GLOSSARY.md: the seed item row names the admin and the customers
+- [x] docs/decisions/ADR-0023 (R1); the import line of `.claude/rules/project-structure.md` rule 4; the Status line of ADR-0011
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

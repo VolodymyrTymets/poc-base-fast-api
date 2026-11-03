@@ -18,7 +18,7 @@ domain and does not repurpose these names. Python identifiers are decided for al
 | Deletion record | `DeletedHistory` | A bookkeeping row naming a record that was deleted (`relationId`), by whom (`deletedBy`, optional) and a `deletedAt` flag. No code writes it yet. | Soft delete: the `deleted` column on domain tables is what marks a row deleted |
 | Sign-in code / OTP | OTP code | The one-time code sent to a phone number to authenticate; hashed at rest, 2 minute TTL, never logged. | JWT tokens, issued after verification |
 | Password reset token | `resetTokenHash` | A random single-use token valid 30 minutes, stored only as a sha256 hash and sent to the account's email. | OTP code, refresh token |
-| Seed item | none (Node: migration item) | One unit of base data the app creates for itself (today: the two roles). It has a unique name, a check for whether it is needed, and a run. Never a schema change. | Alembic revision, which changes the schema |
+| Seed item | none (Node: migration item) | One unit of base data the app creates for itself (the two roles; in development environments also the sample admin and three sample customers). It has a unique name, a check for whether it is needed, and a run. Never a schema change. | Alembic revision, which changes the schema |
 | Seed history | `SeedHistory` (Node: `Migration`, a different table) | One row per seed item: whether its last run succeeded and, if not, the error text. Updated in place on a retry. | `alembic_version`, which records schema revisions |
 | Refresh token | `refreshToken` | A long-lived JWT used only to get a new access token. Stored as sha256 (decision D5), not bcrypt. | Access token (short-lived, 15 min default) |
 
