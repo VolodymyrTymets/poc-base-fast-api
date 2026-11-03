@@ -5,11 +5,19 @@ turn them into `{"error": {"code", "message", "details"}}`. Clients key on `code
 `message`. A new code needs a superseding ADR, not just a new subclass.
 """
 
+import logging
+import traceback
 from collections.abc import Sequence
 from enum import StrEnum, auto
 from typing import ClassVar, TypedDict
 
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
 
 # A validation entry (`field`, `in`, `message`, `type`) or one traceback string: the only
 # two things `details` ever holds.
@@ -123,7 +131,91 @@ class NotFoundError(AppError):
     default_message = "Not found"
 
 
+class InternalServerError(AppError):
+    """Raised by nobody: the handler of an unexpected exception builds it for the body."""
+
+    status_code = 500
+    code = ErrorCode.INTERNAL_SERVER_ERROR
+    default_message = "Internal server error"
+
+
 class ValidationFailedError(AppError):
     status_code = 422
     code = ErrorCode.VALIDATION_FAILED
     default_message = "Validation failed"
+
+
+# HTTP statuses raised by Starlette or a dependency (HTTPException) that have a code of
+# their own. Any other status keeps its number and is reported as VALIDATION_FAILED
+# (decided with the owner on 2026-11-03, no new code: ADR-0003).
+_HTTP_STATUS_ERRORS: dict[int, type[AppError]] = {
+    401: UnauthorizedError,
+    403: ForbiddenError,
+    404: NotFoundError,
+}
+
+
+def validation_details(exc: RequestValidationError) -> list[ErrorDetail]:
+    """One entry per failed field: where it is, which field, why. Never the submitted value.
+
+    Pydantic's own error dicts carry `input` (a password in a sign-up body) and `ctx`, so
+    only `loc`, `msg` and `type` are read (rules D8, P4).
+    """
+    details: list[ErrorDetail] = []
+    for error in exc.errors():
+        location = [str(part) for part in error["loc"]]
+        details.append(
+            {
+                "in": location[0] if location else "",
+                "field": ".".join(location[1:]),
+                "message": str(error["msg"]),
+                "type": str(error["type"]),
+            }
+        )
+    return details
+
+
+def register_error_handlers(app: FastAPI, *, expose_trace: bool) -> None:
+    """Make every error leave `app` in the contract shape.
+
+    `expose_trace` puts the traceback of an unexpected error in `details`; it is for the
+    `local` environment only, the caller decides.
+    """
+
+    @app.exception_handler(AppError)
+    async def handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(exc.body(), status_code=exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        error = ValidationFailedError(details=validation_details(exc))
+        return JSONResponse(error.body(), status_code=error.status_code)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def handle_http_error(
+        _request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        known = _HTTP_STATUS_ERRORS.get(exc.status_code)
+        if known is not None:
+            error = known()
+            status = error.status_code
+        else:
+            error = ValidationFailedError(exc.detail)
+            status = exc.status_code
+        # Headers matter: a 405 carries `Allow`, a 401 may carry `WWW-Authenticate`.
+        return JSONResponse(error.body(), status_code=status, headers=exc.headers)
+
+    @app.exception_handler(Exception)
+    async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        # The stack goes to the log in every environment, never into the body outside local.
+        # No body, headers or query string are logged (rules D8, P4).
+        logger.error(
+            "unhandled error on %s %s", request.method, request.url.path, exc_info=exc
+        )
+        details: list[ErrorDetail] = []
+        if expose_trace:
+            details.append("".join(traceback.format_exception(exc)))
+        error = InternalServerError(details=details)
+        return JSONResponse(error.body(), status_code=error.status_code)

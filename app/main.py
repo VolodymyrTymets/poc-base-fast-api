@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.config import Settings, get_settings
 from app.core.body_limit import BodyLimitMiddleware
 from app.core.db import create_engine, create_session_factory
+from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
@@ -73,6 +74,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
         allow_headers=["*"],
     )
+
+    register_error_handlers(app, expose_trace=settings.app_env == "local")
 
     api = APIRouter(prefix=API_PREFIX)
 
