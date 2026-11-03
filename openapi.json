@@ -1,0 +1,71 @@
+{
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "poc-base-fast-api",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "The signed-in account.",
+      "name": "account"
+    },
+    {
+      "description": "Profile of an account.",
+      "name": "account_profile"
+    },
+    {
+      "description": "Roles of an account.",
+      "name": "account_role"
+    },
+    {
+      "description": "Sign-in, tokens and passwords.",
+      "name": "auth"
+    },
+    {
+      "description": "File upload and download.",
+      "name": "files"
+    },
+    {
+      "description": "Notifications (no public route).",
+      "name": "notifier"
+    }
+  ]
+}
