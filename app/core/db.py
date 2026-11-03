@@ -97,7 +97,7 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """One session per request; closed (and an open transaction rolled back) when it ends.
 
-    Nothing is committed here: the service that owns a use case calls commit() itself.
+    Nothing is committed here: the route handler calls `await session.commit()`; services only flush (ADR-0021).
     """
     factory: async_sessionmaker[AsyncSession] | None = getattr(
         request.app.state, "session_factory", None

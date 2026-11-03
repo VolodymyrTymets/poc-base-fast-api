@@ -2,17 +2,22 @@
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) comes with task 5.3, the refresh-hash check with
-task 7.4, `require_roles` with task 5.2.
+task 7.4. Task 5.2 adds `require_roles`, the role layer of rule P7.
 """
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.core.errors import UnauthorizedError
+from app.core.db import get_session
+from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import TokenClaims, TokenType, verify_token
+from app.models import AccountRoleType
+from app.services.account_role import AccountRoleService
 
 REFRESH_HEADER_NAME = "x-refresh-token"
 
@@ -57,3 +62,29 @@ async def refresh_account(
     if not token:
         raise UnauthorizedError
     return verify_token(settings, token, TokenType.REFRESH)
+
+
+def require_roles(
+    *roles: AccountRoleType,
+) -> Callable[..., Awaitable[TokenClaims]]:
+    """A dependency that admits an account holding at least one of `roles`; 401 without a valid token, else 403 FORBIDDEN.
+
+    Use it as `Depends(require_roles(AccountRoleType.ADMIN))`. It returns the caller's claims, so a route
+    that needs the id does not also depend on `current_account`.
+    """
+    if not roles:
+        # Fail closed. The Node guard logged "no roles" and let the request through.
+        raise ValueError("require_roles needs at least one role")
+    allowed = frozenset(roles)
+
+    async def guard(
+        # Listed before the session so that an unauthenticated request is a 401 even with no database.
+        claims: Annotated[TokenClaims, Depends(current_account)],
+        session: Annotated[AsyncSession, Depends(get_session)],
+    ) -> TokenClaims:
+        held = await AccountRoleService(session).get_account_roles(claims.account_id)
+        if allowed.isdisjoint(held):
+            raise ForbiddenError
+        return claims
+
+    return guard
