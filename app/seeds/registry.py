@@ -3,6 +3,7 @@
 from app.config import Settings
 from app.seeds.base import SeedItem
 from app.seeds.items.init_admin import InitAdmin
+from app.seeds.items.init_customer import InitCustomer
 from app.seeds.items.init_roles import InitRoles
 
 # The environments that also get the sample data (the Node base's local, test and development).
@@ -15,8 +16,8 @@ def base_items() -> list[SeedItem]:
 
 
 def development_items(settings: Settings) -> list[SeedItem]:
-    """Sample data for `DEVELOPMENT_ENVS` only (task 5.5): the admin, then the customers (R2). They need the roles."""
-    return [InitAdmin(settings)]
+    """Sample data for `DEVELOPMENT_ENVS` only (task 5.5): the admin, then the customers. They need the roles."""
+    return [InitAdmin(settings), InitCustomer(settings)]
 
 
 def seed_items(settings: Settings) -> list[SeedItem]:

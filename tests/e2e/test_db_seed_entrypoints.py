@@ -64,9 +64,10 @@ async def test_starting_the_app_seeds_the_roles_and_a_second_start_adds_nothing(
     assert await values(unseeded_database_url, ROLES_SQL) == ["ADMIN", "CUSTOMER"]
     assert await values(unseeded_database_url, HISTORY_SQL) == [
         "init.admin:true",
+        "init.customer:true",
         "init.roles:true",
     ]
-    assert await values(unseeded_database_url, ACCOUNT_COUNT_SQL) == ["1"]
+    assert await values(unseeded_database_url, ACCOUNT_COUNT_SQL) == ["4"]
 
 
 async def test_a_failing_seed_stops_the_boot_and_is_recorded(
@@ -106,9 +107,10 @@ async def test_the_command_seeds_and_exits_0_twice(unseeded_database_url: str) -
     assert await values(unseeded_database_url, ROLES_SQL) == ["ADMIN", "CUSTOMER"]
     assert await values(unseeded_database_url, HISTORY_SQL) == [
         "init.admin:true",
+        "init.customer:true",
         "init.roles:true",
     ]
-    assert await values(unseeded_database_url, ACCOUNT_COUNT_SQL) == ["1"]
+    assert await values(unseeded_database_url, ACCOUNT_COUNT_SQL) == ["4"]
 
 
 def test_the_command_without_a_database_url_exits_1_and_names_the_setting() -> None:

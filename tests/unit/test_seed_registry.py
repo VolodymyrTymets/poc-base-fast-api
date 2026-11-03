@@ -25,8 +25,10 @@ def test_every_environment_gets_the_roles_first() -> None:
 
 
 @pytest.mark.parametrize("app_env", ["local", "development", "test"])
-def test_development_environments_get_the_roles_then_the_admin(app_env: Env) -> None:
-    assert names(app_env) == ["init.roles", "init.admin"]
+def test_development_environments_get_the_roles_then_the_admin_then_the_customers(
+    app_env: Env,
+) -> None:
+    assert names(app_env) == ["init.roles", "init.admin", "init.customer"]
 
 
 def test_production_gets_the_roles_only() -> None:
