@@ -164,6 +164,10 @@ def isolated_settings_env(
         "MAX_REQUEST_BODY_BYTES",
         "SHUTDOWN_TIMEOUT_SECONDS",
         "DATABASE_URL",
+        "JWT_SECRET",
+        "JWT_REFRESH_TOKEN_SECRET",
+        "JWT_ACCESS_TOKEN_EXPIRES_IN",
+        "JWT_REFRESH_TOKEN_EXPIRES_IN",
     ):
         monkeypatch.delenv(name, raising=False)
     get_settings.cache_clear()

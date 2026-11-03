@@ -1,9 +1,17 @@
 """Settings read from the environment and validated once at boot. Tasks: 1.5."""
 
+import re
+from datetime import timedelta
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import BeforeValidator, Field, field_validator
+from pydantic import (
+    BeforeValidator,
+    Field,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # The local web apps (5173, 5174) that the Node base allowed. Ports move when a fork
@@ -31,6 +39,37 @@ def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:
     return parse_cors_origins(value)
 
 
+# ADR-0010: the token lifetimes keep the Node base's `15m` / `55min` / `7d` notation.
+_DURATION_UNITS = {
+    "s": timedelta(seconds=1),
+    "m": timedelta(minutes=1),
+    "min": timedelta(minutes=1),
+    "h": timedelta(hours=1),
+    "d": timedelta(days=1),
+}
+_DURATION_PATTERN = re.compile(r"(\d+)(s|min|m|h|d)")
+
+# Below this a HS256 key is guessable; only enforced outside local and test (task 4.4).
+MIN_JWT_SECRET_LENGTH = 32
+_STRICT_ENVS = {"development", "production"}
+
+
+def parse_duration(raw: str) -> timedelta:
+    """Read `30s`, `15m`, `55min`, `2h` or `7d`; anything else, and zero, is an error."""
+    match = _DURATION_PATTERN.fullmatch(raw.strip())
+    if match is None:
+        raise ValueError("duration must look like 30s, 15m, 55min, 2h or 7d")
+    duration = int(match.group(1)) * _DURATION_UNITS[match.group(2)]
+    if duration <= timedelta(0):
+        raise ValueError("duration must be greater than zero")
+    return duration
+
+
+def _duration_from_env(value: str | timedelta) -> timedelta:
+    # A timedelta (from code) is already parsed.
+    return parse_duration(value) if isinstance(value, str) else value
+
+
 def _blank_to_none(value: str | None) -> str | None:
     # A blank SENTRY_DSN= line in .env means "off", the same as unset.
     return value.strip() or None if isinstance(value, str) else value
@@ -55,6 +94,18 @@ class Settings(BaseSettings):
     sentry_dsn: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
     # None means "no database": the app still boots, only a route that needs a session fails.
     database_url: Annotated[str | None, BeforeValidator(_blank_to_none)] = None
+    # Tasks 4.4 and 7.x. Unset is allowed in local and test (the app boots, only issuing or
+    # checking a token fails); development and production refuse to boot, see below.
+    jwt_secret: Annotated[SecretStr | None, BeforeValidator(_blank_to_none)] = None
+    jwt_refresh_token_secret: Annotated[
+        SecretStr | None, BeforeValidator(_blank_to_none)
+    ] = None
+    jwt_access_token_expires_in: Annotated[
+        timedelta, BeforeValidator(_duration_from_env)
+    ] = timedelta(minutes=15)
+    jwt_refresh_token_expires_in: Annotated[
+        timedelta, BeforeValidator(_duration_from_env)
+    ] = timedelta(days=7)
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
@@ -66,6 +117,31 @@ class Settings(BaseSettings):
         if value is not None and not value.startswith(DATABASE_URL_SCHEME):
             raise ValueError(f"database_url must start with {DATABASE_URL_SCHEME}")
         return value
+
+    @model_validator(mode="after")
+    def _require_strong_jwt_secrets(self) -> Self:
+        if self.app_env not in _STRICT_ENVS:
+            return self
+        # Messages name the fields, never the values (they are secrets).
+        problems: list[str] = []
+        for name in ("jwt_secret", "jwt_refresh_token_secret"):
+            secret: SecretStr | None = getattr(self, name)
+            if secret is None:
+                problems.append(f"{name} must be set")
+            elif len(secret.get_secret_value()) < MIN_JWT_SECRET_LENGTH:
+                problems.append(
+                    f"{name} must be at least {MIN_JWT_SECRET_LENGTH} characters"
+                )
+        if (
+            self.jwt_secret is not None
+            and self.jwt_refresh_token_secret is not None
+            and self.jwt_secret.get_secret_value()
+            == self.jwt_refresh_token_secret.get_secret_value()
+        ):
+            problems.append("jwt_secret and jwt_refresh_token_secret must differ")
+        if problems:
+            raise ValueError(f"{self.app_env}: " + "; ".join(problems))
+        return self
 
 
 @lru_cache
