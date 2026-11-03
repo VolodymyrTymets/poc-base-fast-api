@@ -14,9 +14,9 @@ cp .env.example .env         # every setting has a default; see the file for the
 # 1. a PostGIS database. Skip the container if you already have a PostGIS server; use a database of its own, not
 #    the image's default `postgres` one (see "Common failures").
 docker run -d --name poc-base-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgis/postgis:16-3.4
-docker exec poc-base-pg psql -U postgres -c 'CREATE DATABASE poc_base'
-#    then put this line in .env (or export it):
-#    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/poc_base
+docker exec poc-base-pg psql -U postgres -c 'CREATE DATABASE poc'
+#    .env.example already holds the matching line, so the copied .env works as it is:
+#    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/poc
 
 # 2. the schema: the tables, the enum types, the postgis extension and SeedHistory (see "Migrations")
 uv run alembic upgrade head
