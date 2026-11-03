@@ -73,6 +73,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_tags=TAGS,
         responses=ERROR_RESPONSES,
     )
+    # Read by the auth dependencies (app/dependencies.py), so they see what the app booted with.
+    app.state.settings = settings
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine) if engine else None
