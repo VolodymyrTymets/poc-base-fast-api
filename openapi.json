@@ -214,6 +214,85 @@
         ],
         "title": "HealthResponse",
         "type": "object"
+      },
+      "UpdateAccountProfileInput": {
+        "additionalProperties": false,
+        "description": "A field that is not sent stays unchanged; an explicit `null` clears a nullable one.\n\nRead `model_fields_set` to tell the two apart: both leave the attribute `None`.",
+        "properties": {
+          "avatarId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatarid"
+          },
+          "dataOfBirth": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataofbirth"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 254,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "firstName": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firstname"
+          },
+          "lastName": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastname"
+          },
+          "middleName": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middlename"
+          }
+        },
+        "title": "UpdateAccountProfileInput",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -274,6 +353,74 @@
         "summary": "Read Account",
         "tags": [
           "account"
+        ]
+      }
+    },
+    "/api/v1/accounts/{account_id}/profile": {
+      "patch": {
+        "description": "Update the caller's own profile: only the fields sent change, `null` clears one.",
+        "operationId": "update_account_profile_api_v1_accounts__account_id__profile_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Account Profile",
+        "tags": [
+          "account_profile"
         ]
       }
     },
