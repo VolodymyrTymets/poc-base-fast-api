@@ -1,11 +1,14 @@
 """AccountService on a real Postgres (the template database holds the seeded roles). Task: 5.3."""
 
+import uuid
+from datetime import timedelta
+
 import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from app.core.db import utc_now
+from app.core.db import create_session_factory, utc_now
 from app.models import (
     Account,
     AccountIdentity,
@@ -75,22 +78,54 @@ async def test_get_by_phone_finds_the_customer(db_session: AsyncSession) -> None
     assert found.id == created.id
 
 
-async def test_unknown_id_and_phone_give_none(db_session: AsyncSession) -> None:
+async def test_an_unknown_id_gives_none(db_session: AsyncSession) -> None:
     service = AccountService(db_session)
 
     assert await service.get_by_id("00000000-0000-4000-8000-000000000000") is None
-    assert await service.get_by_phone("+380509990002") is None
 
 
-async def test_a_soft_deleted_account_is_not_found(db_session: AsyncSession) -> None:
+async def test_an_unknown_phone_gives_none(db_session: AsyncSession) -> None:
+    assert await AccountService(db_session).get_by_phone("+380509990002") is None
+
+
+async def test_two_accounts_with_one_phone_give_the_oldest(
+    db_session: AsyncSession,
+) -> None:
+    service = AccountService(db_session)
+    first = await service.create_customer("+380509990004")
+    first_id = first.id
+    await db_session.execute(
+        update(Account)
+        .where(Account.id == first_id)
+        .values(created_at=utc_now() - timedelta(days=1))
+    )
+    await service.create_customer("+380509990004")
+    db_session.expire_all()
+
+    found = await service.get_by_phone("+380509990004")
+
+    assert found is not None
+    assert found.id == first_id
+
+
+@pytest.mark.parametrize("by", ["id", "phone"])
+async def test_a_soft_deleted_account_is_not_found(
+    db_session: AsyncSession, by: str
+) -> None:
     service = AccountService(db_session)
     account = await service.create_customer("+380509990003")
+    account_id = account.id
     await db_session.execute(
-        update(Account).where(Account.id == account.id).values(deleted=True)
+        update(Account).where(Account.id == account_id).values(deleted=True)
     )
 
-    assert await service.get_by_id(account.id) is None
-    assert await service.get_by_phone("+380509990003") is None
+    found = (
+        await service.get_by_id(account_id)
+        if by == "id"
+        else await service.get_by_phone("+380509990003")
+    )
+
+    assert found is None
 
 
 async def test_a_soft_deleted_profile_is_none_even_in_the_same_session(
@@ -143,3 +178,17 @@ async def test_a_duplicate_email_fails_and_leaves_nothing(
 
 async def _count(session: AsyncSession, model: type) -> int:
     return await session.scalar(select(func.count()).select_from(model)) or 0
+
+
+async def test_the_service_never_commits(db_engine: AsyncEngine) -> None:
+    # db_session wraps a savepoint, so a stray commit() would pass unnoticed there: use a plain session and a second connection.
+    email = f"{uuid.uuid4().hex}@example.com"
+    async with create_session_factory(db_engine)() as session:
+        await AccountService(session).create_password_account(email, "h", "s")
+        await session.rollback()
+
+    async with create_session_factory(db_engine)() as other:
+        found = await other.scalar(
+            select(func.count()).where(AccountProfile.email == email)
+        )
+    assert found == 0

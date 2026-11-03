@@ -25,7 +25,7 @@ class AccountService:
         return result.one_or_none()
 
     async def get_by_phone(self, phone_number: str) -> Account | None:
-        """The live account whose live profile has this phone number; `None` when there is none."""
+        """The oldest live account whose live profile has this phone number; `None` when there is none."""
         result = await self._session.scalars(
             _live_accounts()
             .join(
@@ -34,8 +34,12 @@ class AccountService:
                 & AccountProfile.deleted.is_(False),
             )
             .where(AccountProfile.phone_number == phone_number)
+            # The phone has no unique index (as in Prisma): two concurrent first sign-ins can create two accounts.
+            # The oldest wins, like Prisma's findFirst, instead of failing every later lookup.
+            .order_by(Account.created_at, Account.id)
+            .limit(1)
         )
-        return result.one_or_none()
+        return result.first()
 
     async def create_customer(self, phone_number: str) -> Account:
         """A `CUSTOMER` account with a profile holding the phone number. Flushes; the caller commits (ADR-0021)."""

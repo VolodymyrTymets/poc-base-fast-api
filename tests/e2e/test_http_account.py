@@ -13,7 +13,7 @@ from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
-from app.core.db import create_session_factory
+from app.core.db import create_session_factory, utc_now
 from app.core.security import TokenType, issue_token
 from app.main import create_app
 from app.models import Account
@@ -83,6 +83,7 @@ async def test_a_password_account_has_a_null_phone_number(
     async with running_client(make_app(module_database_url)) as client:
         response = await client.get(PATH, headers=token_for(account_id))
 
+    assert response.status_code == 200
     assert response.json()["profile"]["phoneNumber"] is None
     assert response.json()["profile"]["isPhoneVerified"] is False
 
@@ -98,6 +99,24 @@ async def test_no_identity_data_is_in_the_body(
     assert not IDENTITY_KEYS & _keys(response.json())
     assert "secret-hash" not in response.text
     assert "secret-salt" not in response.text
+
+
+async def test_an_account_with_no_role_and_no_profile_still_reads_itself(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    # ADR-0022: authentication only. Adding require_roles to the route must fail this test.
+    async with create_session_factory(db_engine)() as session, session.begin():
+        bare = Account(last_login_at=utc_now())
+        session.add(bare)
+        await session.flush()
+        account_id = bare.id
+
+    async with running_client(make_app(module_database_url)) as client:
+        response = await client.get(PATH, headers=token_for(account_id))
+
+    assert response.status_code == 200
+    assert response.json()["id"] == account_id
+    assert response.json()["profile"] is None
 
 
 async def test_a_token_of_an_unknown_account_is_unauthorized(
@@ -142,6 +161,8 @@ async def test_a_tampered_token_is_unauthorized_without_a_database() -> None:
         )
 
     assert response.status_code == 401
+    assert response.headers["www-authenticate"] == BEARER
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
 def _keys(value: object) -> set[str]:
