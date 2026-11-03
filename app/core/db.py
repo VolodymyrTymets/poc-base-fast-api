@@ -78,10 +78,12 @@ def create_engine(settings: Settings) -> AsyncEngine | None:
     # pool_pre_ping replaces a connection the server dropped while idle instead of
     # failing the request that happens to pick it up. The session time zone is UTC because
     # `CURRENT_TIMESTAMP` fills a column without a time zone in the session's own zone, and
-    # every timestamp here is UTC (ADR-0014).
+    # every timestamp here is UTC (ADR-0014). hide_parameters keeps the values of a failed statement (a seed's
+    # email or phone number, say) out of the error text and so out of the logs (rules D8, P4).
     return create_async_engine(
         settings.database_url,
         pool_pre_ping=True,
+        hide_parameters=True,
         connect_args={"server_settings": {"timezone": "UTC"}},
     )
 

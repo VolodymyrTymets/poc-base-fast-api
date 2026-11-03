@@ -12,7 +12,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.db import new_id
+from app.config import Settings
+from app.core.db import create_engine, create_session_factory, new_id
 from app.models import SeedHistory
 from app.seeds.base import SeedError, SeedItem
 
@@ -29,8 +30,8 @@ MAX_RESULT_LENGTH = 2000
 def describe(error: Exception) -> str:
     """Class and message of the error, for `SeedHistory.result`.
 
-    A database error is described by the driver's error alone: SQLAlchemy's own text appends the statement and its
-    parameters, which may hold personal data (rule D8).
+    A database error is described by the driver's own error: SQLAlchemy's wrapper adds the statement text, which
+    is noise in a table column. (Its parameters are hidden by the engine, `hide_parameters` in app/core/db.py.)
     """
     cause = error.orig if isinstance(error, DBAPIError) and error.orig else error
     return f"{type(cause).__name__}: {cause}"[:MAX_RESULT_LENGTH]
@@ -93,3 +94,14 @@ async def run_seeds(
             logger.error("seed %s failed: %s", item.name, describe(error))
             raise SeedError(f"seed {item.name} failed: {describe(error)}") from error
         logger.info("seed %s: %s", item.name, "done" if ran else "nothing to do")
+
+
+async def seed_database(settings: Settings, items: Sequence[SeedItem]) -> None:
+    """`run_seeds` on a database of its own: for a command or a test helper that has no app engine to borrow."""
+    engine = create_engine(settings)
+    if engine is None:
+        raise SeedError("DATABASE_URL is not set; the seeds need a database")
+    try:
+        await run_seeds(create_session_factory(engine), items)
+    finally:
+        await engine.dispose()

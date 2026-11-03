@@ -113,6 +113,9 @@ INDEX_DEFINITIONS = {
     "NotificationRecipient_pkey": 'CREATE UNIQUE INDEX "NotificationRecipient_pkey" ON "NotificationRecipient" USING btree ("notificationId", "accountId")',
     "DeletedHistory_pkey": 'CREATE UNIQUE INDEX "DeletedHistory_pkey" ON "DeletedHistory" USING btree (id)',
     "DeletedHistory_relationId_idx": 'CREATE INDEX "DeletedHistory_relationId_idx" ON "DeletedHistory" USING btree ("relationId")',
+    # Task 5.1: not a Prisma table (the seed runner's own), but it is on the same metadata.
+    "SeedHistory_pkey": 'CREATE UNIQUE INDEX "SeedHistory_pkey" ON "SeedHistory" USING btree (id)',
+    "SeedHistory_name_key": 'CREATE UNIQUE INDEX "SeedHistory_name_key" ON "SeedHistory" USING btree (name)',
 }
 
 # pg_constraint codes: r = RESTRICT, c = CASCADE, n = SET NULL.

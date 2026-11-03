@@ -18,6 +18,8 @@ from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
+from app.seeds.registry import seed_items
+from app.seeds.runner import run_seeds
 
 API_PREFIX = "/api/v1"
 
@@ -57,6 +59,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine: AsyncEngine | None = app.state.engine
     logger.info("application startup")
     try:
+        session_factory = app.state.session_factory
+        if session_factory is not None:
+            # A failed seed stops the boot (rule D5, approved in POC-5.1): the Node base logged it and served on,
+            # which left an app with no roles that looked healthy. Without DATABASE_URL there is nothing to seed.
+            await run_seeds(session_factory, seed_items(app.state.settings))
         yield
     finally:
         if engine is not None:

@@ -20,7 +20,9 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
-from app.config import get_settings
+from app.config import Settings, get_settings
+from app.seeds.registry import seed_items
+from app.seeds.runner import seed_database
 
 POSTGIS_IMAGE = "postgis/postgis:16-3.4"
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -113,8 +115,10 @@ async def commit_marker_account(engine: AsyncEngine, marker: str) -> list[str]:
         return list(rows.scalars().all())
 
 
-def build_template(server_url: str, workdir: Path) -> str:
-    """Create a database and bring it to `alembic upgrade head`; returns its name.
+def build_template(server_url: str, workdir: Path, *, seed: bool = True) -> str:
+    """Create a database, bring it to `alembic upgrade head` and (by default) run the seeds; returns its name.
+
+    `seed=False` leaves the migrated database empty, for the tests of the seeds themselves.
 
     The environment is isolated for the call only: DATABASE_URL points at the new database, and the working
     directory is `workdir`, so a developer's own .env is not read.
@@ -128,6 +132,11 @@ def build_template(server_url: str, workdir: Path) -> str:
             get_settings.cache_clear()
             try:
                 command.upgrade(Config(str(REPO_ROOT / "alembic.ini")), "head")
+                if seed:
+                    settings = Settings(
+                        database_url=database_url_for(server_url, name), app_env="test"
+                    )
+                    asyncio.run(seed_database(settings, seed_items(settings)))
             finally:
                 get_settings.cache_clear()
     except BaseException:

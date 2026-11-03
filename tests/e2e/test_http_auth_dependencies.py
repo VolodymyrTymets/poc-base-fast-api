@@ -16,7 +16,11 @@ from app.dependencies import current_account, refresh_account
 from app.main import create_app
 
 ACCOUNT_ID = str(uuid.UUID("22222222-2222-4222-8222-222222222222"))
-SETTINGS = Settings(jwt_secret=ACCESS_KEY, jwt_refresh_token_secret=REFRESH_KEY)
+# database_url=None: this is built at import, before the autouse fixture isolates the environment, so it would read a
+# developer's .env, and the lifespan would then seed that database (task 5.1). These tests need none.
+SETTINGS = Settings(
+    jwt_secret=ACCESS_KEY, jwt_refresh_token_secret=REFRESH_KEY, database_url=None
+)
 UNAUTHORIZED = {
     "error": {
         "code": "UNAUTHORIZED",

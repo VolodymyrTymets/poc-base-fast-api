@@ -60,11 +60,25 @@ def database_url() -> Iterator[str]:
 def template_database(
     database_url: str, tmp_path_factory: pytest.TempPathFactory
 ) -> Iterator[str]:
-    """The name of a database migrated with `alembic upgrade head`, built once per session (ADR-0006).
+    """The name of a database migrated with `alembic upgrade head` and seeded, built once per session (ADR-0006).
 
-    Seeds join it in task 5.1. It is only ever copied, never written to by a test.
+    It is only ever copied, never written to by a test.
     """
     name = build_template(database_url, tmp_path_factory.mktemp("alembic"))
+    try:
+        yield name
+    finally:
+        drop_database(database_url, name)
+
+
+@pytest.fixture(scope="session")
+def unseeded_template_database(
+    database_url: str, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[str]:
+    """Like `template_database` but with no seed run: the starting point of the seed tests (task 5.1)."""
+    name = build_template(
+        database_url, tmp_path_factory.mktemp("alembic-unseeded"), seed=False
+    )
     try:
         yield name
     finally:
@@ -83,10 +97,12 @@ def module_database_url(database_url: str, template_database: str) -> Iterator[s
 
 
 @pytest.fixture
-def unseeded_database_url(database_url: str, template_database: str) -> Iterator[str]:
+def unseeded_database_url(
+    database_url: str, unseeded_template_database: str
+) -> Iterator[str]:
     """A migrated database that no seed has touched, one per test (the seed tests commit and may not delete rows, rule P6)."""
     name = new_database_name("unseeded")
-    create_database(database_url, name, template=template_database)
+    create_database(database_url, name, template=unseeded_template_database)
     try:
         yield database_url_for(database_url, name)
     finally:

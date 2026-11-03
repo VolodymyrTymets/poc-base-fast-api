@@ -6,6 +6,7 @@ rollback, can be read back.
 """
 
 import asyncio
+from traceback import format_exception
 
 import pytest
 from sqlalchemy import select, text
@@ -49,14 +50,17 @@ class FakeItem:
 
 
 class BadSqlItem(FakeItem):
-    """Fails in the database with a value that must not reach `SeedHistory.result`."""
+    """Fails in the database; its parameter must not reach `SeedHistory.result` or the traceback.
+
+    Division by zero because Postgres words that error without any value, so the parameter is the only place
+    the number could come from. (A foreign-key or unique violation puts the key in Postgres's own message,
+    which the app cannot hide.)
+    """
 
     async def run(self, session: AsyncSession) -> None:
         await session.execute(
-            text(
-                'INSERT INTO "AccountOnRole" ("roleId", "accountId") VALUES (:role, :account)'
-            ),
-            {"role": "param-value-1", "account": "param-value-2"},
+            text("SELECT 1 / (CAST(:n AS integer) - CAST(:n AS integer))"),
+            {"n": 987654321},
         )
 
 
@@ -143,14 +147,17 @@ async def test_an_item_that_failed_earlier_succeeds_on_the_next_run_in_the_same_
 async def test_the_recorded_error_of_a_database_failure_holds_no_sql_parameters(
     unseeded_session_factory: Factory,
 ) -> None:
-    with pytest.raises(SeedError):
+    with pytest.raises(SeedError) as raised:
         await run_seeds(unseeded_session_factory, [BadSqlItem("bad-sql")])
+
+    traceback_text = "".join(format_exception(raised.value))
+    assert "987654321" not in traceback_text
 
     successful, result = (await history(unseeded_session_factory))["bad-sql"]
     assert successful is False
     assert result is not None
-    assert "ForeignKeyViolationError" in result
-    assert "param-value" not in result
+    assert "division by zero" in result
+    assert "987654321" not in result
     assert "[SQL:" not in result
 
 
