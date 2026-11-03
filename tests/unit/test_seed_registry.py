@@ -1,35 +1,15 @@
-"""Which seed items an environment gets. No database. Task: 5.1."""
+"""Which seed items an environment gets. No database. Tasks: 5.1, 5.5."""
 
 from typing import Literal
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
-from app.seeds import registry
-from app.seeds.base import SeedItem
 from app.seeds.items.init_roles import InitRoles
 from app.seeds.registry import seed_items
 
 type Env = Literal["local", "development", "test", "production"]
-
-
-class Sample:
-    name = "sample"
-
-    async def needs_to_run(self, session: AsyncSession) -> bool:
-        return True
-
-    async def run(self, session: AsyncSession) -> None:
-        return None
-
-
-@pytest.fixture
-def with_a_development_item(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Until task 5.5 the development list is empty, so the rule is tested with a stand-in.
-    items: list[SeedItem] = [Sample()]
-    monkeypatch.setattr(registry, "development_items", lambda: items)
 
 
 def names(app_env: Env) -> list[str]:
@@ -45,11 +25,11 @@ def test_every_environment_gets_the_roles_first() -> None:
 
 
 @pytest.mark.parametrize("app_env", ["local", "development", "test"])
-def test_development_items_run_in_the_development_environments(
-    app_env: Env, with_a_development_item: None
+def test_development_environments_get_the_roles_then_the_admin_then_the_customers(
+    app_env: Env,
 ) -> None:
-    assert names(app_env) == ["init.roles", "sample"]
+    assert names(app_env) == ["init.roles", "init.admin", "init.customer"]
 
 
-def test_production_gets_no_development_item(with_a_development_item: None) -> None:
+def test_production_gets_the_roles_only() -> None:
     assert names("production") == ["init.roles"]

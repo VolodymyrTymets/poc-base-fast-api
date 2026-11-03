@@ -101,7 +101,10 @@ def drop_database(server_url: str, name: str) -> None:
 
 
 async def commit_marker_account(engine: AsyncEngine, marker: str) -> list[str]:
-    """Commit one Account with id `marker`, then return the ids of every Account in that database."""
+    """Commit one Account with id `marker`, then return the ids of the marker accounts (`isolation-*`) in that database.
+
+    The template holds the seeded accounts (task 5.5), which are not markers: the isolation tests ask which markers a module can see.
+    """
     async with engine.begin() as connection:
         await connection.execute(
             text(
@@ -111,7 +114,9 @@ async def commit_marker_account(engine: AsyncEngine, marker: str) -> list[str]:
             {"id": marker},
         )
     async with engine.connect() as connection:
-        rows = await connection.execute(text('SELECT id FROM "Account" ORDER BY id'))
+        rows = await connection.execute(
+            text("SELECT id FROM \"Account\" WHERE id LIKE 'isolation-%' ORDER BY id")
+        )
         return list(rows.scalars().all())
 
 

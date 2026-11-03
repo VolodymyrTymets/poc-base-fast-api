@@ -1,7 +1,7 @@
 # ADR-0011 — Root `app/` package, laid out by layer
 
 - **Date:** 2026-10-29
-- **Status:** accepted; the console-script target (`app:main`) is superseded by ADR-0012
+- **Status:** accepted; the console-script target (`app:main`) is superseded by ADR-0012, and the `seeds` import line of rule 4 by [ADR-0023](ADR-0023-seeds-may-import-schemas.md)
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.3
 - **Extended by:** [ADR-0017](ADR-0017-alembic-migrations-directory.md), which adds `migrations/` beside `app/` and the import rule for `migrations/env.py`.
