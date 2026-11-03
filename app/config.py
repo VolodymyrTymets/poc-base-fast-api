@@ -32,6 +32,24 @@ def parse_cors_origins(raw: str | None) -> list[str]:
     return origins or list(DEFAULT_CORS_ORIGINS)
 
 
+DEFAULT_FILE_ALLOWED_MIME_TYPES = ("image/jpeg", "image/png")
+
+
+def _normalise_mime_type(item: str) -> str:
+    # The same rule FileAssertService applies to an upload: `image/PNG; charset=x` is `image/png`.
+    media_type = item.split(";", 1)[0].strip().lower()
+    if "/" not in media_type:
+        # The message names the shape, never the value.
+        raise ValueError("each mime type must look like type/subtype")
+    return media_type
+
+
+def _mime_types_from_env(value: str | list[str] | None) -> list[str]:
+    # NoDecode hands the raw string over; a list (from code) is normalised the same way.
+    items = value.split(",") if isinstance(value, str) else (value or [])
+    return [_normalise_mime_type(item) for item in items if item.strip()]
+
+
 def _cors_origins_from_env(value: str | list[str] | None) -> list[str]:
     # NoDecode hands the raw string over; a list (from code) is already parsed.
     if isinstance(value, list):
@@ -85,8 +103,8 @@ class Settings(BaseSettings):
 
     app_env: Literal["local", "development", "test", "production"] = "local"
     port: int = Field(default=3001, ge=1, le=65535)
-    # 12 MiB: above FILE_MAX_SIZE (10 MB) plus multipart overhead; the files module (8.x)
-    # enforces the real upload limit.
+    # 12 MiB: above FILE_MAX_SIZE (10 MB) plus multipart overhead; FileAssertService
+    # (task 8.1) enforces the real upload limit.
     max_request_body_bytes: int = Field(default=12_582_912, gt=0)
     # How long SIGTERM lets in-flight requests finish before uvicorn cancels them.
     shutdown_timeout_seconds: int = Field(default=10, ge=1)
@@ -109,6 +127,13 @@ class Settings(BaseSettings):
     cors_origins: Annotated[
         list[str], NoDecode, BeforeValidator(_cors_origins_from_env)
     ] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
+    # Task 8.1: the upload limits `FileAssertService` enforces. Bytes; the body limit above stays larger.
+    file_max_size: int = Field(default=10_485_760, gt=0)
+    # An unset variable means the defaults; one that is set but holds no type is refused, because an
+    # empty allow-list would reject every upload without saying why.
+    file_allowed_mime_types: Annotated[
+        list[str], NoDecode, BeforeValidator(_mime_types_from_env), Field(min_length=1)
+    ] = Field(default_factory=lambda: list(DEFAULT_FILE_ALLOWED_MIME_TYPES))
 
     @field_validator("database_url")
     @classmethod

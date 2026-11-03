@@ -52,6 +52,7 @@ secret logs everyone out.
 - Redaction and the JSON format are set up by `uv run poc-base-fast-api` (`app.main:run`). Starting the app another way, for example
   `uvicorn app.main:create_app --factory`, skips them; a container command (task 11.1) must use the console script.
 - A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB by default) is answered 413 with the standard error body.
+- Upload limits (task 8.1): `FILE_MAX_SIZE` (bytes, default 10485760) and `FILE_ALLOWED_MIME_TYPES` (comma-separated, default `image/jpeg,image/png`, compared case-insensitively). A blank list stops the boot and names the field. Keep `FILE_MAX_SIZE` below `MAX_REQUEST_BODY_BYTES`: a body over that is answered 413 by the middleware before the check runs.
 - `kill -TERM <pid>` (or Ctrl-C) stops accepting connections, lets in-flight requests finish for up to
   `SHUTDOWN_TIMEOUT_SECONDS` (10), runs the lifespan shutdown, then ends with the SIGTERM status (143 in a shell). That is how
   uvicorn behaves, not a crash.
