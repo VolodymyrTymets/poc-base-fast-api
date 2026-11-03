@@ -63,10 +63,10 @@ New here: avatar ownership (Node's e2e for it is commented out), 409 on a duplic
 All ported cases pass. Anything not run goes under "Not verified".
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-5.4/spec.md (ACs checked off)
-- [ ] docs/ARCHITECTURE.md: `services/account_profile.py` and the PATCH route built; the route count sentence; the data-truth paragraph (the profile is updated)
-- [ ] docs/api/ENDPOINTS.md: the `updateAccountProfile` row marked built; note the 404 for a deleted account and that the cache hook waits for 9.2
-- [ ] docs/DOMAIN_GLOSSARY.md: no new term; docs/decisions: none
+- [x] docs/features/POC-5.4/spec.md (ACs checked off)
+- [x] docs/ARCHITECTURE.md: `services/account_profile.py` and the PATCH route built; the route count sentence; the data-truth paragraph (the profile is updated)
+- [x] docs/api/ENDPOINTS.md: the `updateAccountProfile` row marked built; note the 404 for a deleted account and that the cache hook waits for 9.2
+- [x] docs/DOMAIN_GLOSSARY.md: no new term; docs/decisions: none
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

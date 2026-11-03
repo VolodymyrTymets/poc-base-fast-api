@@ -17,15 +17,15 @@ layers of rule P7, which forks copy.
   rejecting a soft-deleted account in the other guarded routes.
 
 ## Acceptance criteria
-- [ ] AC1 Given the caller's own id and `{"firstName": "Jane", "email": "Jane@Example.com"}`, then 200 with the updated profile, and the stored email is `jane@example.com`.
-- [ ] AC2 Fields that are not sent stay unchanged; an explicit `null` clears a nullable one (`avatarId: null` removes the avatar); `email: null` is 422 (task 4.3).
-- [ ] AC3 Given another account's id in the path, then 403 `FORBIDDEN`, answered by the service before the profile or any file is read or written (the role check of `require_roles` comes first, rule P7); no token is 401, an account with no role is 403.
-- [ ] AC4 Given the caller's id but no live profile (or a soft-deleted profile or account), then 404 `NOT_FOUND`.
-- [ ] AC5 Given an `avatarId` of a file the caller did not create, an unknown file or a soft-deleted one, then 403 `FORBIDDEN` and nothing is written; an owned file is accepted.
-- [ ] AC6 Given an email another profile already has (any case, including a soft-deleted account's), then 409 `EMAIL_ALREADY_REGISTERED`, the profile is unchanged and the request's session is still usable.
-- [ ] AC7 An unknown key (for example `SSN`, `is18YearOld`) is 422 `VALIDATION_FAILED` (task 4.3's `extra="forbid"`).
-- [ ] AC8 The change is committed: a following `GET /api/v1/account` shows it.
-- [ ] AC9 `openapi.json` is regenerated and the stale test passes; the response holds no ORM class and no identity data.
+- [x] AC1 Given the caller's own id and `{"firstName": "Jane", "email": "Jane@Example.com"}`, then 200 with the updated profile, and the stored email is `jane@example.com`.
+- [x] AC2 Fields that are not sent stay unchanged; an explicit `null` clears a nullable one (`avatarId: null` removes the avatar); `email: null` is 422 (task 4.3).
+- [x] AC3 Given another account's id in the path, then 403 `FORBIDDEN`, answered by the service before the profile or any file is read or written (the role check of `require_roles` comes first, rule P7); no token is 401, an account with no role is 403.
+- [x] AC4 Given the caller's id but no live profile (or a soft-deleted profile or account), then 404 `NOT_FOUND`.
+- [x] AC5 Given an `avatarId` of a file the caller did not create, an unknown file or a soft-deleted one, then 403 `FORBIDDEN` and nothing is written; an owned file is accepted.
+- [x] AC6 Given an email another profile already has (any case, including a soft-deleted account's), then 409 `EMAIL_ALREADY_REGISTERED`, the profile is unchanged and the request's session is still usable.
+- [x] AC7 An unknown key (for example `SSN`, `is18YearOld`) is 422 `VALIDATION_FAILED` (task 4.3's `extra="forbid"`).
+- [x] AC8 The change is committed: a following `GET /api/v1/account` shows it.
+- [x] AC9 `openapi.json` is regenerated and the stale test passes; the response holds no ORM class and no identity data.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
