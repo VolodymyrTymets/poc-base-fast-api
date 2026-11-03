@@ -12,6 +12,7 @@ import uvicorn
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pydantic_settings import SettingsConfigDict
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.config import Settings, get_settings
@@ -25,6 +26,9 @@ from app.routers import account, account_profile, account_role, auth, files, not
 API_PREFIX = "/api/v1"
 # The committed contract at the repo root (ADR-0003); generated, never hand-edited.
 OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi.json"
+
+# The one list of feature routers: the include loop in create_app and the layout test read it.
+ROUTERS = (account, account_profile, account_role, auth, files, notifier)
 
 # One tag per feature router, in the order of the docs. Declared here so /docs lists
 # every module even while its router has no route yet.
@@ -83,7 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health() -> HealthResponse:
         return HealthResponse(status="ok")
 
-    for module in (account, account_profile, account_role, auth, files, notifier):
+    for module in ROUTERS:
         api.include_router(module.router)
 
     app.include_router(api)
@@ -105,9 +109,23 @@ def run() -> None:
     )
 
 
+class ContractSettings(Settings):
+    """Settings that ignore `.env`; init arguments still win over the environment."""
+
+    model_config = SettingsConfigDict(env_file=None)
+
+
+def contract_app() -> FastAPI:
+    """The app the contract is taken from. Fixed settings: the file must not depend on a developer's
+    `.env` or environment, and a command that only writes a file must not start Sentry."""
+    return create_app(
+        ContractSettings(app_env="local", sentry_dsn=None, database_url=None)
+    )
+
+
 def export_openapi(path: Path = OPENAPI_PATH, *, check: bool = False) -> int:
     """Write the OpenAPI contract to `path`, or with `check` only compare it. Returns the exit status."""
-    app = create_app(Settings())
+    app = contract_app()
     if check:
         if is_current(app, path):
             return 0

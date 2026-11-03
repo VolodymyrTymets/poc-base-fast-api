@@ -1,24 +1,26 @@
 from pathlib import Path
 
-from app.config import Settings
 from app.core.openapi import is_current, render
-from app.main import create_app, export_openapi
+from app.main import ContractSettings, contract_app, create_app, export_openapi
 
 
 def test_render_is_deterministic_and_ends_with_a_newline() -> None:
-    first = render(create_app(Settings()))
-    second = render(create_app(Settings()))
+    first = render(contract_app())
+    second = render(contract_app())
 
     assert first == second
     assert first.endswith("}\n")
 
 
 def test_the_spec_does_not_depend_on_settings() -> None:
-    plain = render(create_app(Settings()))
+    plain = render(contract_app())
     other = render(
         create_app(
-            Settings(
-                app_env="production", cors_origins=["http://x.test"], log_level="DEBUG"
+            ContractSettings(
+                app_env="production",
+                sentry_dsn=None,
+                cors_origins=["http://x.test"],
+                log_level="DEBUG",
             )
         )
     )
@@ -32,7 +34,7 @@ def test_export_writes_what_render_returns(tmp_path: Path) -> None:
     status = export_openapi(target)
 
     assert status == 0
-    assert target.read_text(encoding="utf-8") == render(create_app(Settings()))
+    assert target.read_text(encoding="utf-8") == render(contract_app())
 
 
 def test_check_passes_on_a_current_file_and_fails_on_a_changed_one(
@@ -50,5 +52,5 @@ def test_check_passes_on_a_current_file_and_fails_on_a_changed_one(
 def test_check_fails_when_the_file_is_missing(tmp_path: Path) -> None:
     missing = tmp_path / "openapi.json"
 
-    assert is_current(create_app(Settings()), missing) is False
+    assert is_current(contract_app(), missing) is False
     assert export_openapi(missing, check=True) == 1

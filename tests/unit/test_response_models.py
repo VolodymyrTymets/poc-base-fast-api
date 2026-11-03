@@ -11,7 +11,11 @@ from app.main import create_app
 
 
 def orm_routes(app: FastAPI) -> list[str]:
-    """Routes whose response model is missing or is, or contains, an ORM class."""
+    """Routes whose response model is missing or is, or contains, an ORM class.
+
+    A 204 route may have none. A route that streams bytes (task 8.3) will need an explicit,
+    named exemption here, added in that task with its reason.
+    """
     problems: list[str] = []
     for route in app.routes:
         if not isinstance(route, APIRoute):
@@ -26,16 +30,20 @@ def orm_routes(app: FastAPI) -> list[str]:
     return problems
 
 
-def _contains_orm(annotation: Any) -> bool:
+def _contains_orm(annotation: Any, seen: frozenset[type] = frozenset()) -> bool:
     if inspect.isclass(annotation):
+        if annotation in seen:
+            return False
+        seen = seen | {annotation}
         if issubclass(annotation, Base):
             return True
         if issubclass(annotation, BaseModel):
             return any(
-                _contains_orm(f.annotation) for f in annotation.model_fields.values()
+                _contains_orm(f.annotation, seen)
+                for f in annotation.model_fields.values()
             )
         return False
-    return any(_contains_orm(arg) for arg in getattr(annotation, "__args__", ()))
+    return any(_contains_orm(arg, seen) for arg in getattr(annotation, "__args__", ()))
 
 
 def test_every_route_has_a_response_model_that_is_not_an_orm_class() -> None:
