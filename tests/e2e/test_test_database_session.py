@@ -15,7 +15,9 @@ async def test_a_commit_through_db_session_is_not_visible_to_another_connection(
 
     async with db_engine.connect() as other:
         elsewhere = (
-            await other.execute(text('SELECT count(*) FROM "Account"'))
+            await other.execute(
+                text("SELECT count(*) FROM \"Account\" WHERE id = 'session-probe'")
+            )
         ).scalar_one()
     here = (
         await db_session.execute(
