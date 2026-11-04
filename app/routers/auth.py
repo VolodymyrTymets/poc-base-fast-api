@@ -146,7 +146,7 @@ async def sign_out(
 @router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT)
 async def change_password(
     body: ChangePasswordInput,
-    # Listed first so that a bad token is a 401 even with an invalid body or no database (routes-convention 4).
+    # Listed before the session and the service so that a bad token is a 401 even with an invalid body or no database (routes-convention 4).
     claims: Annotated[TokenClaims, Depends(current_account)],
     session: Annotated[AsyncSession, Depends(get_session)],
     password_auth: Annotated[PasswordAuthService, Depends(get_password_auth_service)],

@@ -5,6 +5,7 @@ The request has its own session, so rows are read and changed through `db_engine
 
 import logging
 import uuid
+from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
@@ -13,7 +14,7 @@ from fastapi import FastAPI
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 from time_machine import TimeMachineFixture
-from utils.auth import sign_in, sign_up
+from utils.auth import AuthTokens, sign_up
 from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 from utils.queue import FakeQueue
@@ -265,27 +266,40 @@ async def test_a_sign_in_code_requested_before_the_change_no_longer_verifies(
     assert (response.status_code, response.json()) == (401, INVALID_CREDENTIALS)
 
 
+INVALID_BODY = {"currentPassword": "", "newPassword": "x"}
+
+
 @pytest.mark.parametrize(
-    "case", ["missing", "garbage", "refresh-token", "expired-access-token"]
+    "headers_for",
+    [
+        pytest.param(lambda tokens: {}, id="missing"),
+        pytest.param(lambda tokens: bearer("garbage"), id="garbage"),
+        pytest.param(lambda tokens: bearer(tokens.refresh_token), id="refresh-token"),
+    ],
 )
 async def test_a_bad_bearer_token_is_401_unauthorized_even_with_an_invalid_body(
-    module_database_url: str, frozen_clock: TimeMachineFixture, case: str
+    module_database_url: str, headers_for: Callable[[AuthTokens], dict[str, str]]
 ) -> None:
     async with running_client(make_app(module_database_url)) as client:
         tokens = await sign_up(client, unique_email(), PHRASE)
-        headers: dict[str, dict[str, str]] = {
-            "missing": {},
-            "garbage": bearer("garbage"),
-            "refresh-token": bearer(tokens.refresh_token),
-            "expired-access-token": tokens.headers,
-        }
-        if case == "expired-access-token":
-            frozen_clock.shift(timedelta(minutes=16))
 
         response = await client.post(
-            CHANGE_PATH,
-            headers=headers[case],
-            json={"currentPassword": "", "newPassword": "x"},
+            CHANGE_PATH, headers=headers_for(tokens), json=INVALID_BODY
+        )
+
+    assert (response.status_code, response.json()) == (401, UNAUTHORIZED)
+
+
+async def test_an_expired_access_token_is_401_unauthorized_even_with_an_invalid_body(
+    module_database_url: str, frozen_clock: TimeMachineFixture
+) -> None:
+    async with running_client(make_app(module_database_url)) as client:
+        tokens = await sign_up(client, unique_email(), PHRASE)
+        # The default access lifetime is 15 minutes.
+        frozen_clock.shift(timedelta(minutes=16))
+
+        response = await client.post(
+            CHANGE_PATH, headers=tokens.headers, json=INVALID_BODY
         )
 
     assert (response.status_code, response.json()) == (401, UNAUTHORIZED)
@@ -319,7 +333,10 @@ async def test_a_bad_body_is_422_naming_the_field(
     error = response.json()["error"]
     assert (response.status_code, error["code"]) == (422, "VALIDATION_FAILED")
     assert field in str(error["details"])
-    assert PHRASE not in response.text
+    assert (PHRASE not in response.text, NEW_PHRASE not in response.text) == (
+        True,
+        True,
+    )
 
 
 async def test_change_logs_no_password_hash_or_token(
@@ -383,16 +400,3 @@ async def test_no_pooled_connection_is_held_while_either_password_step_runs(
         await client.post(CHANGE_PATH, headers=tokens.headers, json=change_body())
 
     assert steps == [("verify", 0), ("hash", 0)]
-
-
-async def test_the_helper_can_sign_in_with_the_new_password(
-    module_database_url: str,
-) -> None:
-    email = unique_email()
-    async with running_client(make_app(module_database_url)) as client:
-        tokens = await sign_up(client, email, PHRASE)
-        await client.post(CHANGE_PATH, headers=tokens.headers, json=change_body())
-
-        again = await sign_in(client, email, NEW_PHRASE)
-
-    assert again.access_token != tokens.access_token

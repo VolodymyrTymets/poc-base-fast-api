@@ -31,6 +31,7 @@ Goal 2 (authentication a new POC can rely on as-is): password accounts can rotat
 | New password equals the current one | accepted, new hash, sessions still revoked | assumption A5 |
 | Pending OTP code requested before the change | no longer verifies | Node behaviour, AC3 |
 | Pending password-reset token | cleared; 7.6's reset then answers `INVALID_RESET_TOKEN` | Node behaviour, AC3 |
+| A sign-in that checked the old password just before the change finishes after it | still stores a fresh refresh hash (`TokenService.issue` is unconditional); not closed here, escalated (F2, B4) | review of POC-7.5 |
 | Wrong current password, repeated | 401 each time; not rate limited | I.8, out of scope |
 
 ## Open questions

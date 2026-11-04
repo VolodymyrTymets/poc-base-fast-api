@@ -133,7 +133,7 @@ A password is 8 to 72 bytes on sign-up and 1 to 72 on sign-in. Neither route is 
 
 ## Change password
 `POST /api/v1/auth/password/change` with `Authorization: Bearer <accessToken>` and `{"currentPassword": "...", "newPassword": "..."}` (task 7.5) answers 204 with no body. The new password is stored as an Argon2id hash and, in the same UPDATE,
-the refresh token, any pending reset token and any pending sign-in code are cleared: the old password and every refresh token issued before stop working, and the account signs in again once its access token expires (default 15 minutes; that token is not revoked).
+the refresh token, any pending reset token and any pending sign-in code are cleared: the old password and every refresh token issued before stop working (one narrow exception: a sign-in that checked the old password just before the change can still finish after it and store a refresh token; see ENDPOINTS.md `changePassword`), and the account signs in again once its access token expires (default 15 minutes; that token is not revoked).
 A wrong current password, an account that has no password (made by OTP), and a soft-deleted account are one 401 `INVALID_CREDENTIALS`; a bad or missing Bearer token is 401 `UNAUTHORIZED`, also when the body is invalid. Two changes racing from the same stored hash apply one;
 the other is 401. The new password is 8 to 72 bytes with no control characters; it may equal the current one. The route is not rate limited (issue I.8), and each call runs two Argon2 steps with no pooled connection held.
 
