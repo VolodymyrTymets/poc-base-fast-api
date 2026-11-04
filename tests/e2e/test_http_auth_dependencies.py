@@ -12,7 +12,12 @@ from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
 from app.core.security import TokenClaims, TokenType, issue_token
-from app.dependencies import current_account, refresh_account
+from app.dependencies import (
+    RefreshCredentials,
+    current_account,
+    refresh_account,
+    refresh_credentials,
+)
 from app.main import create_app
 
 ACCOUNT_ID = str(uuid.UUID("22222222-2222-4222-8222-222222222222"))
@@ -45,6 +50,12 @@ def make_app(settings: Settings = SETTINGS) -> FastAPI:
         claims: Annotated[TokenClaims, Depends(refresh_account)],
     ) -> dict[str, str]:
         return {"id": claims.account_id, "jti": claims.jti}
+
+    @app.post("/api/v1/_refresh_credentials")
+    async def refresh_with_token(
+        credentials: Annotated[RefreshCredentials, Depends(refresh_credentials)],
+    ) -> dict[str, str]:
+        return {"id": credentials.account_id, "token": credentials.token}
 
     return app
 
@@ -229,3 +240,39 @@ async def test_an_unset_secret_is_a_server_error_not_a_pass() -> None:
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "INTERNAL_SERVER_ERROR"
+
+
+async def test_refresh_credentials_carry_the_account_and_the_raw_header_token(
+    frozen_clock: Any,
+) -> None:
+    token = refresh_token()
+    async with running_client(make_app()) as client:
+        response = await client.post(
+            "/api/v1/_refresh_credentials", headers={"x-refresh-token": token}
+        )
+
+    assert (response.status_code, response.json()) == (
+        200,
+        {"id": ACCOUNT_ID, "token": token},
+    )
+
+
+@pytest.mark.parametrize(
+    "headers", [{}, {"x-refresh-token": ""}, {"x-refresh-token": "garbage"}]
+)
+async def test_refresh_credentials_reject_what_refresh_account_rejects(
+    frozen_clock: Any, headers: dict[str, str]
+) -> None:
+    async with running_client(make_app()) as client:
+        response = await client.post("/api/v1/_refresh_credentials", headers=headers)
+
+    assert (response.status_code, response.json()) == (401, UNAUTHORIZED)
+
+
+async def test_refresh_credentials_reject_an_access_token(frozen_clock: Any) -> None:
+    async with running_client(make_app()) as client:
+        response = await client.post(
+            "/api/v1/_refresh_credentials", headers={"x-refresh-token": access_token()}
+        )
+
+    assert (response.status_code, response.json()) == (401, UNAUTHORIZED)

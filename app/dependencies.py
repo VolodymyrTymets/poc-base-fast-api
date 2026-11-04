@@ -1,13 +1,14 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, 7.3, I.9.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, 7.3, 7.4, I.9.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
-(task 5.3, ADR-0022); the refresh-hash check comes with task 7.4. Task 5.2 adds `require_roles`, the role layer of rule P7.
+(task 5.3, ADR-0022); the refresh-hash check is `TokenService.rotate`, which `POST /auth/refresh` calls with `refresh_credentials` (task 7.4). Task 5.2 adds `require_roles`, the role layer of rule P7.
 Issue I.9 adds the service providers (ADR-0025): a route never builds a service, it takes `Depends(get_x_service)`, so a test can
 swap one through `dependency_overrides` and a request shares one session (`get_session` is cached per request).
 """
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
@@ -136,11 +137,32 @@ async def refresh_account(
 ) -> TokenClaims:
     """The account named by a valid refresh token in `x-refresh-token`; otherwise 401 UNAUTHORIZED.
 
-    The token is not yet compared with the stored hash: that is `POST /auth/refresh` (task 7.4).
+    The token is verified (signature, expiry, type) and nothing more: the comparison with the stored hash is `TokenService.rotate` (task 7.4).
     """
     if not token:
         raise UnauthorizedError
     return verify_token(settings, token, TokenType.REFRESH)
+
+
+@dataclass(frozen=True)
+class RefreshCredentials:
+    account_id: str
+    # repr=False: a dataclass repr lands in logs and tracebacks, and a token must not (rules D8, P4).
+    token: str = field(repr=False)
+
+
+async def refresh_credentials(
+    claims: Annotated[TokenClaims, Depends(refresh_account)],
+    token: Annotated[str | None, Depends(_refresh_header)],
+) -> RefreshCredentials:
+    """The account of a valid refresh token together with the token itself, for the route that compares it with the stored hash.
+
+    It builds on `refresh_account`, so it never accepts what that rejects; the header is read again only to hand the raw value on.
+    """
+    if not token:
+        # `refresh_account` has already rejected a missing token; this keeps the type honest and fails closed.
+        raise UnauthorizedError
+    return RefreshCredentials(claims.account_id, token)
 
 
 def require_roles(
