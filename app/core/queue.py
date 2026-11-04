@@ -12,6 +12,7 @@ from typing import Any, Protocol
 
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
+from redis.exceptions import AuthenticationError, AuthorizationError
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
@@ -30,7 +31,7 @@ _UNAVAILABLE = (RedisConnectionError, RedisTimeoutError, OSError)
 
 
 class QueueUnavailableError(RuntimeError):
-    """The queue could not be reached (task 6.3, ADR-0021). The original error is the `__cause__`.
+    """The queue could not be reached (task 6.3, ADR-0027). The original error is the `__cause__`.
 
     The one queue failure a notifier may log and go on from. It carries no job arguments, which can hold a code or a token.
     """
@@ -123,6 +124,10 @@ class ArqQueueClient:
         try:
             pool = await self._get_pool()
             job = await pool.enqueue_job(job_name, *args, **job_kwargs)
+        except AuthenticationError, AuthorizationError:
+            # Subclasses of redis's ConnectionError, but a wrong or missing REDIS_PASSWORD is a configuration fault: it must
+            # reach the caller as itself, or every job would be dropped behind a log line that reads like an outage (rule D5).
+            raise
         except _UNAVAILABLE as error:
             # An unreachable Redis raises (rule D5); there is no silent drop. The text names no argument.
             raise QueueUnavailableError(f"cannot enqueue {job_name}") from error

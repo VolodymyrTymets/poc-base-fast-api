@@ -245,7 +245,12 @@ async def test_no_log_line_holds_the_code_the_token_the_email_or_the_phone(
     await service.notify_about_totp_code(account_id, CODE, ALL)
     await service.notify_about_password_reset(account_id, RESET_VALUE, ALL)
 
-    text = lines(caplog)
+    # The raw records too: the formatter redacts phone numbers, which must not be what makes this pass.
+    raw = "\n".join(
+        f"{record.getMessage()} {record.args!r} {record.exc_text or ''}"
+        for record in caplog.records
+    )
     assert caplog.records
     for secret in (CODE, RESET_VALUE, EMAIL, PHONE):
-        assert secret not in text
+        assert secret not in lines(caplog)
+        assert secret not in raw

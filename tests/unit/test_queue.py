@@ -6,8 +6,13 @@ import pytest
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 from pydantic import SecretStr
+from redis.exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    DataError,
+    ResponseError,
+)
 from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import DataError, ResponseError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 from utils.queue import FakeQueue
 
@@ -145,8 +150,20 @@ async def test_a_failing_enqueue_job_that_means_redis_is_down_is_wrapped(
 
 @pytest.mark.parametrize(
     "error",
-    [ResponseError("NOPERM"), DataError("bad"), ValueError("bug")],
-    ids=["response-error", "data-error", "value-error"],
+    [
+        ResponseError("NOPERM"),
+        DataError("bad"),
+        ValueError("bug"),
+        AuthenticationError("WRONGPASS"),
+        AuthorizationError("no access"),
+    ],
+    ids=[
+        "response-error",
+        "data-error",
+        "value-error",
+        "wrong-password",
+        "no-access",
+    ],
 )
 async def test_any_other_error_from_enqueue_job_propagates_unchanged(
     error: Exception,
