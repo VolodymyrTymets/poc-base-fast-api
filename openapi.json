@@ -215,6 +215,45 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "OtpRequestInput": {
+        "additionalProperties": false,
+        "properties": {
+          "phoneNumber": {
+            "title": "Phonenumber",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phoneNumber"
+        ],
+        "title": "OtpRequestInput",
+        "type": "object"
+      },
+      "OtpRequestResponse": {
+        "description": "`{success, code?}`: `code` is present only in local, development and test, and the route leaves the key out otherwise.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "OtpRequestResponse",
+        "type": "object"
+      },
       "UpdateAccountProfileInput": {
         "additionalProperties": false,
         "description": "A field that is not sent stays unchanged; an explicit `null` clears a nullable one.\n\nRead `model_fields_set` to tell the two apart: both leave the attribute `None`.",
@@ -421,6 +460,58 @@
         "summary": "Update Account Profile",
         "tags": [
           "account_profile"
+        ]
+      }
+    },
+    "/api/v1/auth/otp/request": {
+      "post": {
+        "description": "Issue a one-time sign-in code for a phone number and queue it as an SMS; an unknown number becomes a customer account.",
+        "operationId": "request_otp_api_v1_auth_otp_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpRequestInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpRequestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "summary": "Request Otp",
+        "tags": [
+          "auth"
         ]
       }
     },
