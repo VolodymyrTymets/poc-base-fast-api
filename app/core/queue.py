@@ -16,7 +16,7 @@ from arq.connections import ArqRedis, RedisSettings
 from app.config import Settings
 
 # Between two tries of a job: BACKOFF_BASE_SECONDS, then twice that, then four times (ADR-0005: arq has no backoff setting).
-BACKOFF_BASE_SECONDS = 5
+BACKOFF_BASE_SECONDS = 5.0
 # Matches the scope doc and ADR-0005: three tries, then the job fails for good.
 MAX_TRIES = 3
 
@@ -27,11 +27,11 @@ class QueueClient(Protocol):
     async def enqueue(self, job_name: str, *args: object, **kwargs: object) -> None: ...
 
 
-def retry_delay(job_try: int, base: int = BACKOFF_BASE_SECONDS) -> int:
+def retry_delay(job_try: int, base: float = BACKOFF_BASE_SECONDS) -> float:
     """Seconds to wait before try `job_try + 1`; `job_try` is arq's `ctx["job_try"]`, which starts at 1."""
     if job_try < 1:
         raise ValueError("job_try starts at 1")
-    return base << (job_try - 1)
+    return base * float(2 ** (job_try - 1))
 
 
 def json_serializer(data: dict[str, Any]) -> bytes:
