@@ -5,9 +5,10 @@ import hashlib
 import uuid
 
 import pytest
-from sqlalchemy import select, text, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
+from utils.locks import wait_for_a_lock_waiter
 
 from app.config import Settings
 from app.core.db import create_session_factory, utc_now
@@ -276,27 +277,6 @@ async def test_revoke_of_an_account_with_no_identity_row_does_nothing(
         select(AccountIdentity.id).where(AccountIdentity.account_id == account_id)
     )
     assert found is None
-
-
-async def lock_waiters(engine: AsyncEngine) -> int:
-    async with engine.connect() as connection:
-        count = await connection.scalar(
-            text(
-                "select count(*) from pg_stat_activity "
-                "where wait_event_type = 'Lock' and datname = current_database()"
-            )
-        )
-    assert count is not None
-    return int(count)
-
-
-async def wait_for_a_lock_waiter(engine: AsyncEngine) -> None:
-    # Polls a condition with a bound (about 10 s), not a guess at how long the other transaction needs.
-    for _ in range(500):
-        if await lock_waiters(engine) > 0:
-            return
-        await asyncio.sleep(0.02)
-    raise AssertionError("no transaction waited on a row lock within 10 seconds")
 
 
 async def test_two_rotations_with_one_token_give_one_winner_and_one_rejection(

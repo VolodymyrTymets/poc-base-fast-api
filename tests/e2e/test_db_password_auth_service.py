@@ -1,4 +1,4 @@
-"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up and sign-in), ADR-0028."""
+"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up and sign-in), 7.5 (change), ADR-0028."""
 
 import asyncio
 import uuid
@@ -6,8 +6,9 @@ import uuid
 import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from utils.locks import wait_for_a_lock_waiter
 
-from app.core.db import create_session_factory
+from app.core.db import create_session_factory, utc_now
 from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
 from app.core.hashing import DUMMY_HASH, verify_secret
 from app.models import (
@@ -248,3 +249,141 @@ async def test_every_sign_in_failure_runs_one_argon2_check(
     assert len(calls) == 3
     assert calls[0] == DUMMY_HASH
     assert calls[1] != DUMMY_HASH
+
+
+NEW_PHRASE = "another-correct-horse"
+# Values of the shape the identity columns hold; only their being cleared matters.
+STORED_REFRESH_HASH = "stored-refresh-hash"
+STORED_RESET_HASH = "stored-reset-hash"
+
+
+async def change_password(
+    password_auth: PasswordAuthService,
+    account_id: str,
+    current: str,
+    new: str,
+) -> None:
+    """The two steps the route runs, without its rollback between them (the savepoint session of `db_session` must keep the rows)."""
+    credential = await password_auth.find_credential_for_account(account_id)
+    await password_auth.change(credential, current, new)
+
+
+async def test_change_stores_a_new_hash_that_verifies_the_new_password_only(
+    db_session: AsyncSession,
+) -> None:
+    account_id = await service(db_session).sign_up(unique_email(), PHRASE)
+
+    await change_password(service(db_session), account_id, PHRASE, NEW_PHRASE)
+
+    identity = await identity_of(db_session, account_id)
+    assert identity.hash is not None
+    assert identity.hash.startswith("$argon2id$")
+    assert (
+        await verify_secret(NEW_PHRASE, identity.hash),
+        await verify_secret(PHRASE, identity.hash),
+        identity.salt,
+    ) == (True, False, None)
+
+
+async def test_change_clears_the_refresh_hash_the_reset_token_and_the_sign_in_code(
+    db_session: AsyncSession,
+) -> None:
+    account_id = await service(db_session).sign_up(unique_email(), PHRASE)
+    await db_session.execute(
+        update(AccountIdentity)
+        .where(AccountIdentity.account_id == account_id)
+        .values(
+            refresh_token=STORED_REFRESH_HASH,
+            reset_token_hash=STORED_RESET_HASH,
+            reset_token_expires_at=utc_now(),
+            otp_hash="stored-otp-hash",
+            otp_salt="stored-otp-salt",
+            otp_expires_at=utc_now(),
+        )
+    )
+
+    await change_password(service(db_session), account_id, PHRASE, NEW_PHRASE)
+
+    identity = await identity_of(db_session, account_id)
+    assert (
+        identity.refresh_token,
+        identity.reset_token_hash,
+        identity.reset_token_expires_at,
+        identity.otp_hash,
+        identity.otp_salt,
+        identity.otp_expires_at,
+    ) == (None, None, None, None, None, None)
+
+
+async def test_change_with_a_wrong_current_password_changes_nothing(
+    db_session: AsyncSession,
+) -> None:
+    account_id = await service(db_session).sign_up(unique_email(), PHRASE)
+    before = (await identity_of(db_session, account_id)).hash
+
+    with pytest.raises(InvalidCredentialsError):
+        await change_password(
+            service(db_session), account_id, "not-the-phrase", NEW_PHRASE
+        )
+
+    assert (await identity_of(db_session, account_id)).hash == before
+
+
+async def test_change_for_an_otp_only_account_is_invalid_credentials(
+    db_session: AsyncSession,
+) -> None:
+    account = await AccountService(db_session).create_customer("+380000007302")
+    db_session.add(AccountIdentity(account_id=account.id, otp_hash="otp"))
+    await db_session.flush()
+
+    with pytest.raises(InvalidCredentialsError):
+        await change_password(service(db_session), account.id, PHRASE, NEW_PHRASE)
+
+
+@pytest.mark.parametrize("record", ["account", "identity"])
+async def test_change_for_a_soft_deleted_account_or_identity_is_invalid_credentials(
+    db_session: AsyncSession, record: str
+) -> None:
+    account_id = await service(db_session).sign_up(unique_email(), PHRASE)
+    await db_session.execute(SOFT_DELETES[record](account_id))
+
+    with pytest.raises(InvalidCredentialsError):
+        await change_password(service(db_session), account_id, PHRASE, NEW_PHRASE)
+
+
+async def test_two_racing_changes_from_one_stored_hash_apply_exactly_one(
+    db_engine: AsyncEngine,
+) -> None:
+    factory = create_session_factory(db_engine)
+    email = unique_email()
+    async with factory() as setup:
+        account_id = await service(setup).sign_up(email, PHRASE)
+        await setup.commit()
+
+    async with factory() as first, factory() as second:
+        # Both read the same stored hash. The first change holds its transaction open, so it holds the row lock; the second checks the
+        # right current password, then waits on its UPDATE. Only when the test has seen it wait does the first commit, so the second
+        # really races a committed change, and its conditional write must find the hash gone.
+        first_credential = await service(first).find_credential_for_account(account_id)
+        second_credential = await service(second).find_credential_for_account(
+            account_id
+        )
+        await service(first).change(first_credential, PHRASE, NEW_PHRASE)
+        loser = asyncio.create_task(
+            service(second).change(second_credential, PHRASE, "the-losing-phrase")
+        )
+        await wait_for_a_lock_waiter(db_engine)
+        await first.commit()
+        with pytest.raises(InvalidCredentialsError):
+            await asyncio.wait_for(loser, timeout=10)
+        await second.rollback()
+
+    async with factory() as check:
+        stored = await check.scalar(
+            select(AccountIdentity.hash).where(AccountIdentity.account_id == account_id)
+        )
+    assert stored is not None
+    assert (
+        await verify_secret(NEW_PHRASE, stored),
+        await verify_secret("the-losing-phrase", stored),
+    ) == (True, False)

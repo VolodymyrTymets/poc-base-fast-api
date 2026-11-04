@@ -1,5 +1,5 @@
-"""PasswordAuthService: sign up with an email and a password, and check a password for sign-in (`find_credential`, `check`). Ports the Node `JwtAuthStrategyService`.
-Tasks: 7.3 (7.5 change password and 7.6 reset call it too). ADR-0021, ADR-0027, ADR-0028.
+"""PasswordAuthService: sign up with an email and a password, check a password for sign-in (`find_credential`, `check`) and change it (`find_credential_for_account`, `change`).
+Ports the Node `JwtAuthStrategyService`. Tasks: 7.3, 7.5 (7.6 reset uses the same write-time confirm). ADR-0021, ADR-0027, ADR-0028.
 
 It writes and flushes but never commits (ADR-0021); the route commits after the tokens are issued. The sign-in check is two calls because the route ends the read transaction between them: Argon2 must not run with a pooled connection held (as in `OtpService`).
 The password is stored as an Argon2id hash
@@ -8,7 +8,7 @@ The password is stored as an Argon2id hash
 
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import exists, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,3 +103,66 @@ class PasswordAuthService:
         ):
             raise InvalidCredentialsError
         return credential.account_id
+
+    async def find_credential_for_account(self, account_id: str) -> PasswordCredential:
+        """The password hash of this live account, for a caller already authenticated by token; nothing to check against otherwise.
+
+        A soft-deleted account or identity and an OTP-only account (no hash) all read the same (assumption A2, A3 of POC-7.5).
+        """
+        row = (
+            await self._session.execute(
+                select(Account.id, AccountIdentity.hash)
+                .join(AccountIdentity, AccountIdentity.account_id == Account.id)
+                .where(
+                    Account.id == account_id,
+                    Account.deleted.is_(False),
+                    AccountIdentity.deleted.is_(False),
+                    AccountIdentity.hash.is_not(None),
+                )
+            )
+        ).first()
+        if row is None:
+            return PasswordCredential(None, None)
+        return PasswordCredential(row.id, row.hash)
+
+    async def change(
+        self, credential: PasswordCredential, current_password: str, new_password: str
+    ) -> None:
+        """Replace the password after checking the current one, and end every session and pending credential. The caller commits.
+
+        The check is inside, so no caller can change a password without it. Both Argon2 steps run before this transaction's first query, so the
+        caller must have ended the read that found `credential` (as `sign_in` does). The write is conditional on the hash that was checked: a change
+        or a reset that landed in between matches no row, and this one fails like a wrong password instead of overwriting it.
+        """
+        await self.check(credential, current_password)
+        new_hash = await hash_secret(new_password)
+        if credential.account_id is None or credential.password_hash is None:
+            # `check` has already raised for these; this keeps the types honest and fails closed.
+            raise InvalidCredentialsError
+        # One UPDATE: the new hash and the revocation of everything issued under the old password (refresh token, a pending reset token
+        # and a pending sign-in code). `salt` stays null: the salt is inside the Argon2 string (ADR-0028).
+        changed = await self._session.scalar(
+            update(AccountIdentity)
+            .where(
+                AccountIdentity.account_id == credential.account_id,
+                AccountIdentity.hash == credential.password_hash,
+                AccountIdentity.deleted.is_(False),
+                exists().where(
+                    Account.id == credential.account_id, Account.deleted.is_(False)
+                ),
+            )
+            .values(
+                hash=new_hash,
+                salt=None,
+                refresh_token=None,
+                reset_token_hash=None,
+                reset_token_expires_at=None,
+                otp_hash=None,
+                otp_salt=None,
+                otp_expires_at=None,
+            )
+            .returning(AccountIdentity.id)
+        )
+        if changed is None:
+            raise InvalidCredentialsError
+        await self._session.flush()
