@@ -3,9 +3,7 @@
 import asyncio
 import logging
 import uuid
-from collections.abc import Callable
 from datetime import timedelta
-from typing import Any
 
 import pytest
 from sqlalchemy import func, select, update
@@ -411,6 +409,12 @@ async def test_two_racing_changes_from_one_stored_hash_apply_exactly_one(
     ) == (True, False)
 
 
+def log_output(caplog: pytest.LogCaptureFixture) -> str:
+    """The final JSON lines the API process would print for the captured records, including the traceback text."""
+    formatter = JsonFormatter()
+    return "\n".join(formatter.format(record) for record in caplog.records)
+
+
 async def registered_email(session: AsyncSession) -> str:
     email = unique_email()
     await service(session).sign_up(email, PHRASE)
@@ -467,23 +471,13 @@ async def test_issue_for_an_unknown_email_is_none_and_writes_nothing(
     assert (issued, after) == (None, before)
 
 
-SOFT_DELETED_RECORDS: dict[str, Callable[[str], Any]] = {
-    "profile": lambda account_id: (
-        update(AccountProfile)
-        .where(AccountProfile.account_id == account_id)
-        .values(deleted=True)
-    ),
-    **SOFT_DELETES,
-}
-
-
-@pytest.mark.parametrize("record", list(SOFT_DELETED_RECORDS))
+@pytest.mark.parametrize("record", list(SOFT_DELETES))
 async def test_issue_for_a_soft_deleted_record_is_none_and_stores_no_token(
     db_session: AsyncSession, record: str
 ) -> None:
     email = unique_email()
     account_id = await service(db_session).sign_up(email, PHRASE)
-    await db_session.execute(SOFT_DELETED_RECORDS[record](account_id))
+    await db_session.execute(SOFT_DELETES[record](account_id))
 
     issued = await service(db_session).issue_reset_token(email)
 
@@ -539,7 +533,8 @@ async def test_deliver_queues_one_email_job_with_the_token(
     await service(db_session, queue).deliver_reset_token(issued)
 
     jobs = queue.named("send_password_reset")
-    assert [job.args for job in jobs] == [(issued.account_id, email, issued.token)]
+    assert len(jobs) == 1
+    assert jobs[0].args == (issued.account_id, email, issued.token)
 
 
 async def test_deliver_of_nothing_queues_nothing(db_session: AsyncSession) -> None:
@@ -550,16 +545,18 @@ async def test_deliver_of_nothing_queues_nothing(db_session: AsyncSession) -> No
     assert queue.jobs == []
 
 
-async def test_deliver_with_the_queue_down_does_not_raise(
-    db_session: AsyncSession,
+async def test_deliver_with_the_queue_down_logs_it_and_does_not_raise(
+    db_session: AsyncSession, caplog: pytest.LogCaptureFixture
 ) -> None:
     queue = FakeQueue(fail_on=["send_password_reset"])
     email = await registered_email(db_session)
     issued = await service(db_session, queue).issue_reset_token(email)
+    assert issued is not None
 
     await service(db_session, queue).deliver_reset_token(issued)
 
-    assert queue.jobs == []
+    expected = f"could not queue send_password_reset for account {issued.account_id}"
+    assert expected in log_output(caplog)
 
 
 async def test_issuing_and_delivering_log_no_token_or_email(
@@ -573,8 +570,7 @@ async def test_issuing_and_delivering_log_no_token_or_email(
     await service(db_session, queue).deliver_reset_token(issued)
 
     assert issued is not None
-    formatter = JsonFormatter()
-    output = "\n".join(formatter.format(record) for record in caplog.records)
+    output = log_output(caplog)
     assert (issued.token in output, email in output) == (False, False)
 
 
@@ -650,6 +646,23 @@ async def test_a_challenge_read_before_a_reset_cannot_reset_again_after_it(
 
     with pytest.raises(InvalidResetTokenError):
         await service(db_session).reset(stale, "a-third-phrase-1")
+
+
+async def test_a_challenge_read_for_a_replaced_token_cannot_reset(
+    db_session: AsyncSession,
+) -> None:
+    # The row's expiry is fresh again after the second restore, so only the token-hash condition of the UPDATE rejects the stale challenge.
+    email = await registered_email(db_session)
+    first = await service(db_session).issue_reset_token(email)
+    assert first is not None
+    stale = await service(db_session).find_reset_challenge(first.token)
+    second = await service(db_session).issue_reset_token(email)
+    assert second is not None
+
+    with pytest.raises(InvalidResetTokenError):
+        await service(db_session).reset(stale, NEW_PHRASE)
+
+    await reset_password(service(db_session), second.token, NEW_PHRASE)
 
 
 async def test_an_unknown_token_is_invalid_and_changes_nothing(

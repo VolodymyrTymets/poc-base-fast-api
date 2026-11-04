@@ -75,6 +75,12 @@ def unique_email() -> str:
     return f"{uuid.uuid4().hex}@example.com"
 
 
+def log_output(caplog: pytest.LogCaptureFixture) -> str:
+    """The final JSON lines the API process would print for the captured records, including the traceback text."""
+    formatter = JsonFormatter()
+    return "\n".join(formatter.format(record) for record in caplog.records)
+
+
 def latest_token(queue: FakeQueue) -> str:
     """The token of the newest `send_password_reset` job, as the worker would receive it (account id, email, token)."""
     token = queue.named("send_password_reset")[-1].args[2]
@@ -400,10 +406,14 @@ async def test_restore_and_reset_log_no_token_password_or_hash(
             RESET_PATH, json={"token": token, "newPassword": "a-third-phrase-1"}
         )
 
-    formatter = JsonFormatter()
-    output = "\n".join(formatter.format(record) for record in caplog.records)
-    secrets_seen = (token, NEW_PHRASE, "a-third-phrase-1", PHRASE, "$argon2")
-    assert tuple(secret in output for secret in secrets_seen) == (False,) * 5
+    output = log_output(caplog)
+    assert (
+        token in output,
+        NEW_PHRASE in output,
+        "a-third-phrase-1" in output,
+        PHRASE in output,
+        "$argon2" in output,
+    ) == (False, False, False, False, False)
 
 
 async def test_no_pooled_connection_is_held_while_the_new_password_is_hashed(

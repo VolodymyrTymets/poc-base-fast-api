@@ -10,7 +10,6 @@ The password is stored as an Argon2id hash
 import secrets
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
 
 from sqlalchemy import exists, select, update
 from sqlalchemy.dialects.postgresql import insert
@@ -33,7 +32,7 @@ from app.services.notifier import NotifierService, NotifierType
 RESET_TOKEN_TTL = timedelta(minutes=30)
 
 
-def _credential_replacement(new_hash: str) -> dict[str, Any]:
+def _credential_replacement(new_hash: str) -> dict[str, str | None]:
     """The columns a new password sets, with everything issued under the old one cleared in the same UPDATE.
 
     The refresh token, a pending reset token and a pending sign-in code stop working; `salt` stays null because the salt is inside the Argon2 string (ADR-0028).
