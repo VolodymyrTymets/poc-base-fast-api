@@ -19,14 +19,14 @@ Goal 2 (authentication): completes the OTP sign-in a new POC relies on, and sett
   account policy beyond "a deleted account is not found" (7.4 decides the refresh check), `openapi` consumers (no `web/`).
 
 ## Acceptance criteria
-- [ ] AC1 Valid code for a known phone: 200 `{accessToken, refreshToken}`; the access token verifies with `JWT_SECRET` and `typ=access`, the refresh token with `JWT_REFRESH_TOKEN_SECRET` and `typ=refresh`, both `sub` = the account id.
-- [ ] AC2 After success `otpHash`, `otpSalt`, `otpExpiresAt` are null, `AccountProfile.isPhoneVerified` is true, and `AccountIdentity.refreshToken` is `sha256(refreshToken)` in hex (never the token, never bcrypt/Argon2).
-- [ ] AC3 Unknown phone, account without identity, null `otpHash`, expired code (clock shifted past 2 minutes) and wrong code are each 401 `INVALID_CREDENTIALS` with one message; a failed call changes nothing (`isPhoneVerified` stays false, the code survives).
-- [ ] AC4 The same code used twice: the second call is 401. Two concurrent verifies of one code: exactly one 200.
-- [ ] AC5 Two verifies in a row give different refresh tokens, and the stored hash is the second one's (ported `jwt-strategy` cases). Issuing tokens through `TokenService` alone does not set `isPhoneVerified`.
-- [ ] AC6 A password identity on the same account keeps its `hash` and `salt` through verify (only OTP columns and `refreshToken` change).
-- [ ] AC7 Malformed phone, `code` over 6 characters or missing, or an extra key: 422 `VALIDATION_FAILED`. An access token from the response opens `GET /api/v1/account` (the end-to-end proof).
-- [ ] AC8 No log line from the call holds a code, token or phone (rules D8, P4); `openapi.json` regenerated and the stale check passes.
+- [x] AC1 Valid code for a known phone: 200 `{accessToken, refreshToken}`; the access token verifies with `JWT_SECRET` and `typ=access`, the refresh token with `JWT_REFRESH_TOKEN_SECRET` and `typ=refresh`, both `sub` = the account id.
+- [x] AC2 After success `otpHash`, `otpSalt`, `otpExpiresAt` are null, `AccountProfile.isPhoneVerified` is true, and `AccountIdentity.refreshToken` is `sha256(refreshToken)` in hex (never the token, never bcrypt/Argon2).
+- [x] AC3 Unknown phone, account without identity, null `otpHash`, expired code (clock shifted past 2 minutes) and wrong code are each 401 `INVALID_CREDENTIALS` with one message; a failed call changes nothing (`isPhoneVerified` stays false, the code survives).
+- [x] AC4 The same code used twice: the second call is 401. Two concurrent verifies of one code: exactly one 200.
+- [x] AC5 Two verifies in a row give different refresh tokens, and the stored hash is the second one's (ported `jwt-strategy` cases). Issuing tokens through `TokenService` alone does not set `isPhoneVerified`.
+- [x] AC6 A password identity on the same account keeps its `hash` and `salt` through verify (only OTP columns and `refreshToken` change).
+- [x] AC7 Malformed phone, `code` over 6 characters or missing, or an extra key: 422 `VALIDATION_FAILED`. An access token from the response opens `GET /api/v1/account` (the end-to-end proof).
+- [x] AC8 No log line from the call holds a code, token or phone (rules D8, P4); `openapi.json` regenerated and the stale check passes.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

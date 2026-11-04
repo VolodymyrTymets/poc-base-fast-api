@@ -120,6 +120,10 @@ a known one gets a new code that replaces the old. The code is stored only as an
 and the worker logs `[SMS] TOTP code sent to ***0142` (last four digits, never the code). `code` is in the body only for `APP_ENV` `local`, `development` and `test`; in `production` the key is absent.
 With Redis down the call still answers 200 and the server logs `could not queue send_totp_code for account <id>`. The endpoint is not rate limited (issue I.8).
 
+`POST /api/v1/auth/otp/verify` with `{"phoneNumber": "+12125550142", "code": "123456"}` (task 7.2) answers `{"accessToken": "...", "refreshToken": "..."}`; `Authorization: Bearer <accessToken>` then opens `GET /api/v1/account`.
+A wrong, expired (2 minutes) or already used code, or an unknown number, is 401 `INVALID_CREDENTIALS` with one body for all. A success clears the code, sets `isPhoneVerified` and stores the sha256 of the refresh token (ADR-0008), replacing the previous one.
+The endpoint is not rate limited and a code has 10^6 values (issue I.8, ADR-0028).
+
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
 - With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;
