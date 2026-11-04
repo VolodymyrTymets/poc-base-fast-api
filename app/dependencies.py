@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, 7.3, 7.4, I.9.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, 7.3, 7.4, 7.6, I.9.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
@@ -102,9 +102,10 @@ def get_otp_service(
 def get_password_auth_service(
     session: Annotated[AsyncSession, Depends(get_session)],
     accounts: Annotated[AccountService, Depends(get_account_service)],
+    notifier: Annotated[NotifierService, Depends(get_notifier_service)],
 ) -> PasswordAuthService:
-    """The `PasswordAuthService` on the request's session and account service (ADR-0025)."""
-    return PasswordAuthService(session, accounts)
+    """The `PasswordAuthService` on the request's session, account service and notifier (ADR-0025, ADR-0027)."""
+    return PasswordAuthService(session, accounts, notifier)
 
 
 def get_token_service(

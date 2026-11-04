@@ -1,23 +1,56 @@
-"""PasswordAuthService: sign up with an email and a password, check a password for sign-in (`find_credential`, `check`) and change it (`find_credential_for_account`, `change`).
-Ports the Node `JwtAuthStrategyService`. Tasks: 7.3, 7.5 (7.6 reset uses the same write-time confirm). ADR-0021, ADR-0027, ADR-0028.
+"""PasswordAuthService: sign up with an email and a password, check a password for sign-in (`find_credential`, `check`), change it (`find_credential_for_account`, `change`)
+and recover it (`issue_reset_token`, `deliver_reset_token`; `find_reset_challenge` and `reset` follow in the same task). Ports the Node `JwtAuthStrategyService`.
+Tasks: 7.3, 7.5, 7.6. ADR-0021, ADR-0026, ADR-0027, ADR-0028.
 
 It writes and flushes but never commits (ADR-0021); the route commits after the tokens are issued. The sign-in check is two calls because the route ends the read transaction between them: Argon2 must not run with a pooled connection held (as in `OtpService`).
 The password is stored as an Argon2id hash
 (ADR-0028, which supersedes the bcrypt of the Node base) and `AccountIdentity.salt` stays null: the salt is inside the hash string.
 """
 
+import secrets
 from dataclasses import dataclass, field
+from datetime import timedelta
+from typing import Any
 
 from sqlalchemy import exists, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import violated_index
+from app.core.db import utc_now, violated_index
 from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
-from app.core.hashing import DUMMY_HASH, hash_secret, verify_secret
+from app.core.hashing import DUMMY_HASH, hash_secret, hash_token, verify_secret
 from app.models import Account, AccountIdentity, AccountProfile
 from app.services.account import AccountService
 from app.services.account_profile import EMAIL_UNIQUE_INDEX
+from app.services.notifier import NotifierService, NotifierType
+
+# How long a reset token works (ENDPOINTS.md `restorePassword`); a new request replaces a live token.
+RESET_TOKEN_TTL = timedelta(minutes=30)
+
+
+def _credential_replacement(new_hash: str) -> dict[str, Any]:
+    """The columns a new password sets, with everything issued under the old one cleared in the same UPDATE.
+
+    The refresh token, a pending reset token and a pending sign-in code stop working; `salt` stays null because the salt is inside the Argon2 string (ADR-0028).
+    """
+    return {
+        "hash": new_hash,
+        "salt": None,
+        "refresh_token": None,
+        "reset_token_hash": None,
+        "reset_token_expires_at": None,
+        "otp_hash": None,
+        "otp_salt": None,
+        "otp_expires_at": None,
+    }
+
+
+@dataclass(frozen=True)
+class IssuedReset:
+    account_id: str
+    # repr=False: a dataclass repr lands in logs and tracebacks, and the token must not (rules D8, P4).
+    token: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -30,9 +63,15 @@ class PasswordCredential:
 
 
 class PasswordAuthService:
-    def __init__(self, session: AsyncSession, accounts: AccountService) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        accounts: AccountService,
+        notifier: NotifierService,
+    ) -> None:
         self._session = session
         self._accounts = accounts
+        self._notifier = notifier
 
     async def sign_up(self, email: str, password: str) -> str:
         """A `CUSTOMER` account with this email and password; returns its id. The caller commits, then issues tokens.
@@ -139,8 +178,7 @@ class PasswordAuthService:
         if credential.account_id is None or credential.password_hash is None:
             # `check` has already raised for these; this keeps the types honest and fails closed.
             raise InvalidCredentialsError
-        # One UPDATE: the new hash and the revocation of everything issued under the old password (refresh token, a pending reset token
-        # and a pending sign-in code). `salt` stays null: the salt is inside the Argon2 string (ADR-0028).
+        # One UPDATE: the new hash and the revocation of everything issued under the old password (`_credential_replacement`).
         changed = await self._session.scalar(
             update(AccountIdentity)
             .where(
@@ -151,18 +189,69 @@ class PasswordAuthService:
                     Account.id == credential.account_id, Account.deleted.is_(False)
                 ),
             )
-            .values(
-                hash=new_hash,
-                salt=None,
-                refresh_token=None,
-                reset_token_hash=None,
-                reset_token_expires_at=None,
-                otp_hash=None,
-                otp_salt=None,
-                otp_expires_at=None,
-            )
+            .values(**_credential_replacement(new_hash))
             .returning(AccountIdentity.id)
         )
         if changed is None:
             raise InvalidCredentialsError
         await self._session.flush()
+
+    async def issue_reset_token(self, email: str) -> IssuedReset | None:
+        """A new reset token for the live account with this email, `None` for every other email. The caller commits, then calls `deliver_reset_token`.
+
+        Unknown, soft-deleted (profile, account or identity) and well-formed-but-unregistered emails read the same, so the route answers all of them alike. A live
+        token is replaced. An OTP-only account has no identity row yet and gets one: that is how it sets a first password. `email` is already normalised (`Email`).
+        """
+        account_id = await self._session.scalar(
+            select(Account.id)
+            .join(AccountProfile, AccountProfile.account_id == Account.id)
+            .where(
+                AccountProfile.email == email,
+                AccountProfile.deleted.is_(False),
+                Account.deleted.is_(False),
+                # An account with no identity row passes; a soft-deleted identity is never revived by a reset.
+                ~exists().where(
+                    AccountIdentity.account_id == Account.id,
+                    AccountIdentity.deleted.is_(True),
+                ),
+            )
+            .limit(1)
+        )
+        if account_id is None:
+            return None
+        token = secrets.token_hex(32)
+        # One statement, not select-then-insert: the identity may not exist yet and two requests may race on it. Only the reset columns are set on
+        # conflict, so a password, a sign-in code and a refresh hash on the same identity survive (the table has no `updatedAt`).
+        statement = insert(AccountIdentity).values(
+            account_id=account_id,
+            reset_token_hash=hash_token(token),
+            reset_token_expires_at=utc_now() + RESET_TOKEN_TTL,
+        )
+        columns = AccountIdentity.__table__.c
+        stored = await self._session.scalar(
+            statement.on_conflict_do_update(
+                index_elements=[columns.accountId],
+                set_={
+                    columns.resetTokenHash: statement.excluded[
+                        columns.resetTokenHash.name
+                    ],
+                    columns.resetTokenExpiresAt: statement.excluded[
+                        columns.resetTokenExpiresAt.name
+                    ],
+                },
+                # An identity soft-deleted since the read above gets no token: no row comes back.
+                where=columns.deleted.is_(False),
+            ).returning(AccountIdentity.id)
+        )
+        if stored is None:
+            return None
+        await self._session.flush()
+        return IssuedReset(account_id, token)
+
+    async def deliver_reset_token(self, issued: IssuedReset | None) -> None:
+        """Queue the email job for an issued token; `None` (an unknown email) does nothing. A queue that is down is logged by the notifier, not raised (ADR-0027)."""
+        if issued is None:
+            return
+        await self._notifier.notify_about_password_reset(
+            issued.account_id, issued.token, [NotifierType.EMAIL]
+        )

@@ -1,16 +1,24 @@
-"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up and sign-in), 7.5 (change), ADR-0028."""
+"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up and sign-in), 7.5 (change), 7.6 (restore and reset), ADR-0028."""
 
 import asyncio
+import logging
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from time_machine import TimeMachineFixture
+from utils.clock import FROZEN_NOW
 from utils.locks import wait_for_a_lock_waiter
+from utils.queue import FakeQueue
 
+from app.config import Settings
 from app.core.db import create_session_factory, utc_now
 from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
-from app.core.hashing import DUMMY_HASH, verify_secret
+from app.core.hashing import DUMMY_HASH, hash_token, verify_secret
+from app.core.logging import JsonFormatter
 from app.models import (
     Account,
     AccountIdentity,
@@ -20,7 +28,10 @@ from app.models import (
     AccountRoleType,
 )
 from app.services.account import AccountService
-from app.services.password_auth import PasswordAuthService
+from app.services.account_profile import AccountProfileService
+from app.services.file_assert import FileAssertService
+from app.services.notifier import NotifierService
+from app.services.password_auth import RESET_TOKEN_TTL, PasswordAuthService
 
 PHRASE = "correct-horse-battery"
 
@@ -30,8 +41,14 @@ def unique_email() -> str:
     return f"{uuid.uuid4().hex}@example.com"
 
 
-def service(session: AsyncSession) -> PasswordAuthService:
-    return PasswordAuthService(session, AccountService(session))
+def service(
+    session: AsyncSession, queue: FakeQueue | None = None
+) -> PasswordAuthService:
+    profiles = AccountProfileService(
+        session, FileAssertService(session, Settings(database_url=None))
+    )
+    notifier = NotifierService(profiles, queue or FakeQueue())
+    return PasswordAuthService(session, AccountService(session), notifier)
 
 
 async def identity_of(session: AsyncSession, account_id: str) -> AccountIdentity:
@@ -387,3 +404,170 @@ async def test_two_racing_changes_from_one_stored_hash_apply_exactly_one(
         await verify_secret(NEW_PHRASE, stored),
         await verify_secret("the-losing-phrase", stored),
     ) == (True, False)
+
+
+async def registered_email(session: AsyncSession) -> str:
+    email = unique_email()
+    await service(session).sign_up(email, PHRASE)
+    return email
+
+
+async def test_issue_stores_the_sha256_of_a_64_hex_token_and_never_the_token(
+    db_session: AsyncSession, frozen_clock: TimeMachineFixture
+) -> None:
+    email = await registered_email(db_session)
+
+    issued = await service(db_session).issue_reset_token(email)
+
+    assert issued is not None
+    identity = await identity_of(db_session, issued.account_id)
+    assert (
+        len(issued.token),
+        identity.reset_token_hash == hash_token(issued.token),
+        identity.reset_token_hash == issued.token,
+        identity.reset_token_expires_at,
+    ) == (
+        64,
+        True,
+        False,
+        FROZEN_NOW.replace(tzinfo=None) + RESET_TOKEN_TTL,
+    )
+
+
+async def test_a_second_issue_replaces_the_first_token(
+    db_session: AsyncSession,
+) -> None:
+    email = await registered_email(db_session)
+    first = await service(db_session).issue_reset_token(email)
+    assert first is not None
+
+    second = await service(db_session).issue_reset_token(email)
+
+    assert second is not None
+    identity = await identity_of(db_session, second.account_id)
+    assert (second.token != first.token, identity.reset_token_hash) == (
+        True,
+        hash_token(second.token),
+    )
+
+
+async def test_issue_for_an_unknown_email_is_none_and_writes_nothing(
+    db_session: AsyncSession,
+) -> None:
+    before = await db_session.scalar(select(func.count()).select_from(AccountIdentity))
+
+    issued = await service(db_session).issue_reset_token(unique_email())
+
+    after = await db_session.scalar(select(func.count()).select_from(AccountIdentity))
+    assert (issued, after) == (None, before)
+
+
+SOFT_DELETED_RECORDS: dict[str, Callable[[str], Any]] = {
+    "profile": lambda account_id: (
+        update(AccountProfile)
+        .where(AccountProfile.account_id == account_id)
+        .values(deleted=True)
+    ),
+    **SOFT_DELETES,
+}
+
+
+@pytest.mark.parametrize("record", list(SOFT_DELETED_RECORDS))
+async def test_issue_for_a_soft_deleted_record_is_none_and_stores_no_token(
+    db_session: AsyncSession, record: str
+) -> None:
+    email = unique_email()
+    account_id = await service(db_session).sign_up(email, PHRASE)
+    await db_session.execute(SOFT_DELETED_RECORDS[record](account_id))
+
+    issued = await service(db_session).issue_reset_token(email)
+
+    assert issued is None
+    assert (await identity_of(db_session, account_id)).reset_token_hash is None
+
+
+async def test_issue_creates_the_identity_of_an_account_that_has_none(
+    db_session: AsyncSession,
+) -> None:
+    email = unique_email()
+    account = await AccountService(db_session).create_customer("+380000007601")
+    assert account.profile is not None
+    account.profile.email = email
+    await db_session.flush()
+
+    issued = await service(db_session).issue_reset_token(email)
+
+    assert issued is not None
+    identity = await identity_of(db_session, account.id)
+    assert (identity.hash, identity.reset_token_hash) == (
+        None,
+        hash_token(issued.token),
+    )
+
+
+async def test_issue_keeps_the_password_and_the_sign_in_code_of_the_identity(
+    db_session: AsyncSession,
+) -> None:
+    email = unique_email()
+    account_id = await service(db_session).sign_up(email, PHRASE)
+    await db_session.execute(
+        update(AccountIdentity)
+        .where(AccountIdentity.account_id == account_id)
+        .values(otp_hash="stored-otp-hash")
+    )
+    before = (await identity_of(db_session, account_id)).hash
+
+    await service(db_session).issue_reset_token(email)
+
+    identity = await identity_of(db_session, account_id)
+    assert (identity.hash, identity.otp_hash) == (before, "stored-otp-hash")
+
+
+async def test_deliver_queues_one_email_job_with_the_token(
+    db_session: AsyncSession,
+) -> None:
+    queue = FakeQueue()
+    email = await registered_email(db_session)
+    issued = await service(db_session, queue).issue_reset_token(email)
+    assert issued is not None
+
+    await service(db_session, queue).deliver_reset_token(issued)
+
+    jobs = queue.named("send_password_reset")
+    assert [job.args for job in jobs] == [(issued.account_id, email, issued.token)]
+
+
+async def test_deliver_of_nothing_queues_nothing(db_session: AsyncSession) -> None:
+    queue = FakeQueue()
+
+    await service(db_session, queue).deliver_reset_token(None)
+
+    assert queue.jobs == []
+
+
+async def test_deliver_with_the_queue_down_does_not_raise(
+    db_session: AsyncSession,
+) -> None:
+    queue = FakeQueue(fail_on=["send_password_reset"])
+    email = await registered_email(db_session)
+    issued = await service(db_session, queue).issue_reset_token(email)
+
+    await service(db_session, queue).deliver_reset_token(issued)
+
+    assert queue.jobs == []
+
+
+async def test_issuing_and_delivering_log_no_token_or_email(
+    db_session: AsyncSession, caplog: pytest.LogCaptureFixture
+) -> None:
+    queue = FakeQueue(fail_on=["send_password_reset"])
+    email = await registered_email(db_session)
+    caplog.set_level(logging.DEBUG)
+
+    issued = await service(db_session, queue).issue_reset_token(email)
+    await service(db_session, queue).deliver_reset_token(issued)
+
+    assert issued is not None
+    formatter = JsonFormatter()
+    output = "\n".join(formatter.format(record) for record in caplog.records)
+    assert (issued.token in output, email in output) == (False, False)
