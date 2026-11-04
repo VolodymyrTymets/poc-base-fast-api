@@ -18,6 +18,7 @@ from utils.jwt import ACCESS_KEY, REFRESH_KEY
 from utils.queue import FakeQueue
 
 from app.config import Settings
+from app.core.hashing import verify_secret
 from app.core.security import TokenType, verify_token
 from app.dependencies import get_queue
 from app.main import create_app
@@ -273,3 +274,38 @@ async def test_an_expired_access_token_is_unauthorized_on_a_guarded_route(
         401,
         "UNAUTHORIZED",
     )
+
+
+@pytest.mark.parametrize(
+    ("phone", "send_right_code"),
+    [("+12125550180", True), ("+12125550181", False), ("+12125550189", False)],
+    ids=["right-code", "wrong-code", "unknown-phone"],
+)
+async def test_no_pooled_connection_is_held_while_the_code_is_hashed(
+    module_database_url: str,
+    frozen_clock: TimeMachineFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    phone: str,
+    send_right_code: bool,
+) -> None:
+    # The endpoint is unauthenticated: a connection held through the Argon2 check would let a flood of calls fill the pool (POC-7.2 review).
+    app = make_app(module_database_url)
+    checked_out_during_hash: list[int] = []
+
+    async def watching_verify_secret(secret: str, hashed: str) -> bool:
+        checked_out_during_hash.append(app.state.engine.pool.checkedout())
+        return await verify_secret(secret, hashed)
+
+    async with running_client(app) as client:
+        if phone != "+12125550189":
+            code = await request_code(client, phone)
+        else:
+            code = "123456"
+        monkeypatch.setattr("app.services.otp.verify_secret", watching_verify_secret)
+
+        await client.post(
+            VERIFY_PATH,
+            json={"phoneNumber": phone, "code": code if send_right_code else "000000"},
+        )
+
+    assert checked_out_during_hash == [0]

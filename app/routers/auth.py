@@ -50,7 +50,12 @@ async def verify_otp(
     tokens: Annotated[TokenService, Depends(get_token_service)],
 ) -> TokenResponse:
     """Exchange a sign-in code for an access and a refresh token; a bad, expired or spent code is 401 INVALID_CREDENTIALS."""
-    account_id = await otp.verify(body.phone_number, body.code)
+    challenge = await otp.find_challenge(body.phone_number)
+    # End the read before the slow Argon2 check: this route is unauthenticated, and a connection held through the hash would let a flood of
+    # calls occupy the whole pool. Nothing is written yet; `spend` starts a new transaction and its conditional UPDATE stays race-safe.
+    await session.rollback()
+    await otp.check(challenge, body.code)
+    account_id = await otp.spend(challenge)
     pair = await tokens.issue(account_id)
     # One commit for the spent code, the verified phone and the new refresh hash: any failure above leaves the code usable.
     await session.commit()

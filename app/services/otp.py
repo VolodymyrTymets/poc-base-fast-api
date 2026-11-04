@@ -1,9 +1,9 @@
-"""OtpService: issue a one-time sign-in code for a phone number and hand it to the SMS channel (7.1), and check one (7.2). Ports the
+"""OtpService: issue a one-time sign-in code for a phone number and hand it to the SMS channel (7.1), and check one (7.2: `find_challenge`, `check`, `spend`). Ports the
 Node `OtpAuthStrategyService` and its code generator. Tasks: 7.1, 7.2. ADR-0021, ADR-0027, ADR-0028.
 
 `issue` writes and flushes but never commits (ADR-0021); `deliver` is a separate call because the route commits in between: a job
 must never carry a code the database does not hold. The code is stored only as an Argon2 hash (ADR-0028) and is valid for two minutes.
-`verify` also writes and flushes only: the route commits after the tokens are issued, so a failure anywhere leaves the code unspent.
+`spend` also writes and flushes only: the route commits after the tokens are issued, so a failure anywhere leaves the code unspent. The verify is three calls because the route ends the read transaction between `find_challenge` and `check`: Argon2 must not run with a pooled connection held.
 """
 
 import secrets
@@ -39,6 +39,15 @@ class IssuedOtp:
     account_id: str
     # repr=False: a dataclass repr lands in logs and tracebacks, and the code must not (rules D8, P4).
     code: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class OtpChallenge:
+    """What `find_challenge` read: plain values, no ORM object, so it stays valid after the session's transaction ends."""
+
+    account_id: str | None
+    # repr=False: the stored hash must not land in logs or tracebacks (rules D8, P4). `None` when no code can be verified.
+    otp_hash: str | None = field(repr=False)
 
 
 class OtpService:
@@ -101,40 +110,53 @@ class OtpService:
             issued.account_id, issued.code, [NotifierType.SMS]
         )
 
-    async def verify(self, phone_number: str, code: str) -> str:
-        """Check `code` for the account with this phone number, spend it and mark the phone verified; returns the account id.
+    async def find_challenge(self, phone_number: str) -> OtpChallenge:
+        """Read what a verify of this phone needs: the account id and the stored code hash, `None`s when nothing can be verified.
 
-        An unknown or soft-deleted account or identity, no stored code, an expired code (`expires_at <= now`) and a wrong code all raise the
-        same `InvalidCredentialsError` (ENDPOINTS.md mapping decision 4; never `UnauthorizedError`, which makes a client refresh). The code is
-        single-use under concurrency: the spend is one conditional UPDATE and a request that finds the code already gone fails. The caller commits.
+        Reads only. The caller ends the read (the route rolls back) before `check`, so no pooled connection is held while Argon2 runs. An
+        unknown or soft-deleted account or identity, no stored code and an expired one (`expires_at <= now`) all give a challenge with no hash.
         """
         account = await self._accounts.get_by_phone(phone_number)
-        identity: AccountIdentity | None = None
-        if account is not None:
-            identity = await self._session.scalar(
-                select(AccountIdentity).where(
-                    AccountIdentity.account_id == account.id,
-                    AccountIdentity.deleted.is_(False),
-                )
+        if account is None:
+            return OtpChallenge(None, None)
+        identity = await self._session.scalar(
+            select(AccountIdentity).where(
+                AccountIdentity.account_id == account.id,
+                AccountIdentity.deleted.is_(False),
             )
-        stored = identity.otp_hash if identity is not None else None
-        expires_at = identity.otp_expires_at if identity is not None else None
-        usable = (
-            stored is not None and expires_at is not None and expires_at > utc_now()
         )
+        if (
+            identity is None
+            or identity.otp_hash is None
+            or identity.otp_expires_at is None
+            or identity.otp_expires_at <= utc_now()
+        ):
+            return OtpChallenge(account.id, None)
+        return OtpChallenge(account.id, identity.otp_hash)
 
-        # Always one Argon2 check, so the failure paths take about the same time.
-        matches = await verify_secret(
-            code, stored if usable and stored else _DUMMY_HASH
-        )
-        if account is None or not usable or not matches:
+    @staticmethod
+    async def check(challenge: OtpChallenge, code: str) -> None:
+        """Raise `InvalidCredentialsError` unless `code` matches the challenge's hash. Touches no database.
+
+        Every failure is the same error (ENDPOINTS.md mapping decision 4; never `UnauthorizedError`, which makes a client refresh), and every
+        path runs one Argon2 check, against a dummy hash when there is nothing to match, so the 401 timing does not reveal which phones exist.
+        """
+        matches = await verify_secret(code, challenge.otp_hash or _DUMMY_HASH)
+        if challenge.account_id is None or challenge.otp_hash is None or not matches:
             raise InvalidCredentialsError
 
+    async def spend(self, challenge: OtpChallenge) -> str:
+        """Consume a checked code and mark the phone verified; returns the account id. Flushes, the caller commits.
+
+        Single-use under concurrency: one conditional UPDATE on the hash `check` saw, so a request that finds the code already spent fails.
+        """
+        if challenge.account_id is None or challenge.otp_hash is None:
+            raise InvalidCredentialsError
         spent = await self._session.scalar(
             update(AccountIdentity)
             .where(
-                AccountIdentity.account_id == account.id,
-                AccountIdentity.otp_hash == stored,
+                AccountIdentity.account_id == challenge.account_id,
+                AccountIdentity.otp_hash == challenge.otp_hash,
                 AccountIdentity.deleted.is_(False),
             )
             .values(otp_hash=None, otp_salt=None, otp_expires_at=None)
@@ -148,7 +170,7 @@ class OtpService:
         verified = await self._session.scalar(
             update(AccountProfile)
             .where(
-                AccountProfile.account_id == account.id,
+                AccountProfile.account_id == challenge.account_id,
                 AccountProfile.deleted.is_(False),
             )
             .values(is_phone_verified=True)
@@ -157,9 +179,9 @@ class OtpService:
         if verified is None:
             raise InvalidCredentialsError
         await self._session.flush()
-        return account.id
+        return challenge.account_id
 
     @staticmethod
     async def verify_code(code: str, otp_hash: str) -> bool:
-        """Whether `code` matches a stored `otpHash`; the expiry is `verify`'s check."""
+        """Whether `code` matches a stored `otpHash`; the expiry is `find_challenge`'s check."""
         return await verify_secret(code, otp_hash)

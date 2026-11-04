@@ -55,6 +55,13 @@ async def accounts_with_phone(session: AsyncSession, phone: str) -> int:
     return count
 
 
+async def verify_otp(service: OtpService, phone: str, code: str) -> str:
+    """The three steps the route runs, without its rollback between them (the savepoint session of `db_session` must keep the issued code)."""
+    challenge = await service.find_challenge(phone)
+    await service.check(challenge, code)
+    return await service.spend(challenge)
+
+
 def lines(caplog: pytest.LogCaptureFixture) -> str:
     """The final JSON lines the API process would print for the captured records, including the traceback text."""
     formatter = JsonFormatter()
@@ -211,7 +218,7 @@ async def test_a_valid_code_returns_the_account_clears_the_code_and_verifies_the
     service = otp_service(db_session, queue)
     issued = await service.issue(VERIFY_PHONE)
 
-    account_id = await service.verify(VERIFY_PHONE, issued.code)
+    account_id = await verify_otp(service, VERIFY_PHONE, issued.code)
 
     identity = await identity_of(db_session, account_id)
     await db_session.refresh(identity)
@@ -231,7 +238,7 @@ async def test_a_wrong_code_fails_and_changes_nothing(
     issued = await service.issue(VERIFY_PHONE)
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, "000000")
+        await verify_otp(service, VERIFY_PHONE, "000000")
 
     identity = await identity_of(db_session, issued.account_id)
     assert (
@@ -246,9 +253,9 @@ async def test_the_right_code_still_works_after_a_wrong_one(
     service = otp_service(db_session, queue)
     issued = await service.issue(VERIFY_PHONE)
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, "000000")
+        await verify_otp(service, VERIFY_PHONE, "000000")
 
-    account_id = await service.verify(VERIFY_PHONE, issued.code)
+    account_id = await verify_otp(service, VERIFY_PHONE, issued.code)
 
     assert account_id == issued.account_id
 
@@ -257,7 +264,7 @@ async def test_an_unknown_phone_fails(
     db_session: AsyncSession, queue: FakeQueue, frozen_clock: TimeMachineFixture
 ) -> None:
     with pytest.raises(InvalidCredentialsError):
-        await otp_service(db_session, queue).verify("+380000000099", "123456")
+        await verify_otp(otp_service(db_session, queue), "+380000000099", "123456")
 
 
 async def test_an_account_without_an_identity_fails(
@@ -266,7 +273,7 @@ async def test_an_account_without_an_identity_fails(
     await AccountService(db_session).create_customer(VERIFY_PHONE)
 
     with pytest.raises(InvalidCredentialsError):
-        await otp_service(db_session, queue).verify(VERIFY_PHONE, "123456")
+        await verify_otp(otp_service(db_session, queue), VERIFY_PHONE, "123456")
 
 
 async def test_an_identity_without_a_code_fails(
@@ -277,7 +284,7 @@ async def test_an_identity_without_a_code_fails(
     await db_session.flush()
 
     with pytest.raises(InvalidCredentialsError):
-        await otp_service(db_session, queue).verify(VERIFY_PHONE, "123456")
+        await verify_otp(otp_service(db_session, queue), VERIFY_PHONE, "123456")
 
 
 async def test_a_code_is_still_good_one_second_before_the_two_minutes_end(
@@ -287,7 +294,7 @@ async def test_a_code_is_still_good_one_second_before_the_two_minutes_end(
     issued = await service.issue(VERIFY_PHONE)
     frozen_clock.shift(OTP_TTL - timedelta(seconds=1))
 
-    assert await service.verify(VERIFY_PHONE, issued.code) == issued.account_id
+    assert await verify_otp(service, VERIFY_PHONE, issued.code) == issued.account_id
 
 
 async def test_a_code_is_expired_at_exactly_two_minutes(
@@ -298,7 +305,7 @@ async def test_a_code_is_expired_at_exactly_two_minutes(
     frozen_clock.shift(OTP_TTL)
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, issued.code)
+        await verify_otp(service, VERIFY_PHONE, issued.code)
 
     identity = await identity_of(db_session, issued.account_id)
     assert identity.otp_hash is not None
@@ -309,10 +316,10 @@ async def test_a_code_works_once(
 ) -> None:
     service = otp_service(db_session, queue)
     issued = await service.issue(VERIFY_PHONE)
-    await service.verify(VERIFY_PHONE, issued.code)
+    await verify_otp(service, VERIFY_PHONE, issued.code)
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, issued.code)
+        await verify_otp(service, VERIFY_PHONE, issued.code)
 
 
 async def test_a_new_request_kills_the_previous_code(
@@ -323,8 +330,8 @@ async def test_a_new_request_kills_the_previous_code(
     second = await service.issue(VERIFY_PHONE)
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, first.code)
-    assert await service.verify(VERIFY_PHONE, second.code) == second.account_id
+        await verify_otp(service, VERIFY_PHONE, first.code)
+    assert await verify_otp(service, VERIFY_PHONE, second.code) == second.account_id
 
 
 async def test_verify_keeps_the_password_columns_of_the_identity(
@@ -338,7 +345,7 @@ async def test_verify_keeps_the_password_columns_of_the_identity(
     service = otp_service(db_session, queue)
     issued = await service.issue(VERIFY_PHONE)
 
-    await service.verify(VERIFY_PHONE, issued.code)
+    await verify_otp(service, VERIFY_PHONE, issued.code)
 
     identity = await identity_of(db_session, account.id)
     await db_session.refresh(identity)
@@ -355,7 +362,7 @@ async def test_a_soft_deleted_account_fails(
     )
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, issued.code)
+        await verify_otp(service, VERIFY_PHONE, issued.code)
 
 
 async def test_a_soft_deleted_identity_fails_and_keeps_its_code(
@@ -370,7 +377,7 @@ async def test_a_soft_deleted_identity_fails_and_keeps_its_code(
     )
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, issued.code)
+        await verify_otp(service, VERIFY_PHONE, issued.code)
 
     identity = await identity_of(db_session, issued.account_id)
     await db_session.refresh(identity)
@@ -402,8 +409,8 @@ async def test_two_concurrent_verifies_of_one_code_let_exactly_one_through(
     async def attempt() -> str | None:
         async with AsyncSession(db_engine, expire_on_commit=False) as session:
             try:
-                account_id = await otp_service(session, queue).verify(
-                    phone, issued.code
+                account_id = await verify_otp(
+                    otp_service(session, queue), phone, issued.code
                 )
             except InvalidCredentialsError:
                 await session.rollback()
@@ -427,8 +434,8 @@ async def test_a_failed_verify_logs_neither_the_code_nor_the_phone(
     caplog.set_level(logging.DEBUG)
 
     with pytest.raises(InvalidCredentialsError):
-        await service.verify(VERIFY_PHONE, "000000")
-    await service.verify(VERIFY_PHONE, issued.code)
+        await verify_otp(service, VERIFY_PHONE, "000000")
+    await verify_otp(service, VERIFY_PHONE, issued.code)
 
     output = lines(caplog)
     assert (issued.code in output, VERIFY_PHONE in output) == (False, False)
