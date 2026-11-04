@@ -6,12 +6,16 @@ import pytest
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
 from pydantic import SecretStr
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import DataError, ResponseError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 from utils.queue import FakeQueue
 
 from app.config import Settings
 from app.core.queue import (
     ArqQueueClient,
     QueueClient,
+    QueueUnavailableError,
     json_deserializer,
     json_serializer,
     redis_settings,
@@ -113,10 +117,48 @@ async def test_an_unreachable_redis_is_one_attempt_and_enqueue_raises() -> None:
     factory = new_factory(error=ConnectionError("down"))
     client = ArqQueueClient(Settings(), pool_factory=factory)
 
-    with pytest.raises(ConnectionError):
+    with pytest.raises(QueueUnavailableError, match="cannot enqueue ping") as raised:
         await client.enqueue("ping")
 
+    assert isinstance(raised.value.__cause__, ConnectionError)
     factory.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "error",
+    [RedisConnectionError("down"), RedisTimeoutError("slow"), TimeoutError()],
+    ids=["redis-connection", "redis-timeout", "builtin-timeout"],
+)
+async def test_a_failing_enqueue_job_that_means_redis_is_down_is_wrapped(
+    error: Exception,
+) -> None:
+    pool = new_pool()
+    pool.enqueue_job.side_effect = error
+    client = ArqQueueClient(Settings(), pool_factory=new_factory(pool))
+
+    with pytest.raises(QueueUnavailableError) as raised:
+        await client.enqueue("ping", "a-secret-argument")
+
+    assert raised.value.__cause__ is error
+    assert "a-secret-argument" not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [ResponseError("NOPERM"), DataError("bad"), ValueError("bug")],
+    ids=["response-error", "data-error", "value-error"],
+)
+async def test_any_other_error_from_enqueue_job_propagates_unchanged(
+    error: Exception,
+) -> None:
+    pool = new_pool()
+    pool.enqueue_job.side_effect = error
+    client = ArqQueueClient(Settings(), pool_factory=new_factory(pool))
+
+    with pytest.raises(type(error)) as raised:
+        await client.enqueue("ping")
+
+    assert raised.value is error
 
 
 async def test_a_kwarg_starting_with_an_underscore_is_refused() -> None:
