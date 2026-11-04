@@ -1,4 +1,4 @@
-"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up), ADR-0028."""
+"""PasswordAuthService on a real Postgres. Tasks: 7.3 (sign-up and sign-in), ADR-0028."""
 
 import asyncio
 import uuid
@@ -8,8 +8,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.core.db import create_session_factory
-from app.core.errors import EmailAlreadyRegisteredError
-from app.core.hashing import verify_secret
+from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
+from app.core.hashing import DUMMY_HASH, verify_secret
 from app.models import (
     Account,
     AccountIdentity,
@@ -133,3 +133,110 @@ async def test_two_concurrent_sign_ups_for_one_email_give_one_account_and_one_co
     assert sorted(r == "conflict" for r in results) == [False, True]
     async with factory() as session:
         assert await count_profiles(session, email) == 1
+
+
+async def sign_in(password_auth: PasswordAuthService, email: str, phrase: str) -> str:
+    """The two steps the route runs, without its rollback between them (the savepoint session of `db_session` must keep the rows)."""
+    credential = await password_auth.find_credential(email)
+    return await password_auth.check(credential, phrase)
+
+
+async def test_sign_in_returns_the_account_id_for_the_right_password(
+    db_session: AsyncSession,
+) -> None:
+    email = unique_email()
+    account_id = await service(db_session).sign_up(email, PHRASE)
+
+    assert await sign_in(service(db_session), email, PHRASE) == account_id
+
+
+async def test_sign_in_wrong_password_is_invalid_credentials(
+    db_session: AsyncSession,
+) -> None:
+    email = unique_email()
+    await service(db_session).sign_up(email, PHRASE)
+
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), email, "not-the-phrase")
+
+
+async def test_sign_in_unknown_email_is_invalid_credentials(
+    db_session: AsyncSession,
+) -> None:
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), unique_email(), PHRASE)
+
+
+async def test_sign_in_of_an_otp_only_account_is_invalid_credentials(
+    db_session: AsyncSession,
+) -> None:
+    # An account with an email and an identity that holds no password hash (only an OTP, as the OTP path creates one).
+    email = unique_email()
+    account = await AccountService(db_session).create_customer("+380000007301")
+    profile = account.profile
+    assert profile is not None
+    profile.email = email
+    db_session.add(AccountIdentity(account_id=account.id, otp_hash="otp"))
+    await db_session.flush()
+
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), email, PHRASE)
+
+
+SOFT_DELETES = {
+    "account": lambda account_id: (
+        update(Account).where(Account.id == account_id).values(deleted=True)
+    ),
+    "profile": lambda account_id: (
+        update(AccountProfile)
+        .where(AccountProfile.account_id == account_id)
+        .values(deleted=True)
+    ),
+    "identity": lambda account_id: (
+        update(AccountIdentity)
+        .where(AccountIdentity.account_id == account_id)
+        .values(deleted=True)
+    ),
+}
+
+
+@pytest.mark.parametrize("record", list(SOFT_DELETES))
+async def test_sign_in_of_a_soft_deleted_record_is_invalid_credentials(
+    db_session: AsyncSession, record: str
+) -> None:
+    email = unique_email()
+    account_id = await service(db_session).sign_up(email, PHRASE)
+    await db_session.execute(SOFT_DELETES[record](account_id))
+
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), email, PHRASE)
+
+
+async def test_every_sign_in_failure_runs_one_argon2_check(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    email = unique_email()
+    await service(db_session).sign_up(email, PHRASE)
+    calls: list[str] = []
+    real = verify_secret
+
+    async def counting(secret: str, hashed: str) -> bool:
+        calls.append(hashed)
+        return await real(secret, hashed)
+
+    # By name: the service imported the function, so the name in its own module is the one to replace.
+    monkeypatch.setattr("app.services.password_auth.verify_secret", counting)
+
+    for attempt_email, attempt in [
+        (unique_email(), PHRASE),
+        (email, "not-the-phrase"),
+        (email, PHRASE),
+    ]:
+        try:
+            await sign_in(service(db_session), attempt_email, attempt)
+        except InvalidCredentialsError:
+            pass
+
+    assert len(calls) == 3
+    assert calls[0] == DUMMY_HASH
+    assert calls[1] != DUMMY_HASH
