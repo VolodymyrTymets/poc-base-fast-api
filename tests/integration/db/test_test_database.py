@@ -1,17 +1,14 @@
 """The server and the template database the database tests run on (task 3.1)."""
 
 import importlib
-from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
-from utils.db import database_url_for
+from utils.db import REPO_ROOT, database_url_for
 
 from app.core.db import Base
-
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 async def test_the_database_server_url_reaches_a_server_that_offers_postgis(

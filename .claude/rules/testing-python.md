@@ -1,5 +1,5 @@
 ---
-description: Python testing rules for this repo - tests/unit vs tests/e2e, file naming, the fixtures of tests/conftest.py, what may be mocked, determinism, markers and skips.
+description: Python testing rules for this repo - tests/unit, tests/integration/{db,http} and tests/e2e, file naming, markers, Arrange-Act-Assert, the fixtures of tests/conftest.py, what may be mocked, determinism, markers and skips.
 paths:
   - "**/test_*.py"
   - "**/*_test.py"
@@ -17,17 +17,18 @@ fixtures themselves are documented in `tests/conftest.py` and `docs/RUNBOOK.md` 
 exists (rule D1): no second client helper, no second fake queue, no second clock.
 
 ## Levels and layout
-1. **`tests/unit/` needs nothing outside the process**: no Docker, no database, no network, no Redis. If a test needs the database or
-   the app served over HTTP, it is e2e. Today no unit test uses a database fixture; keep it so.
-2. **`tests/e2e/` runs against a real Postgres** (rule P8, ADR-0006), through the fixtures below, and the app over HTTP where it
-   calls an endpoint. A mocked or in-memory database is never an e2e test and never a substitute for one.
+1. **`tests/unit/` needs nothing outside the process**: no Docker, no database, no network, no Redis, no process. If a test needs the database or
+   the app served over HTTP, it is integration. Today no unit test uses a database fixture; keep it so.
+2. **`tests/integration/` runs against a real Postgres** (rule P8, ADR-0006, ADR-0029), through the fixtures below: `db/` for services, models, seeds and
+   migrations, `http/` for endpoints and middleware over ASGI. A mocked or in-memory database is never an integration test and never a substitute for one.
+   **`tests/e2e/` is for a test that starts the app, the worker or a project command as its own process** (uvicorn, `arq`, `python -m app.seeds`).
 3. One behaviour at one level (`testing.md` 2). A pure rule (parsing, hashing, redaction, a token's claims) is unit. A route,
-   a query, a constraint, a transaction or a migration is e2e.
-4. Files are flat under `tests/unit/` and `tests/e2e/`, named `test_<subject>.py`. A test of one module of a layer is
+   a query, a constraint, a transaction or a migration is integration. Only what needs a real process (signals, start-up, a worker loop) is e2e.
+4. Files are flat under `tests/unit/`, `tests/integration/db/`, `tests/integration/http/` and `tests/e2e/`, named `test_<subject>.py`. A test of one module of a layer is
    `test_<module>_<layer>.py` (`test_account_service.py`, `test_account_models.py`), so a router and a service called `account`
-   never collide. In e2e the same module gets a `db_` prefix (`test_db_account_models.py` beside the unit `test_account_models.py`)
-   and an HTTP test of it an `http_` one (`test_http_client.py`). A file name is unique across both directories: `tests/`,
-   `tests/unit/` and `tests/e2e/` have no `__init__.py`, so a duplicate basename stops collection. A `core/` concern is `test_<concern>.py` (`test_logging.py`). An e2e flow is named for the flow
+   never collide. In integration the same module gets a `db_` prefix (`test_db_account_models.py` beside the unit `test_account_models.py`)
+   and an HTTP test of it an `http_` one (`test_http_client.py`). A file name is unique across all directories: `tests/`,
+   `tests/unit/`, `tests/integration/*` and `tests/e2e/` have no `__init__.py`, so a duplicate basename stops collection. A `core/` concern is `test_<concern>.py` (`test_logging.py`). An integration or e2e flow is named for the flow
    (`test_sign_in.py`, `test_refresh_token.py`). Split a directory by area only when it passes about 20 files, in its own PR.
 5. Shared helpers live in `tests/utils/` and are imported as `utils.<module>` (rootdir `conftest.py`; `tests/utils/` is the only package, it has an `__init__.py`);
    fixtures used by several files live in `tests/conftest.py`; a fixture used once stays beside its test.
@@ -61,7 +62,7 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
     the unit under test.
 12. Use what exists before writing a fake: `frozen_clock` for time, `FakeQueue` for jobs. The app builds an `ArqQueueClient` (task 6.1);
     override `get_queue` with `FakeQueue` (`asgi_app.dependency_overrides`), or call `queue.enqueue(...)` from a test route while no real endpoint enqueues.
-    A test of the real client or worker uses the `redis_settings` fixture (real Redis, index 15 only; `TEST_REDIS_URL` or a container) and lives in e2e.
+    A test of the real client or worker uses the `redis_settings` fixture (real Redis, index 15 only; `TEST_REDIS_URL` or a container) and lives in `tests/e2e` (it starts a worker process).
 13. A new boundary gets a small hand-written fake (same interface, fails loudly on a wrong call) in `tests/utils/`, not
     `MagicMock`. When `mock` is unavoidable, use `create_autospec` or `spec=True` and assert on the effect. Patch where the code
     under test looks the name up (`monkeypatch.setattr(module_under_test, "name", fake)`), not where it is defined.
@@ -75,7 +76,10 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
     `pytest.raises(X, match=...)` for errors, `pytest.approx(x, abs=tol)` for floats. A bare `assert ok` hides the cause
     (`testing.md` 12).
 16. **`@pytest.mark.parametrize`** for one behaviour over several inputs, with readable `ids=`. No loops or `if` in a test body.
-17. Name the behaviour (`test_rejects_a_password_over_72_bytes`), one assertion subject per test, arrange/act/assert apart.
+17. Name the behaviour (`test_rejects_a_password_over_72_bytes`), one assertion subject per test, **Arrange-Act-Assert** (ADR-0029): three blocks separated by a blank
+    line and labelled `# Arrange`, `# Act`, `# Assert`. The labels are section markers, not explanations (rule D6 does not apply); omit one only for a test with a single statement. One Act per test:
+    a second Act is a second test. When the Act sits inside `async with running_client(...)`, the `# Act` label goes on the call and `# Assert` follows after the block.
+    Setup shared by several tests is a fixture or a `tests/utils/` helper, not copied Arrange code.
     An HTTP test asserts status and body together (`assert (response.status_code, response.json()) == (...)`).
 18. Test code is typed (mypy checks `tests/`); full annotations are not needed on a one-line helper, but never `# type: ignore`
     without a human-approved `# WHY:` (S3).
@@ -83,8 +87,10 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
     (`a@example.test`, `+380000000001`) (rule D8, P4).
 
 ## Markers, skips, flakiness
-20. `--strict-markers` is on and **no custom marker is registered yet**. A new marker goes into `pyproject.toml`
-    (ask-first file) in the same PR, with a line saying what it excludes and how to run it.
+20. `--strict-markers` is on. Registered: `unit`, `integration`, `e2e`, `db`, `http`, `redis` (`pyproject.toml`). **They are set by the collection hook in
+    `tests/conftest.py` from the folder and the fixtures** (`tests/utils/markers.py`); never write a `pytestmark` or `@pytest.mark.<level>` in a test file. The hook is also why a
+    marker must be registered before it is used. A new marker goes into `pyproject.toml` (ask-first file) in the same PR, with a line saying what it excludes and how to run it.
+    Run `-m unit` on save, `-m "not e2e"` before a push, `-m "not db and not redis"` without Docker (`docs/RUNBOOK.md`, "Test levels and markers").
 21. **No `skip`, `skipif`, `xfail` or `pytest.skip()` without a human-approved `# WHY:` and a ticket** (rule B3). Missing Docker
     is a failure with a message, not a skip.
 22. A flaky test is fixed or quarantined with a ticket in the same PR. `pytest-rerunfailures` or re-running until green is a

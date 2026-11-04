@@ -63,6 +63,15 @@ files = ["app", "tests", "migrations"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers"
+addopts = "-ra --strict-markers"
+# Set by the collection hook in tests/conftest.py from the folder and the fixtures (ADR-0029); select with -m.
+markers = [
+    "unit: no Docker, database, network, Redis or process (tests/unit); run with -m unit",
+    "integration: a real Postgres or the app in process (tests/integration); run with -m integration",
+    "e2e: the app, the worker or a project command as its own process (tests/e2e); run with -m e2e",
+    "db: needs the Postgres of the test fixtures (Docker or TEST_DATABASE_URL); -m 'not db' skips it",
+    "http: calls the app over HTTP (tests/integration/http)",
+    "redis: needs Redis (Docker or TEST_REDIS_URL); -m 'not redis' skips it",
+]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"

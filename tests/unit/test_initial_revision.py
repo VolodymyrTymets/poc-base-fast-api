@@ -1,7 +1,7 @@
 """The 0001_init revision as SQL, rendered offline (`alembic upgrade head --sql`). No database.
 
 The names are compared with what `Base.metadata` declares, so a model change without a revision shows here even
-on a machine with no Postgres. The live comparison (`alembic check`) is tests/e2e/test_db_migrations.py.
+on a machine with no Postgres. The live comparison (`alembic check`) is tests/integration/db/test_db_migrations.py.
 """
 
 import importlib

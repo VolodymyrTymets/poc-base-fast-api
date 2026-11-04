@@ -1,6 +1,6 @@
 # Error contract
 
-> Task 4.2, decided in ADR-0003. Code: `app/core/errors.py`. Tests: `tests/unit/test_errors.py`, `tests/unit/test_errors_openapi.py`, `tests/e2e/test_http_errors.py`.
+> Task 4.2, decided in ADR-0003. Code: `app/core/errors.py`. Tests: `tests/unit/test_errors.py`, `tests/unit/test_errors_openapi.py`, `tests/integration/http/test_http_errors.py`.
 
 Every error the API returns has this body, and only this body:
 
@@ -39,4 +39,4 @@ Every error the API returns has this body, and only this body:
 ## Adding an error
 1. Subclass `AppError` in `app/core/errors.py` with `status_code`, `code` (an existing `ErrorCode`) and `default_message`; raise it from a service. No router code is needed.
 2. A new `ErrorCode` changes the contract: write a superseding ADR for ADR-0003, add the row above, and regenerate `openapi.json` (`uv run python -m app.cli --export-openapi`).
-3. Add a test to `tests/e2e/test_http_errors.py`.
+3. Add a test to `tests/integration/http/test_http_errors.py`.

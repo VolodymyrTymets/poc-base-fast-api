@@ -3,7 +3,7 @@ description: How a route gets its services and who owns the transaction - one De
 paths:
   - "app/routers/**"
   - "app/dependencies.py"
-  - "tests/e2e/test_http_*.py"
+  - "tests/integration/http/test_http_*.py"
 ---
 
 # Routes convention
