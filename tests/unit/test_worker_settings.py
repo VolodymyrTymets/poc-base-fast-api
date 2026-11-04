@@ -7,7 +7,9 @@ import pytest
 from app.config import get_settings
 from app.core.queue import json_deserializer, json_serializer
 from app.worker import HideJobArguments, WorkerSettings, on_startup
+from app.workers.email import send_password_reset
 from app.workers.ping import ping
+from app.workers.sms import send_totp_code
 
 
 def test_retries_are_capped_at_three_and_results_are_not_kept() -> None:
@@ -15,8 +17,8 @@ def test_retries_are_capped_at_three_and_results_are_not_kept() -> None:
     assert WorkerSettings.log_results is False
 
 
-def test_the_ping_job_is_registered_with_json_payloads() -> None:
-    assert WorkerSettings.functions == [ping]
+def test_the_jobs_are_registered_with_json_payloads() -> None:
+    assert WorkerSettings.functions == [ping, send_totp_code, send_password_reset]
     assert WorkerSettings.job_serializer is json_serializer
     assert WorkerSettings.job_deserializer is json_deserializer
 
