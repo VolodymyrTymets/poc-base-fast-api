@@ -112,10 +112,22 @@ async def test_sign_up_keeps_the_email_of_a_soft_deleted_profile_reserved(
 
 
 async def test_two_concurrent_sign_ups_for_one_email_give_one_account_and_one_conflict(
-    db_engine: AsyncEngine,
+    db_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     email = unique_email()
     factory = create_session_factory(db_engine)
+    # Both sign-ups must pass the pre-check before either inserts, or the loser is stopped by the pre-check and the
+    # unique-index mapping is never reached (hashing time alone does not make the race happen).
+    both_checked = asyncio.Barrier(2)
+    real_create = AccountService.create_password_account
+
+    async def create_after_both_checked(self: AccountService, *args: str) -> Account:
+        await both_checked.wait()
+        return await real_create(self, *args)
+
+    monkeypatch.setattr(
+        AccountService, "create_password_account", create_after_both_checked
+    )
 
     async def attempt() -> str:
         async with factory() as session:

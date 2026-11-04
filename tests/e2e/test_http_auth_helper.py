@@ -8,6 +8,7 @@ one never does).
 
 import uuid
 from collections.abc import AsyncIterator
+from typing import Annotated
 
 import httpx
 import pytest
@@ -48,7 +49,7 @@ async def auth_client(auth_settings: Settings) -> AsyncIterator[httpx.AsyncClien
 
     @app.get("/api/v1/_refreshing")
     async def refreshing(
-        x_refresh_token: str | None = Header(default=None),
+        x_refresh_token: Annotated[str | None, Header()] = None,
     ) -> dict[str, str]:
         # Stands in for `POST /auth/refresh` (task 7.4): accepts only a valid refresh token.
         try:

@@ -4,6 +4,7 @@ The request has its own session, so rows are read and changed through `db_engine
 """
 
 import hashlib
+import logging
 import uuid
 
 import pytest
@@ -15,6 +16,7 @@ from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
 from app.core.hashing import verify_secret
+from app.core.logging import JsonFormatter
 from app.core.security import TokenType, verify_token
 from app.main import create_app
 from app.models import Account, AccountIdentity, AccountProfile
@@ -226,3 +228,35 @@ async def test_no_pooled_connection_is_held_while_the_password_is_checked(
         )
 
     assert checked_out_during_check == [0]
+
+
+async def test_sign_in_logs_no_password_hash_token_or_email(
+    module_database_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    email = unique_email()
+    async with running_client(make_app(module_database_url)) as client:
+        await client.post(SIGN_UP_PATH, json={"email": email, "password": PHRASE})
+        caplog.set_level(logging.DEBUG)
+        success = await client.post(
+            SIGN_IN_PATH, json={"email": email, "password": PHRASE}
+        )
+        await client.post(
+            SIGN_IN_PATH, json={"email": email, "password": "not-the-phrase"}
+        )
+
+    formatter = JsonFormatter()
+    output = "\n".join(formatter.format(record) for record in caplog.records)
+    body = success.json()
+    leaked = [
+        secret
+        for secret in (
+            PHRASE,
+            "not-the-phrase",
+            email,
+            body["accessToken"],
+            body["refreshToken"],
+            "$argon2",
+        )
+        if secret in output
+    ]
+    assert leaked == []

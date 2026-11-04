@@ -13,11 +13,12 @@ import pytest
 from fastapi import FastAPI
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncEngine
+from utils.auth import sign_up
 from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
-from app.core.hashing import verify_secret
+from app.core.hashing import hash_secret, verify_secret
 from app.core.logging import JsonFormatter
 from app.core.security import TokenType, verify_token
 from app.main import create_app
@@ -200,8 +201,6 @@ async def test_no_pooled_connection_is_held_while_the_password_is_hashed(
     module_database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The route is unauthenticated: a connection held through the Argon2 hash would let a flood of calls fill the pool.
-    from app.core.hashing import hash_secret
-
     app = make_app(module_database_url)
     checked_out_during_hash: list[int] = []
 
@@ -221,8 +220,6 @@ async def test_no_pooled_connection_is_held_while_the_password_is_hashed(
 async def test_a_client_helper_signs_up_over_the_real_route(
     module_database_url: str,
 ) -> None:
-    from utils.auth import sign_up
-
     async with running_client(make_app(module_database_url)) as client:
         tokens = await sign_up(client, unique_email(), PHRASE)
         account: httpx.Response = await client.get(ACCOUNT_PATH, headers=tokens.headers)
