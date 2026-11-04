@@ -1,8 +1,10 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, and require_roles. Tasks: 4.4, 5.2, 6.1.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, I.9.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
 (task 5.3, ADR-0022); the refresh-hash check comes with task 7.4. Task 5.2 adds `require_roles`, the role layer of rule P7.
+Issue I.9 adds the service providers (ADR-0025): a route never builds a service, it takes `Depends(get_x_service)`, so a test can
+swap one through `dependency_overrides` and a request shares one session (`get_session` is cached per request).
 """
 
 from collections.abc import Awaitable, Callable
@@ -18,7 +20,10 @@ from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.queue import QueueClient
 from app.core.security import TokenClaims, TokenType, verify_token
 from app.models import AccountRoleType
+from app.services.account import AccountService
+from app.services.account_profile import AccountProfileService
 from app.services.account_role import AccountRoleService
+from app.services.file_assert import FileAssertService
 
 REFRESH_HEADER_NAME = "x-refresh-token"
 
@@ -40,6 +45,36 @@ def get_queue(request: Request) -> QueueClient:
     """The queue a route or service enqueues jobs on (task 6.1); tests override it with `FakeQueue`."""
     queue: QueueClient = request.app.state.queue
     return queue
+
+
+def get_account_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> AccountService:
+    """The `AccountService` on the request's session (ADR-0025)."""
+    return AccountService(session)
+
+
+def get_account_role_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> AccountRoleService:
+    """The `AccountRoleService` on the request's session (ADR-0025)."""
+    return AccountRoleService(session)
+
+
+def get_file_assert_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(app_settings)],
+) -> FileAssertService:
+    """The `FileAssertService` on the request's session, with the upload limits of the app's settings (ADR-0025)."""
+    return FileAssertService(session, settings)
+
+
+def get_account_profile_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    file_assert: Annotated[FileAssertService, Depends(get_file_assert_service)],
+) -> AccountProfileService:
+    """The `AccountProfileService`; its `FileAssertService` is a provider too, so a test may replace either (ADR-0025)."""
+    return AccountProfileService(session, file_assert)
 
 
 async def current_account(
@@ -87,9 +122,9 @@ def require_roles(
     async def guard(
         # Listed before the session so that an unauthenticated request is a 401 even with no database.
         claims: Annotated[TokenClaims, Depends(current_account)],
-        session: Annotated[AsyncSession, Depends(get_session)],
+        role_service: Annotated[AccountRoleService, Depends(get_account_role_service)],
     ) -> TokenClaims:
-        held = await AccountRoleService(session).get_account_roles(claims.account_id)
+        held = await role_service.get_account_roles(claims.account_id)
         if allowed.isdisjoint(held):
             raise ForbiddenError
         return claims

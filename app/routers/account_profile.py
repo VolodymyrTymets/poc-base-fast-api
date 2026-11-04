@@ -5,17 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings
 from app.core.db import get_session
 from app.core.security import TokenClaims
-from app.dependencies import app_settings, require_roles
+from app.dependencies import get_account_profile_service, require_roles
 from app.models import AccountRoleType
 from app.schemas.account_profile import (
     AccountProfileResponse,
     UpdateAccountProfileInput,
 )
 from app.services.account_profile import AccountProfileService
-from app.services.file_assert import FileAssertService
 
 router = APIRouter(prefix="/accounts", tags=["account_profile"])
 
@@ -30,11 +28,11 @@ async def update_account_profile(
         TokenClaims,
         Depends(require_roles(AccountRoleType.ADMIN, AccountRoleType.CUSTOMER)),
     ],
+    service: Annotated[AccountProfileService, Depends(get_account_profile_service)],
+    # The same session the service uses (`get_session` is cached per request): the handler owns the commit (ADR-0021).
     session: Annotated[AsyncSession, Depends(get_session)],
-    settings: Annotated[Settings, Depends(app_settings)],
 ) -> AccountProfileResponse:
     """Update the caller's own profile: only the fields sent change, `null` clears one."""
-    service = AccountProfileService(session, FileAssertService(session, settings))
     profile = await service.update(claims.account_id, account_id, body)
     await session.commit()
     return AccountProfileResponse.model_validate(profile)
