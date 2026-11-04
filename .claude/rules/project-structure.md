@@ -19,6 +19,7 @@ poc-base-fast-api/
 ├── app/
 │   ├── main.py           # the app: lifespan, middleware, health, include_router; no business logic
 │   ├── cli.py            # project commands that need the whole app: `python -m app.cli --export-openapi` (ADR-0020)
+│   ├── worker.py         # the arq worker entrypoint: `arq app.worker.WorkerSettings` (ADR-0024); nothing imports it
 │   ├── config.py         # settings, validated once at boot
 │   ├── dependencies.py   # shared Depends: current account, require_roles
 │   ├── routers/          # one APIRouter per module
