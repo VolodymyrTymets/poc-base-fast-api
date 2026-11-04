@@ -136,6 +136,25 @@
         "title": "AccountResponse",
         "type": "object"
       },
+      "ChangePasswordInput": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "title": "Currentpassword",
+            "type": "string"
+          },
+          "newPassword": {
+            "title": "Newpassword",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "title": "ChangePasswordInput",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -647,6 +666,56 @@
           }
         },
         "summary": "Verify Otp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password/change": {
+      "post": {
+        "description": "Replace the caller's password. The refresh token, a pending reset token and a pending sign-in code stop working; the account signs in again.\n\nA wrong current password, an account with no password, and a deleted account are 401 INVALID_CREDENTIALS.",
+        "operationId": "change_password_api_v1_auth_password_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Password",
         "tags": [
           "auth"
         ]
