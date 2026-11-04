@@ -131,6 +131,12 @@ The email is lowercased before lookup and storage. An email already on any profi
 that has no password, and a soft-deleted account or identity are one 401 `INVALID_CREDENTIALS`. The password is stored as an Argon2id hash (ADR-0028) in `AccountIdentity.hash`; `salt` stays null because the salt is inside the hash.
 A password is 8 to 72 bytes on sign-up and 1 to 72 on sign-in. Neither route is rate limited (issue I.8); each runs one Argon2 hash or check and holds no pooled connection while it does.
 
+## Change password
+`POST /api/v1/auth/password/change` with `Authorization: Bearer <accessToken>` and `{"currentPassword": "...", "newPassword": "..."}` (task 7.5) answers 204 with no body. The new password is stored as an Argon2id hash and, in the same UPDATE,
+the refresh token, any pending reset token and any pending sign-in code are cleared: the old password and every refresh token issued before stop working (one narrow exception: a sign-in that checked the old password just before the change can still finish after it and store a refresh token; see ENDPOINTS.md `changePassword`), and the account signs in again once its access token expires (default 15 minutes; that token is not revoked).
+A wrong current password, an account that has no password (made by OTP), and a soft-deleted account are one 401 `INVALID_CREDENTIALS`; a bad or missing Bearer token is 401 `UNAUTHORIZED`, also when the body is invalid. Two changes racing from the same stored hash apply one;
+the other is 401. The new password is 8 to 72 bytes with no control characters; it may equal the current one. The route is not rate limited (issue I.8), and each call runs two Argon2 steps with no pooled connection held.
+
 ## Refresh and sign out
 `POST /api/v1/auth/refresh` with the header `x-refresh-token: <refreshToken>` and no body (task 7.4) answers 200 `{"accessToken": "...", "refreshToken": "..."}`. The refresh token is single use: the new one replaces the stored sha256,
 so the old one answers 401 `UNAUTHORIZED` at once, and so does one issued before a later sign-in or a sign-out. Two requests with the same token get one 200 and one 401. A missing, malformed, expired or tampered token, an access token in the

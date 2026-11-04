@@ -18,6 +18,7 @@ from app.dependencies import (
     refresh_credentials,
 )
 from app.schemas.auth import (
+    ChangePasswordInput,
     OtpRequestInput,
     OtpRequestResponse,
     OtpVerifyInput,
@@ -139,4 +140,24 @@ async def sign_out(
 ) -> None:
     """End the caller's session: the refresh token and any pending sign-in code are cleared. The access token works until it expires."""
     await tokens.revoke(claims.account_id)
+    await session.commit()
+
+
+@router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    body: ChangePasswordInput,
+    # Listed before the session and the service so that a bad token is a 401 even with an invalid body or no database (routes-convention 4).
+    claims: Annotated[TokenClaims, Depends(current_account)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    password_auth: Annotated[PasswordAuthService, Depends(get_password_auth_service)],
+) -> None:
+    """Replace the caller's password. The refresh token, a pending reset token and a pending sign-in code stop working; the account signs in again.
+
+    A wrong current password, an account with no password, and a deleted account are 401 INVALID_CREDENTIALS.
+    """
+    credential = await password_auth.find_credential_for_account(claims.account_id)
+    # End the read before the two slow Argon2 steps inside `change`: a connection held through them would let a caller with a valid token
+    # occupy the pool. Nothing is written yet; `change` starts a new transaction and its UPDATE is conditional on the hash it read.
+    await session.rollback()
+    await password_auth.change(credential, body.current_password, body.new_password)
     await session.commit()
