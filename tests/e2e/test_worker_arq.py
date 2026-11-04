@@ -11,7 +11,7 @@ import socket
 import sys
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 
 import httpx
 import pytest
@@ -36,8 +36,13 @@ from app.main import API_PREFIX, create_app
 
 WAIT_SECONDS = 20
 
+
 # Reads the next JSON log line of the worker with this message; fails with everything seen after WAIT_SECONDS.
-LogReader = Callable[[str], Awaitable[dict[str, Any]]]
+# `.seen` is every output line read so far, arq's own lines included, for tests that look for what must not be there.
+class LogReader(Protocol):
+    seen: list[str]
+
+    def __call__(self, message: str) -> Awaitable[dict[str, Any]]: ...
 
 
 @pytest.fixture
@@ -57,6 +62,17 @@ async def arq_pool(redis_settings: Settings) -> AsyncIterator[ArqRedis]:
     )
     yield pool
     await pool.aclose()
+
+
+class _Reader:
+    def __init__(
+        self, read: Callable[[str], Awaitable[dict[str, Any]]], seen: list[str]
+    ) -> None:
+        self._read = read
+        self.seen = seen
+
+    def __call__(self, message: str) -> Awaitable[dict[str, Any]]:
+        return self._read(message)
 
 
 @pytest.fixture
@@ -107,7 +123,8 @@ async def worker_logs(redis_settings: Settings) -> AsyncIterator[LogReader]:
         except TimeoutError:
             pytest.fail(f"no {message!r} from the worker in {WAIT_SECONDS}s: {seen}")
 
-    yield read
+    reader = _Reader(read, seen)
+    yield reader
     if process.returncode is None:
         process.send_signal(signal.SIGTERM)
     await asyncio.wait_for(process.wait(), WAIT_SECONDS)
@@ -126,6 +143,36 @@ async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
         "INFO",
         1,
     )
+
+
+async def test_the_password_reset_job_logs_the_recipient_and_token_in_the_test_environment(
+    arq_client: ArqQueueClient, worker_logs: LogReader
+) -> None:
+    await worker_logs("worker startup")
+
+    await arq_client.enqueue(
+        "send_password_reset", "account-1", "reset.me@example.test", "fake-reset-value"
+    )
+    entry = await worker_logs(
+        "[EMAIL] Password reset for reset.me@example.test (account account-1): token fake-reset-value"
+    )
+
+    assert (entry["logger"], entry["level"]) == ("app.workers.email", "INFO")
+
+
+async def test_the_totp_job_logs_the_masked_phone_only(
+    arq_client: ArqQueueClient, worker_logs: LogReader
+) -> None:
+    await worker_logs("worker startup")
+
+    await arq_client.enqueue("send_totp_code", "+380000000001", "482913")
+    entry = await worker_logs("[SMS] TOTP code sent to ***0001")
+
+    assert (entry["logger"], entry["level"]) == ("app.workers.sms", "INFO")
+    # arq's job-start line comes before the job's own line, so it is in `seen` already (rule P4).
+    output = "\n".join(worker_logs.seen)
+    assert "+380000000001" not in output
+    assert "482913" not in output
 
 
 async def test_a_job_that_keeps_retrying_runs_three_times_with_growing_delays(

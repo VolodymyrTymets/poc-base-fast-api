@@ -104,7 +104,7 @@ down fails at once. Start a Redis (for example `docker run -d --name poc-base-re
 ```bash
 uv run arq app.worker.WorkerSettings    # logs JSON on stdout; SIGTERM or Ctrl-C lets a running job finish
 ```
-Today the only job is `ping`, which logs `ping job ran`; the SMS and email jobs come with task 6.2. A job is tried at most 3 times (`Retry(defer=retry_delay(ctx["job_try"]))`
+Jobs today: `ping` (logs `ping job ran`), `send_totp_code(phone, code)` (logs `[SMS] TOTP code sent to ***0001`: last four digits of the phone, the code never) and `send_password_reset(account_id, email, token)` (task 6.2, log only). The reset job logs `[EMAIL] Password reset for <email> (account <id>): token <token>` only when `APP_ENV` is `local`, `development` or `test`, so the flow can be finished by hand from the worker log (ADR-0026: anyone who can read the logs of a shared `development` host can read live tokens); any other environment logs the account id only. A job is tried at most 3 times (`Retry(defer=retry_delay(ctx["job_try"]))`
 doubles the wait from 5 s); results are not kept. Job arguments must be JSON values. arq's own first two start-up lines are plain text (its CLI prints them before our hook runs).
 Flushing Redis drops queued and in-flight jobs.
 

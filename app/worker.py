@@ -16,7 +16,9 @@ from app.core.queue import (
     json_serializer,
     redis_settings,
 )
+from app.workers.email import send_password_reset
 from app.workers.ping import ping
+from app.workers.sms import send_totp_code
 
 # arq's CLI calls dictConfig before `on_startup`, which gives the `arq` logger its own plain-text handler.
 _ARQ_LOGGERS = ("arq", "arq.worker", "arq.jobs", "arq.connections")
@@ -55,7 +57,11 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 
 
 class WorkerSettings:
-    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [ping]
+    functions: ClassVar[list[Callable[..., Awaitable[None]]]] = [
+        ping,
+        send_totp_code,
+        send_password_reset,
+    ]
     # Retries are ours: a job raises `Retry(defer=retry_delay(ctx["job_try"]))`, arq stops after `max_tries`.
     max_tries = MAX_TRIES
     # Nothing reads a job's result, so none is stored (scope doc 6.1).
