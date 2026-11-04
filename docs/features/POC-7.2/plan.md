@@ -29,7 +29,7 @@ Behaviour from Node `otp-auth-strategy.service.ts` (`verifyOtp`) and `jwt-strate
 - executed how: R4.
 
 ### R3 — OtpService.verify (M)
-- files: `app/services/otp.py`: `verify(phone_number, code) -> str` (account id). Order: `get_by_phone`; identity select (`deleted = false`); if no account/identity/hash/expiry or `expires_at <= utc_now()` → dummy `verify_secret` (A1) then `InvalidCredentialsError`;
+- files: `app/services/otp.py`: `find_challenge(phone) -> OtpChallenge`, `check(challenge, code)`, `spend(challenge) -> account id` (one `verify` was split after review so Argon2 runs with no connection held; the route rolls back between find and check). Logic: `get_by_phone`; identity select (`deleted = false`); if no account/identity/hash/expiry or `expires_at <= utc_now()` → dummy `verify_secret` (A1) then `InvalidCredentialsError`;
   `verify_secret(code, hash)` false → `InvalidCredentialsError`; then one `UPDATE "AccountIdentity" SET otpHash=NULL, otpSalt=NULL, otpExpiresAt=NULL WHERE accountId=:id AND otpHash=:hash AND deleted = false` (row count must be 1, else `InvalidCredentialsError`: the code was already spent),
   then `UPDATE "AccountProfile" SET isPhoneVerified=true`; flush, never commit. Replace `verify_code`'s "7.2 checks the expiry" note.
 - layer: services. test: `tests/e2e/test_db_otp_service.py` (extend; `frozen_clock`): every AC3 case incl. expiry at 2:00 and 2:01, AC2 clearing, AC4 double use and a concurrent pair on two sessions (`asyncio.gather`, one wins), AC6, soft-deleted account and soft-deleted identity (A2); a `JsonFormatter` pass over records for code/phone (AC8). Ports the 10 `verifyOtp` cases of `otp-auth-strategy.service.spec.ts`.
@@ -63,7 +63,7 @@ Behaviour from Node `otp-auth-strategy.service.ts` (`verifyOtp`) and `jwt-strate
 |------|--------|-------------------------------|
 | Two concurrent verifies both pass the Argon2 check, both spend the code | one code mints two sessions | conditional UPDATE with row-count check; the `asyncio.gather` test in R3 is written first and must fail without the guard |
 | Unauthenticated 6-digit guess surface (10^6 values, no attempt limit) | brute force inside the 2 minute window | out of scope (I.8, ADR-0028 accepts it); state it in the PR, do not build a limiter |
-| Argon2 verify while a transaction is open holds a pooled connection (7.1 noted this) | pool starvation under a flood | read identity, verify outside any write, then the short UPDATEs; measure with the R5 run |
+| Argon2 verify while a transaction is open holds a pooled connection (7.1 noted this; both reviewers flagged it) | pool starvation under a flood | fixed in this PR: `find_challenge` → route `session.rollback()` → `check` → `spend`; `test_no_pooled_connection_is_held_while_the_code_is_hashed` fails without the rollback |
 | `isPhoneVerified` lives on `AccountProfile` and the profile may be soft-deleted | verified flag not set, silent | update by `accountId` and check the row count in R3's test |
 
 ## Assumptions

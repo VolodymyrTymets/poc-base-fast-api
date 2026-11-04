@@ -26,6 +26,7 @@ Goal 2 (authentication): completes the OTP sign-in a new POC relies on, and sett
 - [x] AC5 Two verifies in a row give different refresh tokens, and the stored hash is the second one's (ported `jwt-strategy` cases). Issuing tokens through `TokenService` alone does not set `isPhoneVerified`.
 - [x] AC6 A password identity on the same account keeps its `hash` and `salt` through verify (only OTP columns and `refreshToken` change).
 - [x] AC7 Malformed phone, `code` over 6 characters or missing, or an extra key: 422 `VALIDATION_FAILED`. An access token from the response opens `GET /api/v1/account` (the end-to-end proof).
+- [x] AC9 No pooled database connection is held while the code is hashed, on every failure path too (`engine.pool.checkedout() == 0` during the Argon2 check).
 - [x] AC8 No log line from the call holds a code, token or phone (rules D8, P4); `openapi.json` regenerated and the stale check passes.
 
 ## Edge cases
