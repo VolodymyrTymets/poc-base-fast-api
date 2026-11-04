@@ -1,110 +1,136 @@
-"""The auth helper of task 3.2, proved against stub routes.
+"""The auth helper of task 3.2, proved against the real sign-up and sign-in routes of task 7.3.
 
-The real endpoints do not exist yet (JWT is task 4.4, sign-up and sign-in are 7.3), so the app gets test-only routes that
-follow the ENDPOINTS.md contract. That proves the plumbing of the helper (body sent, status checked, tokens parsed, headers
-accepted), not that the real endpoints answer this way: the e2e tests of 7.3 are its first real run.
+Until 7.3 the helper was proved against stub routes written to the ENDPOINTS.md contract. The real routes replace them, so the helper's
+plumbing (body sent, status checked, tokens parsed, headers accepted) is now shown end to end. Two stubs remain, each for something
+no real route offers yet: `_refreshing` (`POST /auth/refresh` is task 7.4) and a sign-up that answers without a refresh token (the real
+one never does).
 """
 
+import uuid
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 import httpx
 import pytest
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import ValidationError
 from utils.auth import AuthTokens, sign_in, sign_up
+from utils.client import client_for, running_client
+from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
-from app.core.errors import InvalidCredentialsError
+from app.config import Settings
+from app.core.errors import UnauthorizedError
+from app.core.security import TokenType, verify_token
+from app.main import create_app
 
-STUB_ACCESS = "stub-access-token"
-STUB_REFRESH = "stub-refresh-token"
 VALID_PHRASE = "correct-horse-battery"
 INVALID_PHRASE = "not-the-phrase"
-MALFORMED_EMAIL = "malformed@example.test"
 
 
-class Credentials(BaseModel):
-    # extra="forbid": the helper must send exactly {email, password}, as the contract says.
-    model_config = ConfigDict(extra="forbid")
-
-    email: str
-    password: str
+def new_email() -> str:
+    # Commits persist for the module, so every test registers an address of its own.
+    return f"{uuid.uuid4().hex}@example.com"
 
 
 @pytest.fixture
-def stub_auth_routes(asgi_app: FastAPI) -> None:
-    @asgi_app.post("/api/v1/auth/sign-up", status_code=201)
-    async def sign_up_stub(body: Credentials) -> dict[str, str]:
-        if body.email == MALFORMED_EMAIL:
-            return {"accessToken": STUB_ACCESS}
-        return {"accessToken": STUB_ACCESS, "refreshToken": STUB_REFRESH}
+def auth_settings(module_database_url: str) -> Settings:
+    # The default `asgi_app` has no token secrets, so it cannot issue a token; the real routes need them.
+    return Settings(
+        app_env="test",
+        database_url=module_database_url,
+        jwt_secret=ACCESS_KEY,
+        jwt_refresh_token_secret=REFRESH_KEY,
+    )
 
-    @asgi_app.post("/api/v1/auth/sign-in", status_code=200)
-    async def sign_in_stub(body: Credentials) -> dict[str, str]:
-        if body.password != VALID_PHRASE:
-            # The domain error, as the real sign-in raises it: since task 4.2 an HTTPException 401 is always
-            # UNAUTHORIZED and its `detail` is dropped (issue I.10).
-            raise InvalidCredentialsError
-        return {"accessToken": STUB_ACCESS, "refreshToken": STUB_REFRESH}
 
-    @asgi_app.get("/api/v1/_whoami")
-    async def whoami(
-        authorization: Annotated[str | None, Header()] = None,
-    ) -> dict[str, str]:
-        if authorization != f"Bearer {STUB_ACCESS}":
-            raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-        return {"who": "stub"}
+@pytest.fixture
+async def auth_client(auth_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
+    app = create_app(auth_settings)
 
-    @asgi_app.get("/api/v1/_refreshing")
+    @app.get("/api/v1/_refreshing")
     async def refreshing(
         x_refresh_token: Annotated[str | None, Header()] = None,
     ) -> dict[str, str]:
-        if x_refresh_token != STUB_REFRESH:
-            raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+        # Stands in for `POST /auth/refresh` (task 7.4): accepts only a valid refresh token.
+        try:
+            verify_token(auth_settings, x_refresh_token or "", TokenType.REFRESH)
+        except UnauthorizedError as error:
+            raise HTTPException(status_code=401, detail="UNAUTHORIZED") from error
         return {"refreshing": "yes"}
 
+    async with running_client(app) as client:
+        yield client
 
-@pytest.mark.usefixtures("stub_auth_routes")
+
 async def test_sign_up_gives_headers_the_guarded_route_accepts(
-    client: httpx.AsyncClient,
+    auth_client: httpx.AsyncClient,
 ) -> None:
-    tokens = await sign_up(client, "new@example.test", VALID_PHRASE)
+    email = new_email()
 
-    guarded = await client.get("/api/v1/_whoami", headers=tokens.headers)
-    bare = await client.get("/api/v1/_whoami")
+    tokens = await sign_up(auth_client, email, VALID_PHRASE)
 
-    assert (guarded.status_code, guarded.json(), bare.status_code) == (
+    guarded = await auth_client.get("/api/v1/account", headers=tokens.headers)
+    bare = await auth_client.get("/api/v1/account")
+    # WHY: the real route answers the signed-in account, not the stub's fixed body (POC-7.3).
+    assert (
+        guarded.status_code,
+        guarded.json()["profile"]["email"],
+        bare.status_code,
+    ) == (
         200,
-        {"who": "stub"},
+        email,
         401,
     )
 
 
-@pytest.mark.usefixtures("stub_auth_routes")
 async def test_sign_in_gives_access_and_refresh_headers(
-    client: httpx.AsyncClient,
+    auth_client: httpx.AsyncClient, auth_settings: Settings
 ) -> None:
-    tokens = await sign_in(client, "existing@example.test", VALID_PHRASE)
+    email = new_email()
+    await sign_up(auth_client, email, VALID_PHRASE)
 
-    refreshing = await client.get("/api/v1/_refreshing", headers=tokens.refresh_headers)
-    access_only = await client.get("/api/v1/_refreshing", headers=tokens.headers)
+    tokens = await sign_in(auth_client, email, VALID_PHRASE)
 
-    assert tokens == AuthTokens(STUB_ACCESS, STUB_REFRESH)
+    refreshing = await auth_client.get(
+        "/api/v1/_refreshing", headers=tokens.refresh_headers
+    )
+    access_only = await auth_client.get("/api/v1/_refreshing", headers=tokens.headers)
+    # WHY: real routes issue non-deterministic JWTs, so equality with fixed stub tokens becomes "each token passes its own check" (POC-7.3).
+    access = verify_token(auth_settings, tokens.access_token, TokenType.ACCESS)
+    refresh = verify_token(auth_settings, tokens.refresh_token, TokenType.REFRESH)
+    assert access.account_id == refresh.account_id
     assert (refreshing.status_code, access_only.status_code) == (200, 401)
 
 
-@pytest.mark.usefixtures("stub_auth_routes")
 async def test_an_unexpected_status_fails_with_the_status_and_the_body(
-    client: httpx.AsyncClient,
+    auth_client: httpx.AsyncClient,
 ) -> None:
+    email = new_email()
+    await sign_up(auth_client, email, VALID_PHRASE)
+
     with pytest.raises(
         AssertionError, match=r"sign-in answered 401, expected 200.*INVALID_CREDENTIALS"
     ):
-        await sign_in(client, "existing@example.test", INVALID_PHRASE)
+        await sign_in(auth_client, email, INVALID_PHRASE)
 
 
-@pytest.mark.usefixtures("stub_auth_routes")
-async def test_a_body_without_both_tokens_fails_naming_what_came_back(
-    client: httpx.AsyncClient,
-) -> None:
-    with pytest.raises(ValidationError, match="refreshToken"):
-        await sign_up(client, MALFORMED_EMAIL, VALID_PHRASE)
+async def test_a_body_without_both_tokens_fails_naming_what_came_back() -> None:
+    # A bare app of its own: the real sign-up route would shadow a stub added to the real app. The real route never answers without both tokens.
+    app = FastAPI()
+
+    @app.post("/api/v1/auth/sign-up", status_code=201)
+    async def sign_up_without_a_refresh_token() -> dict[str, str]:
+        return {"accessToken": "only-the-access-token"}
+
+    async with client_for(app) as client:
+        with pytest.raises(ValidationError, match="refreshToken"):
+            await sign_up(client, new_email(), VALID_PHRASE)
+
+
+def test_auth_tokens_expose_the_two_header_shapes() -> None:
+    tokens = AuthTokens("access", "refresh")
+
+    assert (tokens.headers, tokens.refresh_headers) == (
+        {"Authorization": "Bearer access"},
+        {"x-refresh-token": "refresh"},
+    )

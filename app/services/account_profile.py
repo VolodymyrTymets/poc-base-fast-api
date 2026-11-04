@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db import violated_index
 from app.core.errors import EmailAlreadyRegisteredError, ForbiddenError, NotFoundError
 from app.models import Account, AccountProfile
 from app.schemas.account_profile import UpdateAccountProfileInput
@@ -65,14 +66,7 @@ class AccountProfileService:
                     setattr(profile, name, getattr(changes, name))
                 await self._session.flush()
         except IntegrityError as error:
-            if _violated_index(error) == EMAIL_UNIQUE_INDEX:
+            if violated_index(error) == EMAIL_UNIQUE_INDEX:
                 raise EmailAlreadyRegisteredError from None
             raise
         return profile
-
-
-def _violated_index(error: IntegrityError) -> str | None:
-    # SQLAlchemy wraps the driver's error; asyncpg's UniqueViolationError is its `__cause__` and carries the name.
-    cause = error.orig.__cause__ if error.orig is not None else None
-    name = getattr(cause, "constraint_name", None)
-    return name if isinstance(name, str) else None

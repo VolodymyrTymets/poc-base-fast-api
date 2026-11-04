@@ -16,16 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import utc_now
 from app.core.errors import InvalidCredentialsError
-from app.core.hashing import hash_secret, verify_secret
+from app.core.hashing import DUMMY_HASH, hash_secret, verify_secret
 from app.models import AccountIdentity, AccountProfile
 from app.services.account import AccountService
 from app.services.notifier import NotifierService, NotifierType
 
 OTP_TTL = timedelta(minutes=2)
 _CODE_DIGITS = 6
-# A valid Argon2id hash (same cost as `hash_secret`) of a value nobody sends: `verify` checks against it when there is no usable code, so an
-# unknown phone, a missing or an expired code cost about the same time as a wrong code and the 401 does not tell which numbers exist.
-_DUMMY_HASH = "$argon2id$v=19$m=19456,t=2,p=1$much5sGO41ZuZ1RPLIa4eQ$WrkG3m+uQY4I7f754HVd4gVkq6L22XTF3jNs+sxWt0E"
 
 
 def generate_code() -> str:
@@ -141,7 +138,7 @@ class OtpService:
         Every failure is the same error (ENDPOINTS.md mapping decision 4; never `UnauthorizedError`, which makes a client refresh), and every
         path runs one Argon2 check, against a dummy hash when there is nothing to match, so the 401 timing does not reveal which phones exist.
         """
-        matches = await verify_secret(code, challenge.otp_hash or _DUMMY_HASH)
+        matches = await verify_secret(code, challenge.otp_hash or DUMMY_HASH)
         if challenge.account_id is None or challenge.otp_hash is None or not matches:
             raise InvalidCredentialsError
 
