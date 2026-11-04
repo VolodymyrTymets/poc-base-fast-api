@@ -1,4 +1,4 @@
-"""Request models of the /auth routes (task 4.3) and their response models, which arrive with tasks 7.1 to 7.6 (7.1: `OtpRequestResponse`; 7.2: `TokenResponse`)."""
+"""Request models of the /auth routes (task 4.3) and their response models, which arrive with tasks 7.1 to 7.6 (7.1: `OtpRequestResponse`; 7.2: `TokenResponse`; 7.6: `RestorePasswordResponse`)."""
 
 from typing import Annotated
 
@@ -25,6 +25,14 @@ class OtpRequestResponse(BaseModel):
 
     success: bool
     code: str | None = None
+
+
+class RestorePasswordResponse(BaseModel):
+    """`{success: true}` for every well-formed email, registered or not; it never carries the token (task 7.6)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    success: bool
 
 
 class TokenResponse(BaseModel):

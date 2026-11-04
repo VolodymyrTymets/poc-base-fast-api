@@ -22,6 +22,9 @@ from app.schemas.auth import (
     OtpRequestInput,
     OtpRequestResponse,
     OtpVerifyInput,
+    ResetPasswordInput,
+    RestorePasswordInput,
+    RestorePasswordResponse,
     SignInInput,
     SignUpInput,
     TokenResponse,
@@ -160,4 +163,33 @@ async def change_password(
     # occupy the pool. Nothing is written yet; `change` starts a new transaction and its UPDATE is conditional on the hash it read.
     await session.rollback()
     await password_auth.change(credential, body.current_password, body.new_password)
+    await session.commit()
+
+
+@router.post("/password/restore", response_model=RestorePasswordResponse)
+async def restore_password(
+    body: RestorePasswordInput,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    password_auth: Annotated[PasswordAuthService, Depends(get_password_auth_service)],
+) -> RestorePasswordResponse:
+    """Email a password reset token. The answer is the same for an unknown email and never contains the token."""
+    issued = await password_auth.issue_reset_token(body.email)
+    # Commit first, deliver after: a job must never carry a token the database does not hold (routes-convention 3).
+    await session.commit()
+    await password_auth.deliver_reset_token(issued)
+    return RestorePasswordResponse(success=True)
+
+
+@router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(
+    body: ResetPasswordInput,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    password_auth: Annotated[PasswordAuthService, Depends(get_password_auth_service)],
+) -> None:
+    """Set a new password with a reset token; every refresh token stops working. An unknown, used or expired token is 400 INVALID_RESET_TOKEN."""
+    challenge = await password_auth.find_reset_challenge(body.token)
+    # End the read before the slow Argon2 hash inside `reset`: this route is unauthenticated, and a connection held through the hash would let a flood
+    # of calls occupy the whole pool. Nothing is written yet; `reset` starts a new transaction and its UPDATE is conditional on the token still being there.
+    await session.rollback()
+    await password_auth.reset(challenge, body.new_password)
     await session.commit()
