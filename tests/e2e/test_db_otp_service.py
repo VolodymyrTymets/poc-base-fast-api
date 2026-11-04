@@ -13,6 +13,7 @@ from utils.queue import EnqueuedJob, FakeQueue
 
 from app.config import Settings
 from app.core.errors import InvalidCredentialsError
+from app.core.hashing import verify_secret
 from app.core.logging import JsonFormatter
 from app.models import Account, AccountIdentity, AccountProfile, AccountRoleType
 from app.services.account import AccountService
@@ -236,8 +237,20 @@ async def test_a_wrong_code_fails_and_changes_nothing(
     assert (
         identity.otp_hash is not None,
         (await profile_of(db_session, issued.account_id)).is_phone_verified,
-        await service.verify(VERIFY_PHONE, issued.code),
-    ) == (True, False, issued.account_id)
+    ) == (True, False)
+
+
+async def test_the_right_code_still_works_after_a_wrong_one(
+    db_session: AsyncSession, queue: FakeQueue, frozen_clock: TimeMachineFixture
+) -> None:
+    service = otp_service(db_session, queue)
+    issued = await service.issue(VERIFY_PHONE)
+    with pytest.raises(InvalidCredentialsError):
+        await service.verify(VERIFY_PHONE, "000000")
+
+    account_id = await service.verify(VERIFY_PHONE, issued.code)
+
+    assert account_id == issued.account_id
 
 
 async def test_an_unknown_phone_fails(
@@ -365,9 +378,22 @@ async def test_a_soft_deleted_identity_fails_and_keeps_its_code(
 
 
 async def test_two_concurrent_verifies_of_one_code_let_exactly_one_through(
-    db_engine: AsyncEngine, queue: FakeQueue, frozen_clock: TimeMachineFixture
+    db_engine: AsyncEngine,
+    queue: FakeQueue,
+    frozen_clock: TimeMachineFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Own sessions that commit: `verify` never commits, so a shared savepoint session could not show the row lock at work.
+    # The barrier holds both calls after their hash check until both have passed it, so both reach the spend with a good code:
+    # only the conditional UPDATE can then tell them apart (without it this test fails).
+    barrier = asyncio.Barrier(2)
+
+    async def meeting_verify_secret(secret: str, hashed: str) -> bool:
+        result = await verify_secret(secret, hashed)
+        await barrier.wait()
+        return result
+
+    monkeypatch.setattr("app.services.otp.verify_secret", meeting_verify_secret)
     phone = "+380000000073"
     async with AsyncSession(db_engine, expire_on_commit=False) as setup:
         issued = await otp_service(setup, queue).issue(phone)

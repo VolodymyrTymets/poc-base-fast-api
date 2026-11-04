@@ -52,10 +52,10 @@ Behaviour from Node `otp-auth-strategy.service.ts` (`verifyOtp`) and `jwt-strate
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` (Docker), `uv run python -m app.cli --export-openapi --check`, `uv run alembic check`, `uv build`.
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-7.2/spec.md (ACs ticked)
-- [ ] docs/ARCHITECTURE.md: layout row (`services/tokens.py`, `get_token_service`, `hash_token`), "Where data truth lives" (`TokenService.issue`, `OtpService.verify` write), "Four routes exist" → five, "Key flows: None implemented" (OTP sign-in now works)
-- [ ] docs/DOMAIN_GLOSSARY.md: "Refresh token" row (stored as sha256, replaced on every issue); an "Access/refresh token pair" term only if the glossary lacks one
-- [ ] docs/api/ENDPOINTS.md, docs/RUNBOOK.md (R4)
+- [x] docs/features/POC-7.2/spec.md (ACs ticked)
+- [x] docs/ARCHITECTURE.md: layout row (`services/tokens.py`, `get_token_service`, `hash_token`), "Where data truth lives" (`TokenService.issue`, `OtpService.verify` write), "Four routes exist" → five, "Key flows: None implemented" (OTP sign-in now works)
+- [x] docs/DOMAIN_GLOSSARY.md: "Refresh token" row (stored as sha256, replaced on every issue); an "Access/refresh token pair" term only if the glossary lacks one
+- [x] docs/api/ENDPOINTS.md, docs/RUNBOOK.md (R4)
 - [ ] scope doc row 7.2 status: a human edits the Claude Docs doc (listed in the PR body)
 
 ## Risks
