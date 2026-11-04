@@ -1,4 +1,7 @@
+import pytest
 from utils.queue import EnqueuedJob, FakeQueue
+
+from app.core.queue import QueueUnavailableError
 
 
 async def test_jobs_are_recorded_in_the_order_they_were_enqueued() -> None:
@@ -74,3 +77,13 @@ async def test_the_jobs_property_is_a_copy() -> None:
 
 def test_the_queue_fixture_starts_empty(queue: FakeQueue) -> None:
     assert queue.jobs == []
+
+
+async def test_a_job_named_in_fail_on_raises_and_is_not_recorded() -> None:
+    queue = FakeQueue(fail_on=["send_totp_code"])
+
+    with pytest.raises(QueueUnavailableError):
+        await queue.enqueue("send_totp_code", "+380000000001")
+    await queue.enqueue("send_password_reset", "account-1")
+
+    assert [job.name for job in queue.jobs] == ["send_password_reset"]

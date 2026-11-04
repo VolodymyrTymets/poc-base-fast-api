@@ -12,6 +12,9 @@ from typing import Any, Protocol
 
 from arq import create_pool
 from arq.connections import ArqRedis, RedisSettings
+from redis.exceptions import AuthenticationError, AuthorizationError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.config import Settings
 
@@ -19,6 +22,19 @@ from app.config import Settings
 BACKOFF_BASE_SECONDS = 5.0
 # Matches the scope doc and ADR-0005: three tries, then the job fails for good.
 MAX_TRIES = 3
+
+
+# What "Redis is down" looks like. Any other RedisError (ResponseError, DataError, ...) is a bad ACL, a full server or a bug:
+# it must reach the caller as itself and never pass for an outage (rule D5). asyncio's timeout is a builtin TimeoutError,
+# an OSError, which is what arq's `create_pool` raises when the server does not answer.
+_UNAVAILABLE = (RedisConnectionError, RedisTimeoutError, OSError)
+
+
+class QueueUnavailableError(RuntimeError):
+    """The queue could not be reached (task 6.3, ADR-0027). The original error is the `__cause__`.
+
+    The one queue failure a notifier may log and go on from. It carries no job arguments, which can hold a code or a token.
+    """
 
 
 class QueueClient(Protocol):
@@ -103,11 +119,18 @@ class ArqQueueClient:
             raise ValueError(
                 f"job arguments cannot start with an underscore: {reserved}"
             )
-        pool = await self._get_pool()
-        # An unreachable Redis raises here (rule D5); there is no silent drop.
         # Widened to Any because arq types its own `_`-prefixed options, which the check above keeps out of kwargs.
         job_kwargs: dict[str, Any] = dict(kwargs)
-        job = await pool.enqueue_job(job_name, *args, **job_kwargs)
+        try:
+            pool = await self._get_pool()
+            job = await pool.enqueue_job(job_name, *args, **job_kwargs)
+        except AuthenticationError, AuthorizationError:
+            # Subclasses of redis's ConnectionError, but a wrong or missing REDIS_PASSWORD is a configuration fault: it must
+            # reach the caller as itself, or every job would be dropped behind a log line that reads like an outage (rule D5).
+            raise
+        except _UNAVAILABLE as error:
+            # An unreachable Redis raises (rule D5); there is no silent drop. The text names no argument.
+            raise QueueUnavailableError(f"cannot enqueue {job_name}") from error
         if job is None:
             # Only possible with a `_job_id` that already exists, which this client never sets.
             raise RuntimeError(f"job {job_name} was not enqueued")

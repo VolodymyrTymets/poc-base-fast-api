@@ -19,13 +19,13 @@ from arq import Retry, create_pool
 from arq.connections import ArqRedis
 from arq.worker import FailedJobs, Worker, func
 from fastapi import Depends
-from redis.exceptions import RedisError
 from utils.client import running_client
 
 from app.config import Settings
 from app.core.queue import (
     ArqQueueClient,
     QueueClient,
+    QueueUnavailableError,
     json_deserializer,
     json_serializer,
     retry_delay,
@@ -225,7 +225,7 @@ async def test_the_api_boots_without_redis_and_an_enqueue_then_fails() -> None:
 
     async with running_client(app) as http_client:
         health = await http_client.get(f"{API_PREFIX}/health")
-        with pytest.raises((OSError, RedisError)):
+        with pytest.raises(QueueUnavailableError):
             await app.state.queue.enqueue("ping")
 
     assert (health.status_code, health.json()) == (200, {"status": "ok"})
