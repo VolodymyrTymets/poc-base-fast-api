@@ -14,18 +14,18 @@ Goal 2 (authentication a new POC can rely on as-is): the forgotten-password flow
   a reset link or URL (the token is the only artefact), tokens in any response body, any migration, new dependency or CI change.
 
 ## Acceptance criteria
-- [ ] AC1 Given a registered email, when `POST /auth/password/restore`, then 200 `{"success": true}` with no token in the body, `resetTokenHash` holds the sha256 of a 64 hex character token (never the token), `resetTokenExpiresAt` is 30 minutes ahead, and one `send_password_reset` job carries the token after the commit.
-- [ ] AC2 An unknown email, and an email on a soft-deleted profile, account or identity, answer the same 200 body and enqueue nothing.
-- [ ] AC3 A second restore replaces the first token: the first no longer resets, the second does.
-- [ ] AC4 An OTP-only account that has an email (no identity row yet, or an identity with no hash) gets a token; after a reset it signs in with its first password.
-- [ ] AC5 Given a valid token and a valid new password, when `POST /auth/password/reset`, then 204 with no body; the new password signs in, the old one is 401 `INVALID_CREDENTIALS`, and `refreshToken`, `resetTokenHash`, `resetTokenExpiresAt`, `otpHash`, `otpSalt`, `otpExpiresAt` are null, `salt` null.
-- [ ] AC6 The refresh token issued before the reset is rejected by `POST /auth/refresh`; an access token already issued works until it expires.
-- [ ] AC7 An unknown, already used, expired (30 minutes) or soft-deleted-account token is one 400 `INVALID_RESET_TOKEN`, and changes nothing; expiry is also checked at write time.
-- [ ] AC8 Given two resets racing with the same token, then exactly one is applied; the other is 400 `INVALID_RESET_TOKEN` and its password is not stored.
-- [ ] AC9 A malformed email, a token empty or over 200 characters, a new password under 8 or over 72 bytes or with a control character, and an unknown key are 422 `VALIDATION_FAILED` naming the field.
-- [ ] AC10 The token appears in no response body and in no log line of the API (it appears in the worker log only in `local`, `development` and `test`, ADR-0026); no password or hash in any log.
-- [ ] AC11 A reset with a garbage token runs no Argon2 work, and the Argon2 hash of a valid reset holds no pooled DB connection.
-- [ ] AC12 The RUNBOOK "forgot password" flow works from the worker log against a running API and worker; `openapi.json` is current.
+- [x] AC1 Given a registered email, when `POST /auth/password/restore`, then 200 `{"success": true}` with no token in the body, `resetTokenHash` holds the sha256 of a 64 hex character token (never the token), `resetTokenExpiresAt` is 30 minutes ahead, and one `send_password_reset` job carries the token after the commit.
+- [x] AC2 An unknown email, and an email on a soft-deleted profile, account or identity, answer the same 200 body and enqueue nothing.
+- [x] AC3 A second restore replaces the first token: the first no longer resets, the second does.
+- [x] AC4 An OTP-only account that has an email (no identity row yet, or an identity with no hash) gets a token; after a reset it signs in with its first password.
+- [x] AC5 Given a valid token and a valid new password, when `POST /auth/password/reset`, then 204 with no body; the new password signs in, the old one is 401 `INVALID_CREDENTIALS`, and `refreshToken`, `resetTokenHash`, `resetTokenExpiresAt`, `otpHash`, `otpSalt`, `otpExpiresAt` are null, `salt` null.
+- [x] AC6 The refresh token issued before the reset is rejected by `POST /auth/refresh`; an access token already issued works until it expires.
+- [x] AC7 An unknown, already used, expired (30 minutes) or soft-deleted-account token is one 400 `INVALID_RESET_TOKEN`, and changes nothing; expiry is also checked at write time.
+- [x] AC8 Given two resets racing with the same token, then exactly one is applied; the other is 400 `INVALID_RESET_TOKEN` and its password is not stored.
+- [x] AC9 A malformed email, a token empty or over 200 characters, a new password under 8 or over 72 bytes or with a control character, and an unknown key are 422 `VALIDATION_FAILED` naming the field.
+- [x] AC10 The token appears in no response body and in no log line of the API (it appears in the worker log only in `local`, `development` and `test`, ADR-0026); no password or hash in any log.
+- [x] AC11 A reset with a garbage token runs no Argon2 work, and the Argon2 hash of a valid reset holds no pooled DB connection.
+- [x] AC12 The RUNBOOK "forgot password" flow works from the worker log against a running API and worker; `openapi.json` is current.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
