@@ -131,6 +131,13 @@ The email is lowercased before lookup and storage. An email already on any profi
 that has no password, and a soft-deleted account or identity are one 401 `INVALID_CREDENTIALS`. The password is stored as an Argon2id hash (ADR-0028) in `AccountIdentity.hash`; `salt` stays null because the salt is inside the hash.
 A password is 8 to 72 bytes on sign-up and 1 to 72 on sign-in. Neither route is rate limited (issue I.8); each runs one Argon2 hash or check and holds no pooled connection while it does.
 
+## Refresh and sign out
+`POST /api/v1/auth/refresh` with the header `x-refresh-token: <refreshToken>` and no body (task 7.4) answers 200 `{"accessToken": "...", "refreshToken": "..."}`. The refresh token is single use: the new one replaces the stored sha256,
+so the old one answers 401 `UNAUTHORIZED` at once, and so does one issued before a later sign-in or a sign-out. Two requests with the same token get one 200 and one 401. A missing, malformed, expired or tampered token, an access token in the
+header, and a soft-deleted account are the same 401 `UNAUTHORIZED`, which is what tells a client to sign in again.
+`POST /api/v1/auth/sign-out` with `Authorization: Bearer <accessToken>` answers 204 with no body: it clears the stored refresh hash and any pending sign-in code (the password stays). It is idempotent: a second call, or an account
+with nothing stored, is 204. The access token is not revoked and works until it expires (default 15 minutes); there is no denylist.
+
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
 - With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;
