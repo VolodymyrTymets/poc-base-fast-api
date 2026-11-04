@@ -6,24 +6,19 @@ import pytest
 
 from app.config import get_settings
 from app.core.queue import json_deserializer, json_serializer
-from app.worker import WorkerSettings, on_startup
+from app.worker import HideJobArguments, WorkerSettings, on_startup
 from app.workers.ping import ping
 
 
 def test_retries_are_capped_at_three_and_results_are_not_kept() -> None:
     assert (WorkerSettings.max_tries, WorkerSettings.keep_result) == (3, 0)
+    assert WorkerSettings.log_results is False
 
 
 def test_the_ping_job_is_registered_with_json_payloads() -> None:
     assert WorkerSettings.functions == [ping]
     assert WorkerSettings.job_serializer is json_serializer
     assert WorkerSettings.job_deserializer is json_deserializer
-
-
-def test_redis_settings_come_from_the_settings_module() -> None:
-    redis = WorkerSettings.redis_settings
-
-    assert (redis.host, redis.port, redis.database) == ("localhost", 6379, 0)
 
 
 @pytest.fixture
@@ -67,3 +62,41 @@ async def test_the_ping_job_logs_that_it_ran(
         await ping({"job_try": 1})
 
     assert [record.getMessage() for record in caplog.records] == ["ping job ran"]
+
+
+def arq_start_record(arguments: str) -> logging.LogRecord:
+    # The shape of arq's own call: logger.info('%6.2fs → %s(%s)%s', seconds, ref, arguments, extra).
+    return logging.LogRecord(
+        "arq.worker",
+        logging.INFO,
+        __file__,
+        1,
+        "%6.2fs → %s(%s)%s",
+        (0.5, "job-id:send_totp_code", arguments, " try=2"),
+        None,
+    )
+
+
+def test_the_arguments_of_a_job_never_reach_the_log() -> None:
+    record = arq_start_record("'+380000000001', '483920'")
+
+    HideJobArguments().filter(record)
+
+    message = record.getMessage()
+    assert "483920" not in message
+    assert message == "  0.50s → job-id:send_totp_code(arguments hidden) try=2"
+
+
+def test_other_arq_records_pass_through_untouched() -> None:
+    record = logging.LogRecord(
+        "arq.worker",
+        logging.INFO,
+        __file__,
+        1,
+        "%6.2fs ← %s ● %s",
+        (0.1, "id:f", ""),
+        None,
+    )
+
+    assert HideJobArguments().filter(record) is True
+    assert record.getMessage() == "  0.10s ← id:f ● "

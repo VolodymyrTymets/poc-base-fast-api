@@ -43,6 +43,7 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
    | the app over HTTP with no database | `running_client(create_app(Settings()))` from `utils.client` |
    | a signed-in caller | `sign_up` / `sign_in` from `utils.auth` (`.headers`, `.refresh_headers`) |
    | the jobs an endpoint or service enqueued | `queue` (`FakeQueue`: `jobs`, `named(...)`, `clear()`) |
+   | the real arq client or worker, a real Redis | `redis_settings` (`Settings` for the test Redis, index 15 flushed around the test) |
    | tokens, codes or links that expire | `frozen_clock` (`frozen_clock.shift(timedelta(...))`) |
    The database fixtures start Docker on first use, or use `TEST_DATABASE_URL`; they fail loudly, never skip.
 8. `module_database_url` gives each test module its own database, so rows from a committing test stay until the module ends. Do not

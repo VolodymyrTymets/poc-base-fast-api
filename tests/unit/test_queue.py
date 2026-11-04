@@ -1,9 +1,10 @@
 import json
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import create_autospec
 
 import pytest
-from arq.connections import RedisSettings
+from arq import create_pool
+from arq.connections import ArqRedis, RedisSettings
 from pydantic import SecretStr
 from utils.queue import FakeQueue
 
@@ -18,12 +19,21 @@ from app.core.queue import (
 )
 
 
-class FakePool:
-    """Stands in for ArqRedis, the one boundary mocked (testing-python rule 3)."""
+def new_pool(*, job_enqueued: bool = True) -> Any:
+    """An ArqRedis with the real method signatures (autospec), the one boundary mocked (testing-python rules 11, 13).
 
-    def __init__(self) -> None:
-        self.enqueue_job = AsyncMock(return_value=object())
-        self.aclose = AsyncMock()
+    Typed `Any` so a test can read the mock's assertions; `enqueue_job` answers None when `job_enqueued` is False.
+    """
+    pool = create_autospec(ArqRedis, instance=True)
+    pool.enqueue_job.return_value = object() if job_enqueued else None
+    return pool
+
+
+def new_factory(pool: Any = None, error: Exception | None = None) -> Any:
+    """A stand-in for `create_pool` with its real signature: a wrong keyword fails the test."""
+    return create_autospec(
+        create_pool, return_value=pool, side_effect=error if error else None
+    )
 
 
 def test_fake_queue_and_arq_client_both_satisfy_the_protocol() -> None:
@@ -48,6 +58,9 @@ def test_the_serializer_round_trips_json_and_refuses_anything_else() -> None:
     assert json_deserializer(json_serializer(payload)) == payload
     with pytest.raises(TypeError):
         json_serializer({"a": {1, 2}})
+    assert json.loads(
+        json_serializer({"r": RuntimeError("max 3 retries exceeded")})
+    ) == {"r": "max 3 retries exceeded"}
     with pytest.raises(TypeError, match="JSON object"):
         json_deserializer(json.dumps([1]).encode())
 
@@ -73,7 +86,7 @@ def test_redis_settings_are_built_from_settings() -> None:
 
 
 async def test_constructing_the_client_opens_no_connection() -> None:
-    factory = AsyncMock()
+    factory = new_factory()
 
     ArqQueueClient(Settings(), pool_factory=factory)
 
@@ -81,8 +94,8 @@ async def test_constructing_the_client_opens_no_connection() -> None:
 
 
 async def test_the_first_enqueue_opens_one_pool_and_sends_the_job() -> None:
-    pool = FakePool()
-    factory = AsyncMock(return_value=pool)
+    pool = new_pool()
+    factory = new_factory(pool)
     client = ArqQueueClient(Settings(), pool_factory=factory)
 
     await client.enqueue("ping", "a", n=1)
@@ -97,7 +110,7 @@ async def test_the_first_enqueue_opens_one_pool_and_sends_the_job() -> None:
 
 
 async def test_an_unreachable_redis_is_one_attempt_and_enqueue_raises() -> None:
-    factory = AsyncMock(side_effect=ConnectionError("down"))
+    factory = new_factory(error=ConnectionError("down"))
     client = ArqQueueClient(Settings(), pool_factory=factory)
 
     with pytest.raises(ConnectionError):
@@ -107,7 +120,7 @@ async def test_an_unreachable_redis_is_one_attempt_and_enqueue_raises() -> None:
 
 
 async def test_a_kwarg_starting_with_an_underscore_is_refused() -> None:
-    factory = AsyncMock(return_value=FakePool())
+    factory = new_factory(new_pool())
     client = ArqQueueClient(Settings(), pool_factory=factory)
 
     with pytest.raises(ValueError, match="_job_id"):
@@ -117,17 +130,16 @@ async def test_a_kwarg_starting_with_an_underscore_is_refused() -> None:
 
 
 async def test_a_job_that_was_not_enqueued_raises() -> None:
-    pool = FakePool()
-    pool.enqueue_job.return_value = None
-    client = ArqQueueClient(Settings(), pool_factory=AsyncMock(return_value=pool))
+    pool = new_pool(job_enqueued=False)
+    client = ArqQueueClient(Settings(), pool_factory=new_factory(pool))
 
     with pytest.raises(RuntimeError, match="not enqueued"):
         await client.enqueue("ping")
 
 
 async def test_close_closes_the_pool_once_and_is_safe_without_one() -> None:
-    pool = FakePool()
-    client = ArqQueueClient(Settings(), pool_factory=AsyncMock(return_value=pool))
+    pool = new_pool()
+    client = ArqQueueClient(Settings(), pool_factory=new_factory(pool))
 
     await client.close()
     await client.enqueue("ping")

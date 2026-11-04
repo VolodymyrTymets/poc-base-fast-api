@@ -8,7 +8,7 @@ have something to build on, but there is no worker, no Redis setting and no queu
 Goal 1 (scaffolding: a fork gets a working worker process and a testable enqueue seam) and goal 3 (the fake queue and a real-Redis test path).
 
 ## Scope
-- in: `Settings` gains the Redis connection fields (the `REDIS_*` names the env templates already carry); `QueueClient` protocol and `ArqQueueClient` in
+- in: `Settings` gains the Redis connection fields (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` and `REDIS_DATABASE`, the last so the tests can use index 15); `QueueClient` protocol and `ArqQueueClient` in
   `app/core/queue.py`; `WorkerSettings` in `app/worker.py` (`max_tries=3`, exponential backoff helper, results not kept, JSON job serializer, JSON logging); one smoke job
   `ping` that only logs; `app.state.queue` built in `create_app`, closed in the lifespan, and a `get_queue` dependency; `FakeQueue` made to satisfy the protocol; ADR-0024 for the new top-level `app/worker.py`.
 - **out (explicit):** the SMS and email jobs (6.2), `NotifierService` (6.3), the Redis read cache (9.x), Docker/compose services for the worker (11.1, 11.2), cron jobs,
@@ -16,13 +16,13 @@ Goal 1 (scaffolding: a fork gets a working worker process and a testable enqueue
 
 ## Acceptance criteria
 - [x] AC1 Given Redis and a running `uv run arq app.worker.WorkerSettings`, when `ArqQueueClient.enqueue("ping")` is called from another process, then the worker's log shows the job ran.
-- [x] AC2 `WorkerSettings.max_tries == 3`, `keep_result == 0`, and its Redis settings come from `Settings` (`REDIS_HOST`, `REDIS_PORT`, optional `REDIS_PASSWORD`).
+- [x] AC2 `WorkerSettings.max_tries == 3`, `keep_result == 0`, and its Redis settings come from `Settings` (`REDIS_HOST`, `REDIS_PORT`, optional `REDIS_PASSWORD`, and `REDIS_DATABASE`, default 0).
 - [x] AC3 A job that raises `Retry(defer=retry_delay(job_try))` is retried with delays that grow exponentially and is a permanent failure after 3 tries.
 - [x] AC4 The API boots and answers `/api/v1/health` with no Redis running; the pool is opened on the first `enqueue`, never at boot.
 - [x] AC5 When Redis is unreachable, `enqueue` raises (rule D5, no silent drop) after exactly one connection attempt, not after arq's default five.
 - [x] AC6 `FakeQueue` and `ArqQueueClient` both satisfy `QueueClient` (checked by mypy and a unit test).
 - [x] AC7 Job arguments cross Redis as JSON, never pickle; a kwarg starting with `_` (arq's own options) is refused by the client.
-- [x] AC8 Worker log lines are JSON and redacted by the same formatter as the API (rule P4).
+- [x] AC8 Worker log lines are JSON and redacted by the same formatter as the API (rule P4); arq's own job-argument and job-result log text is dropped, since patterns cannot recognise a bare OTP code.
 - [x] AC9 `openapi.json` unchanged.
 
 ## Edge cases

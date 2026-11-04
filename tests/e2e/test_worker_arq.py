@@ -10,8 +10,8 @@ import signal
 import socket
 import sys
 import time
-from pathlib import Path
-from typing import Any
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Annotated, Any
 
 import httpx
 import pytest
@@ -34,40 +34,39 @@ from app.core.queue import redis_settings as arq_redis_settings
 from app.dependencies import get_queue
 from app.main import API_PREFIX, create_app
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 WAIT_SECONDS = 20
 
-
-async def read_json_lines(
-    process: asyncio.subprocess.Process, message: str
-) -> dict[str, Any]:
-    """The first JSON log line of the worker whose message is `message`; fails after WAIT_SECONDS."""
-    assert process.stdout is not None
-    seen: list[str] = []
-    try:
-        async with asyncio.timeout(WAIT_SECONDS):
-            while True:
-                raw = await process.stdout.readline()
-                if not raw:
-                    pytest.fail(f"worker exited before logging {message!r}: {seen}")
-                line = raw.decode().strip()
-                seen.append(line)
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if isinstance(entry, dict) and entry.get("message") == message:
-                    return entry
-    except TimeoutError:
-        pytest.fail(f"no {message!r} line from the worker in {WAIT_SECONDS}s: {seen}")
+# Reads the next JSON log line of the worker with this message; fails with everything seen after WAIT_SECONDS.
+LogReader = Callable[[str], Awaitable[dict[str, Any]]]
 
 
-async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
-    redis_settings: Settings,
-) -> None:
+@pytest.fixture
+async def arq_client(redis_settings: Settings) -> AsyncIterator[ArqQueueClient]:
+    client = ArqQueueClient(redis_settings)
+    yield client
+    await client.close()
+
+
+@pytest.fixture
+async def arq_pool(redis_settings: Settings) -> AsyncIterator[ArqRedis]:
+    """A raw arq pool, to look at what is in the queue."""
+    pool: ArqRedis = await create_pool(
+        arq_redis_settings(redis_settings),
+        job_serializer=json_serializer,
+        job_deserializer=json_deserializer,
+    )
+    yield pool
+    await pool.aclose()
+
+
+@pytest.fixture
+async def worker_logs(redis_settings: Settings) -> AsyncIterator[LogReader]:
+    """Starts `arq app.worker.WorkerSettings` as its own process and stops it with SIGTERM after the test."""
     env = {
         **os.environ,
         "APP_ENV": "test",
+        # Pinned, so a developer's own LOG_LEVEL cannot hide the line a test waits for.
+        "LOG_LEVEL": "INFO",
         "REDIS_HOST": redis_settings.redis_host,
         "REDIS_PORT": str(redis_settings.redis_port),
         "REDIS_DATABASE": str(redis_settings.redis_database),
@@ -77,27 +76,50 @@ async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
             else ""
         ),
     }
-    queue = ArqQueueClient(redis_settings)
+    # No cwd: the autouse fixture already runs the test from an empty directory, so no `.env` is read.
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
         "arq",
         "app.worker.WorkerSettings",
-        cwd=REPO_ROOT,
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    try:
-        await read_json_lines(process, "worker startup")
-        await queue.enqueue("ping")
+    seen: list[str] = []
 
-        entry = await read_json_lines(process, "ping job ran")
-    finally:
-        await queue.close()
-        if process.returncode is None:
-            process.send_signal(signal.SIGTERM)
-        await asyncio.wait_for(process.wait(), WAIT_SECONDS)
+    async def read(message: str) -> dict[str, Any]:
+        assert process.stdout is not None
+        try:
+            async with asyncio.timeout(WAIT_SECONDS):
+                while True:
+                    raw = await process.stdout.readline()
+                    if not raw:
+                        pytest.fail(f"worker exited before {message!r}: {seen}")
+                    line = raw.decode().strip()
+                    seen.append(line)
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(entry, dict) and entry.get("message") == message:
+                        return entry
+        except TimeoutError:
+            pytest.fail(f"no {message!r} from the worker in {WAIT_SECONDS}s: {seen}")
+
+    yield read
+    if process.returncode is None:
+        process.send_signal(signal.SIGTERM)
+    await asyncio.wait_for(process.wait(), WAIT_SECONDS)
+
+
+async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
+    arq_client: ArqQueueClient, worker_logs: LogReader
+) -> None:
+    await worker_logs("worker startup")
+
+    await arq_client.enqueue("ping")
+    entry = await worker_logs("ping job ran")
 
     assert (entry["logger"], entry["level"], entry["job_try"]) == (
         "app.workers.ping",
@@ -107,7 +129,7 @@ async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
 
 
 async def test_a_job_that_keeps_retrying_runs_three_times_with_growing_delays(
-    redis_settings: Settings,
+    redis_settings: Settings, arq_client: ArqQueueClient
 ) -> None:
     base = 0.1
     started: list[float] = []
@@ -116,7 +138,6 @@ async def test_a_job_that_keeps_retrying_runs_three_times_with_growing_delays(
         started.append(time.monotonic())
         raise Retry(defer=retry_delay(ctx["job_try"], base=base))
 
-    queue = ArqQueueClient(redis_settings)
     worker = Worker(
         functions=[func(flaky, name="flaky")],
         redis_settings=arq_redis_settings(redis_settings),
@@ -130,17 +151,17 @@ async def test_a_job_that_keeps_retrying_runs_three_times_with_growing_delays(
         burst=True,
     )
     try:
-        await queue.enqueue("flaky")
+        await arq_client.enqueue("flaky")
         async with asyncio.timeout(WAIT_SECONDS):
             with pytest.raises(FailedJobs):
                 await worker.run_check()
     finally:
-        await queue.close()
         await worker.close()
 
-    first_gap, second_gap = started[1] - started[0], started[2] - started[1]
     assert len(started) == 3
-    assert (first_gap >= base, second_gap >= base * 2) == (True, True)
+    # Lower bounds only: the clock never runs the retry before its delay has passed.
+    assert started[1] - started[0] >= base
+    assert started[2] - started[1] >= base * 2
     assert worker.jobs_failed == 1
 
 
@@ -164,28 +185,20 @@ async def test_the_api_boots_without_redis_and_an_enqueue_then_fails() -> None:
 
 
 async def test_a_route_enqueues_through_the_injected_queue(
-    redis_settings: Settings,
+    redis_settings: Settings, arq_pool: ArqRedis
 ) -> None:
     app = create_app(redis_settings)
 
     @app.post("/enqueue-ping")
     async def enqueue_ping(
-        queue: QueueClient = Depends(get_queue),  # noqa: B008
+        queue: Annotated[QueueClient, Depends(get_queue)],
     ) -> dict[str, str]:
         await queue.enqueue("ping")
         return {"status": "queued"}
 
-    pool: ArqRedis = await create_pool(
-        arq_redis_settings(redis_settings),
-        job_serializer=json_serializer,
-        job_deserializer=json_deserializer,
-    )
-    try:
-        async with running_client(app) as http_client:
-            response: httpx.Response = await http_client.post("/enqueue-ping")
-        queued = await pool.queued_jobs()
-    finally:
-        await pool.aclose()
+    async with running_client(app) as http_client:
+        response: httpx.Response = await http_client.post("/enqueue-ping")
+    queued = await arq_pool.queued_jobs()
 
     assert (response.status_code, response.json()) == (200, {"status": "queued"})
     assert [job.function for job in queued] == ["ping"]

@@ -7,7 +7,7 @@ the worker layer. Callers depend on the protocol only: tests inject `FakeQueue` 
 
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from arq import create_pool
@@ -34,9 +34,17 @@ def retry_delay(job_try: int, base: float = BACKOFF_BASE_SECONDS) -> float:
     return base * float(2 ** (job_try - 1))
 
 
+def _json_default(value: object) -> str:
+    # arq serializes the failure of a job that ran out of tries (a JobExecutionFailed) even when results are not kept;
+    # its text is all that is wanted. Any other non-JSON value stays an error, so a bad job argument still raises.
+    if isinstance(value, BaseException):
+        return str(value)
+    raise TypeError(f"{type(value).__name__} is not JSON serializable")
+
+
 def json_serializer(data: dict[str, Any]) -> bytes:
     # Not pickle (AC7): whoever can write to Redis could otherwise run code in the worker.
-    return json.dumps(data).encode()
+    return json.dumps(data, default=_json_default).encode()
 
 
 def json_deserializer(raw: bytes) -> dict[str, Any]:
@@ -68,7 +76,7 @@ class ArqQueueClient:
         self,
         settings: Settings,
         *,
-        pool_factory: Callable[..., Any] = create_pool,
+        pool_factory: Callable[..., Awaitable[ArqRedis]] = create_pool,
     ) -> None:
         # conn_retries=0 is one attempt: a request fails at once when Redis is down instead of hanging for arq's
         # five retries a second apart.
