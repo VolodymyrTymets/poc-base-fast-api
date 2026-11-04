@@ -304,3 +304,51 @@ def test_a_mime_type_without_a_slash_is_refused(
 
     assert "file_allowed_mime_types" in str(caught.value)
     assert "7731" not in str(caught.value)
+
+
+def test_redis_defaults_point_at_a_local_server() -> None:
+    settings = Settings()
+
+    assert (settings.redis_host, settings.redis_port, settings.redis_database) == (
+        "localhost",
+        6379,
+        0,
+    )
+    assert settings.redis_password is None
+
+
+def test_redis_values_come_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REDIS_HOST", "redis")
+    monkeypatch.setenv("REDIS_PORT", "6380")
+    monkeypatch.setenv("REDIS_DATABASE", "15")
+    monkeypatch.setenv("REDIS_PASSWORD", "s3cret-value")
+
+    settings = Settings()
+
+    assert (settings.redis_host, settings.redis_port, settings.redis_database) == (
+        "redis",
+        6380,
+        15,
+    )
+    assert settings.redis_password == SecretStr("s3cret-value")
+
+
+def test_a_blank_redis_password_means_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("REDIS_PASSWORD", "  ")
+
+    assert Settings().redis_password is None
+
+
+def test_a_bad_redis_port_names_the_field_and_hides_the_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("REDIS_PORT", "abc")
+    monkeypatch.setenv("REDIS_PASSWORD", "s3cret-value")
+
+    with pytest.raises(ValidationError) as error:
+        Settings()
+
+    assert "redis_port" in str(error.value)
+    assert "s3cret-value" not in str(error.value)

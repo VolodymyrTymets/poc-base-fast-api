@@ -135,6 +135,14 @@ class Settings(BaseSettings):
         list[str], NoDecode, BeforeValidator(_mime_types_from_env), Field(min_length=1)
     ] = Field(default_factory=lambda: list(DEFAULT_FILE_ALLOWED_MIME_TYPES))
 
+    # Task 6.1: where the arq queue lives. Only a connection is opened with these, and only on the first
+    # enqueue or in the worker process, so the API boots with no Redis. The database index is a setting
+    # because the tests run on index 15 and never touch a developer's own queue.
+    redis_host: str = Field(default="localhost", min_length=1)
+    redis_port: int = Field(default=6379, ge=1, le=65535)
+    redis_database: int = Field(default=0, ge=0, le=15)
+    redis_password: Annotated[SecretStr | None, BeforeValidator(_blank_to_none)] = None
+
     @field_validator("database_url")
     @classmethod
     def _require_asyncpg_scheme(cls, value: str | None) -> str | None:
