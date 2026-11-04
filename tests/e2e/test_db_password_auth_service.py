@@ -227,15 +227,11 @@ async def test_every_sign_in_failure_runs_one_argon2_check(
     # By name: the service imported the function, so the name in its own module is the one to replace.
     monkeypatch.setattr("app.services.password_auth.verify_secret", counting)
 
-    for attempt_email, attempt in [
-        (unique_email(), PHRASE),
-        (email, "not-the-phrase"),
-        (email, PHRASE),
-    ]:
-        try:
-            await sign_in(service(db_session), attempt_email, attempt)
-        except InvalidCredentialsError:
-            pass
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), unique_email(), PHRASE)
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), email, "not-the-phrase")
+    await sign_in(service(db_session), email, PHRASE)
 
     assert len(calls) == 3
     assert calls[0] == DUMMY_HASH

@@ -1,6 +1,6 @@
 """Sign up and sign in over HTTP and get the headers the guarded routes expect.
 
-Written to the contract in docs/api/ENDPOINTS.md (rows `signUp` and `signIn`): `POST /api/v1/auth/sign-up` answers 201 and
+Written to the contract in docs/api/ENDPOINTS.md (rows `signUp` and `signIn`, built in task 7.3): `POST /api/v1/auth/sign-up` answers 201 and
 `POST /api/v1/auth/sign-in` answers 200, both with `{accessToken, refreshToken}`; a guarded route reads
 `Authorization: Bearer <accessToken>`, and `POST /auth/refresh` reads `x-refresh-token` (ADR-0008).
 """

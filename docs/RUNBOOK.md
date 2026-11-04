@@ -87,7 +87,7 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
   from `utils.client`; `client_for(app)` is the same client without the lifespan.
 - `utils.auth`: `sign_up(client, email, password)` and `sign_in(...)` post to `/api/v1/auth/sign-up` (expects 201) and `/sign-in` (expects 200) and
   return `AuthTokens`; `.headers` is the Bearer header, `.refresh_headers` the `x-refresh-token` one. A wrong status fails the test with the status
-  and the start of the body. Until task 7.3 exists only stub routes prove it, so its first real run is the 7.3 e2e suite.
+  and the start of the body. Since task 7.3 they call the real routes; the app in the test needs token secrets (`Settings(app_env="test", jwt_secret=..., jwt_refresh_token_secret=...)`, `utils.jwt`), which the default `asgi_app` does not have.
 - `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. It satisfies the
   `QueueClient` protocol of `app/core/queue.py`; to use it through the app, `asgi_app.dependency_overrides[get_queue] = lambda: queue`. A service is swappable the same way (`dependency_overrides[get_account_service]`, ADR-0025), but only for one that fronts an external edge or to test the wiring itself: data-layer behaviour is still tested on the real database (rule P8).
 - `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to
@@ -123,6 +123,13 @@ With Redis down the call still answers 200 and the server logs `could not queue 
 `POST /api/v1/auth/otp/verify` with `{"phoneNumber": "+12125550142", "code": "123456"}` (task 7.2) answers `{"accessToken": "...", "refreshToken": "..."}`; `Authorization: Bearer <accessToken>` then opens `GET /api/v1/account`.
 A wrong, expired (2 minutes) or already used code, or an unknown number, is 401 `INVALID_CREDENTIALS` with one body for all. A success clears the code, sets `isPhoneVerified` and stores the sha256 of the refresh token (ADR-0008), replacing the previous one.
 The endpoint is not rate limited and a code has 10^6 values (issue I.8, ADR-0028). Every verify call, even for an unknown number, runs one Argon2 check; the route ends its read transaction first, so no pooled connection is held while it runs and a flood of calls costs CPU and memory, not pool slots (`test_no_pooled_connection_is_held_while_the_code_is_hashed`).
+
+## Sign up and sign in with a password
+`POST /api/v1/auth/sign-up` with `{"email": "a@example.com", "password": "correct-horse-battery"}` (task 7.3) answers 201 `{"accessToken": "...", "refreshToken": "..."}` and creates a customer account.
+`POST /api/v1/auth/sign-in` with the same body answers 200 with a new pair; the new refresh token replaces the stored sha256, so the previous one stops matching (ADR-0008).
+The email is lowercased before lookup and storage. An email already on any profile, a soft-deleted one included, is 409 `EMAIL_ALREADY_REGISTERED`. An unknown email, a wrong password, an account made by OTP
+that has no password, and a soft-deleted account or identity are one 401 `INVALID_CREDENTIALS`. The password is stored as an Argon2id hash (ADR-0028) in `AccountIdentity.hash`; `salt` stays null because the salt is inside the hash.
+A password is 8 to 72 bytes on sign-up and 1 to 72 on sign-in. Neither route is rate limited (issue I.8); each runs one Argon2 hash or check and holds no pooled connection while it does.
 
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
