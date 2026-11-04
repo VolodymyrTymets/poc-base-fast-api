@@ -21,6 +21,7 @@ from utils.db import (
     new_postgis,
     resolve_server_url,
 )
+from utils.markers import UnplacedTestError, markers_for
 from utils.queue import FakeQueue
 from utils.redis import (
     TEST_REDIS_DATABASE,
@@ -34,6 +35,19 @@ from app.core.db import create_engine, create_session_factory
 from app.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+TESTS_ROOT = REPO_ROOT / "tests"
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    # Level and area come from the folder, so no file can forget a marker; the markers are registered in pyproject.toml.
+    for item in items:
+        fixtures = item.fixturenames if isinstance(item, pytest.Function) else []
+        try:
+            names = markers_for(item.path.relative_to(TESTS_ROOT).parts, fixtures)
+        except UnplacedTestError as error:
+            raise pytest.UsageError(str(error)) from error
+        for name in names:
+            item.add_marker(name)
 
 
 class DatabaseEnv(BaseSettings):
