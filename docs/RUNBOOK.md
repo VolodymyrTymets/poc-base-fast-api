@@ -131,6 +131,18 @@ The email is lowercased before lookup and storage. An email already on any profi
 that has no password, and a soft-deleted account or identity are one 401 `INVALID_CREDENTIALS`. The password is stored as an Argon2id hash (ADR-0028) in `AccountIdentity.hash`; `salt` stays null because the salt is inside the hash.
 A password is 8 to 72 bytes on sign-up and 1 to 72 on sign-in. Neither route is rate limited (issue I.8); each runs one Argon2 hash or check and holds no pooled connection while it does.
 
+## Forgot password
+`POST /api/v1/auth/password/restore` with `{"email": "a@example.com"}` (task 7.6) answers 200 `{"success": true}` for every well-formed email, registered or not, and the body never holds the token. For a registered account it stores the sha256 of a random 32-byte token valid for 30 minutes
+(a new request replaces it) and queues the `send_password_reset` job after the commit. With no email provider the worker logs it, so finish the flow by hand:
+```bash
+curl -X POST localhost:3001/api/v1/auth/password/restore -H 'content-type: application/json' -d '{"email": "a@example.com"}'
+# the worker log (uv run arq app.worker.WorkerSettings) shows: [EMAIL] Password reset for a@example.com (account <id>): token <64 hex characters>
+curl -X POST localhost:3001/api/v1/auth/password/reset -H 'content-type: application/json' -d '{"token": "<64 hex characters>", "newPassword": "a-new-password"}'   # 204
+```
+The worker prints the token only for `APP_ENV` `local`, `development` and `test` (ADR-0026); anywhere else it logs the account id only. Redis must be up for the job to be queued: with Redis down the call still answers 200 and the server logs `could not queue send_password_reset`.
+`reset` answers 204 with no body. The new password is stored as an Argon2id hash and, in the same UPDATE, the refresh token, the reset token and any pending sign-in code are cleared: the old password and every refresh token issued before stop working. An unknown, used, expired or soft-deleted-account token is one 400 `INVALID_RESET_TOKEN`;
+a token works once, and of two resets racing with it one applies. An account made by OTP, which has no password, sets its first one this way (the account needs an email on its profile). Neither route is rate limited (issue I.8): a known email can have its pending token replaced by anyone, and response time can tell known from unknown emails.
+
 ## Change password
 `POST /api/v1/auth/password/change` with `Authorization: Bearer <accessToken>` and `{"currentPassword": "...", "newPassword": "..."}` (task 7.5) answers 204 with no body. The new password is stored as an Argon2id hash and, in the same UPDATE,
 the refresh token, any pending reset token and any pending sign-in code are cleared: the old password and every refresh token issued before stop working (one narrow exception: a sign-in that checked the old password just before the change can still finish after it and store a refresh token; see ENDPOINTS.md `changePassword`), and the account signs in again once its access token expires (default 15 minutes; that token is not revoked).
