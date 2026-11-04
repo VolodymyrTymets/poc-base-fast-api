@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, I.9.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, 7.1, 7.2, 7.3, I.9.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
@@ -26,6 +26,7 @@ from app.services.account_role import AccountRoleService
 from app.services.file_assert import FileAssertService
 from app.services.notifier import NotifierService
 from app.services.otp import OtpService
+from app.services.password_auth import PasswordAuthService
 from app.services.tokens import TokenService
 
 REFRESH_HEADER_NAME = "x-refresh-token"
@@ -95,6 +96,14 @@ def get_otp_service(
 ) -> OtpService:
     """The `OtpService` on the request's session, account service and notifier (ADR-0025, ADR-0027)."""
     return OtpService(session, accounts, notifier)
+
+
+def get_password_auth_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    accounts: Annotated[AccountService, Depends(get_account_service)],
+) -> PasswordAuthService:
+    """The `PasswordAuthService` on the request's session and account service (ADR-0025)."""
+    return PasswordAuthService(session, accounts)
 
 
 def get_token_service(

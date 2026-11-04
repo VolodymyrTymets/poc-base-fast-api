@@ -34,6 +34,10 @@ _hasher = PasswordHash(
     )
 )
 
+# A valid Argon2id hash (same cost as `hash_secret`) of a value nobody sends: a check with nothing to match runs against it, so an unknown phone or
+# email, a missing hash or an expired code cost about the same time as a wrong secret and the 401 does not tell which accounts exist.
+DUMMY_HASH = "$argon2id$v=19$m=19456,t=2,p=1$much5sGO41ZuZ1RPLIa4eQ$WrkG3m+uQY4I7f754HVd4gVkq6L22XTF3jNs+sxWt0E"
+
 
 async def hash_secret(secret: str) -> str:
     """The Argon2id hash of `secret`, with a fresh random salt: two calls on one secret differ."""

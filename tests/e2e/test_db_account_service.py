@@ -192,3 +192,16 @@ async def test_the_service_never_commits(db_engine: AsyncEngine) -> None:
             select(func.count()).where(AccountProfile.email == email)
         )
     assert found == 0
+
+
+async def test_a_password_account_without_a_salt_keeps_the_salt_null(
+    db_session: AsyncSession,
+) -> None:
+    account = await AccountService(db_session).create_password_account(
+        "e@example.com", "h"
+    )
+
+    result = await db_session.scalars(
+        select(AccountIdentity).where(AccountIdentity.account_id == account.id)
+    )
+    assert result.one().salt is None

@@ -1,7 +1,7 @@
 """AccountService: find an account by id or phone, create a customer or a password account. Ports the Node `AccountService`. Tasks: 5.3, 9.2.
 
-The shape of a service (class over a session, flush but never commit) is ADR-0021. The password hash and salt
-come from the caller: hashing arrives with task 7.3, and this service adds no dependency for it.
+The shape of a service (class over a session, flush but never commit) is ADR-0021. The password hash (and an optional salt)
+come from the caller: `PasswordAuthService` (task 7.3) hashes, and this service adds no dependency for it.
 """
 
 from sqlalchemy import Select, select
@@ -46,11 +46,11 @@ class AccountService:
         return await self._create(AccountProfile(phone_number=phone_number))
 
     async def create_password_account(
-        self, email: str, password_hash: str, password_salt: str
+        self, email: str, password_hash: str, password_salt: str | None = None
     ) -> Account:
         """A `CUSTOMER` account with a profile (email), a password identity and the role link, in the caller's transaction.
 
-        The caller normalises the email (task 7.3). A second account with the same email fails on the unique
+        The caller normalises the email (task 7.3). The salt is `None` for an Argon2 hash, which carries its own (ADR-0028). A second account with the same email fails on the unique
         index with `IntegrityError`; the caller rolls back, and nothing of this call remains.
         """
         return await self._create(

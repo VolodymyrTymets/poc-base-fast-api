@@ -1,4 +1,4 @@
-"""Async engine, the request-scoped session dependency, the declarative Base and the column mixins. Tasks: 2.1."""
+"""Async engine, the request-scoped session dependency, the declarative Base and the column mixins. Tasks: 2.1, 7.3 (`violated_index`)."""
 
 import uuid
 from collections.abc import AsyncIterator
@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from fastapi import Request
 from sqlalchemy import MetaData, Text, text
 from sqlalchemy.dialects.postgresql import TIMESTAMP
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -108,3 +109,11 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
         raise RuntimeError("DATABASE_URL is not set, so there is no database session")
     async with factory() as session:
         yield session
+
+
+def violated_index(error: IntegrityError) -> str | None:
+    """The name of the unique index or constraint an `IntegrityError` violated, or `None` when the driver gave none."""
+    # SQLAlchemy wraps the driver's error; asyncpg's UniqueViolationError is its `__cause__` and carries the name.
+    cause = error.orig.__cause__ if error.orig is not None else None
+    name = getattr(cause, "constraint_name", None)
+    return name if isinstance(name, str) else None
