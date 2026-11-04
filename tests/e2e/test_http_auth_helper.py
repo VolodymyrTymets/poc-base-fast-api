@@ -1,25 +1,22 @@
-"""The auth helper of task 3.2, proved against the real sign-up and sign-in routes of task 7.3.
+"""The auth helper of task 3.2, proved against the real sign-up, sign-in and refresh routes of tasks 7.3 and 7.4.
 
 Until 7.3 the helper was proved against stub routes written to the ENDPOINTS.md contract. The real routes replace them, so the helper's
-plumbing (body sent, status checked, tokens parsed, headers accepted) is now shown end to end. Two stubs remain, each for something
-no real route offers yet: `_refreshing` (`POST /auth/refresh` is task 7.4) and a sign-up that answers without a refresh token (the real
-one never does).
+plumbing (body sent, status checked, tokens parsed, headers accepted) is now shown end to end. One stub remains, for something no real
+route does: a sign-up that answers without a refresh token.
 """
 
 import uuid
 from collections.abc import AsyncIterator
-from typing import Annotated
 
 import httpx
 import pytest
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI
 from pydantic import ValidationError
 from utils.auth import AuthTokens, sign_in, sign_up
 from utils.client import client_for, running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
 
 from app.config import Settings
-from app.core.errors import UnauthorizedError
 from app.core.security import TokenType, verify_token
 from app.main import create_app
 
@@ -46,17 +43,6 @@ def auth_settings(module_database_url: str) -> Settings:
 @pytest.fixture
 async def auth_client(auth_settings: Settings) -> AsyncIterator[httpx.AsyncClient]:
     app = create_app(auth_settings)
-
-    @app.get("/api/v1/_refreshing")
-    async def refreshing(
-        x_refresh_token: Annotated[str | None, Header()] = None,
-    ) -> dict[str, str]:
-        # Stands in for `POST /auth/refresh` (task 7.4): accepts only a valid refresh token.
-        try:
-            verify_token(auth_settings, x_refresh_token or "", TokenType.REFRESH)
-        except UnauthorizedError as error:
-            raise HTTPException(status_code=401, detail="UNAUTHORIZED") from error
-        return {"refreshing": "yes"}
 
     async with running_client(app) as client:
         yield client
@@ -91,10 +77,11 @@ async def test_sign_in_gives_access_and_refresh_headers(
 
     tokens = await sign_in(auth_client, email, VALID_PHRASE)
 
-    refreshing = await auth_client.get(
-        "/api/v1/_refreshing", headers=tokens.refresh_headers
+    # WHY: the stub `GET /_refreshing` is replaced by the real `POST /auth/refresh`, which accepts only the refresh header (POC-7.4).
+    refreshing = await auth_client.post(
+        "/api/v1/auth/refresh", headers=tokens.refresh_headers
     )
-    access_only = await auth_client.get("/api/v1/_refreshing", headers=tokens.headers)
+    access_only = await auth_client.post("/api/v1/auth/refresh", headers=tokens.headers)
     # WHY: real routes issue non-deterministic JWTs, so equality with fixed stub tokens becomes "each token passes its own check" (POC-7.3).
     access = verify_token(auth_settings, tokens.access_token, TokenType.ACCESS)
     refresh = verify_token(auth_settings, tokens.refresh_token, TokenType.REFRESH)

@@ -7,11 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.db import get_session
+from app.core.security import TokenClaims
 from app.dependencies import (
+    RefreshCredentials,
     app_settings,
+    current_account,
     get_otp_service,
     get_password_auth_service,
     get_token_service,
+    refresh_credentials,
 )
 from app.schemas.auth import (
     OtpRequestInput,
@@ -109,3 +113,30 @@ async def sign_in(
     return TokenResponse(
         access_token=pair.access_token, refresh_token=pair.refresh_token
     )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(
+    # Listed before the session so that a bad token is a 401 even with no database (routes-convention 4).
+    credentials: Annotated[RefreshCredentials, Depends(refresh_credentials)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> TokenResponse:
+    """Exchange the refresh token in `x-refresh-token` for a new pair; the old refresh token stops working. Any failure is 401 UNAUTHORIZED."""
+    pair = await tokens.rotate(credentials.account_id, credentials.token)
+    # A rejected token never reaches the commit, so a failed rotation leaves the stored hash as it was.
+    await session.commit()
+    return TokenResponse(
+        access_token=pair.access_token, refresh_token=pair.refresh_token
+    )
+
+
+@router.post("/sign-out", status_code=status.HTTP_204_NO_CONTENT)
+async def sign_out(
+    claims: Annotated[TokenClaims, Depends(current_account)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> None:
+    """End the caller's session: the refresh token and any pending sign-in code are cleared. The access token works until it expires."""
+    await tokens.revoke(claims.account_id)
+    await session.commit()
