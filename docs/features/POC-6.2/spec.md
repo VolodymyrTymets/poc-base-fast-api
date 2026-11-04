@@ -19,12 +19,12 @@ Goal 2 (authentication: a new POC can finish the OTP and reset flows by reading 
 - Both are idempotent: no state, no external call, a retry only logs the same line again. Neither raises, so no `Retry`.
 
 ## Acceptance criteria
-- [ ] AC1 Given Redis, a worker with `APP_ENV=local` and `send_password_reset` enqueued through `ArqQueueClient`, then the worker log has `[EMAIL] Password reset … token …` with the real email and token.
-- [ ] AC2 With `APP_ENV=production` the same job logs the account id only: neither the email nor the token appears anywhere in the output.
-- [ ] AC3 `send_totp_code` logs the phone masked (I.5): at most its last 4 digits, never the full number, in every environment; the OTP code appears in no log line.
-- [ ] AC4 Calling either job twice with the same arguments gives the same log line twice and no error.
-- [ ] AC5 Both functions are in `WorkerSettings.functions` beside `ping`; arguments still never reach arq's own log lines (`HideJobArguments`, AC8 of 6.1).
-- [ ] AC6 `openapi.json` unchanged; no new dependency.
+- [x] AC1 Given Redis, a worker with `APP_ENV=local` and `send_password_reset` enqueued through `ArqQueueClient`, then the worker log has `[EMAIL] Password reset … token …` with the real email and token.
+- [x] AC2 With `APP_ENV=production` the same job logs the account id only: neither the email nor the token appears anywhere in the output.
+- [x] AC3 `send_totp_code` logs the phone masked (I.5): at most its last 4 digits, never the full number, in every environment; the OTP code appears in no log line.
+- [x] AC4 Calling either job twice with the same arguments gives the same log line twice and no error.
+- [x] AC5 Both functions are in `WorkerSettings.functions` beside `ping`; arguments still never reach arq's own log lines (`HideJobArguments`, AC8 of 6.1).
+- [x] AC6 `openapi.json` unchanged; no new dependency.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
