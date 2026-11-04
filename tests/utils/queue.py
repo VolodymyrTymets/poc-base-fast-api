@@ -1,7 +1,7 @@
 """A queue that records the jobs an endpoint or service enqueues instead of sending them to Redis.
 
-The real `QueueClient` protocol and the arq implementation come with task 6.1, which also adapts this fake to it. Until
-then the shape is the smallest one that lets a test say "this call enqueued this job with these arguments".
+It satisfies the `QueueClient` protocol of `app.core.queue` (task 6.1), whose real implementation is `ArqQueueClient`. The
+shape is the smallest one that lets a test say "this call enqueued this job with these arguments".
 """
 
 from dataclasses import dataclass
