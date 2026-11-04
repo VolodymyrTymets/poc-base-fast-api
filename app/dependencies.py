@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, I.9.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, require_roles and one provider per service. Tasks: 4.4, 5.2, 6.1, 6.3, I.9.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
@@ -24,6 +24,7 @@ from app.services.account import AccountService
 from app.services.account_profile import AccountProfileService
 from app.services.account_role import AccountRoleService
 from app.services.file_assert import FileAssertService
+from app.services.notifier import NotifierService
 
 REFRESH_HEADER_NAME = "x-refresh-token"
 
@@ -75,6 +76,14 @@ def get_account_profile_service(
 ) -> AccountProfileService:
     """The `AccountProfileService`; its `FileAssertService` is a provider too, so a test may replace either (ADR-0025)."""
     return AccountProfileService(session, file_assert)
+
+
+def get_notifier_service(
+    profiles: Annotated[AccountProfileService, Depends(get_account_profile_service)],
+    queue: Annotated[QueueClient, Depends(get_queue)],
+) -> NotifierService:
+    """The `NotifierService` on the request's profile service and the app's queue (ADR-0025, ADR-0027); it takes no session."""
+    return NotifierService(profiles, queue)
 
 
 async def current_account(

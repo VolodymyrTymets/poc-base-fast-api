@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
+from utils.queue import EnqueuedJob, FakeQueue
 
 from app.config import Settings
 from app.core.db import create_session_factory, get_session
@@ -18,11 +19,14 @@ from app.core.security import TokenClaims, TokenType, issue_token
 from app.dependencies import (
     get_account_role_service,
     get_account_service,
+    get_notifier_service,
+    get_queue,
     require_roles,
 )
 from app.main import create_app
-from app.models import Account, AccountRoleType
+from app.models import Account, AccountProfile, AccountRoleType
 from app.services.account_role import AccountRoleService
+from app.services.notifier import NotifierService, NotifierType
 
 CUSTOMER = AccountRoleType.CUSTOMER
 # Tokens carry a UUID subject; no such account exists, only the fake service knows it.
@@ -127,3 +131,60 @@ async def test_a_test_can_replace_the_account_service_behind_a_real_route(
 
     assert response.status_code == 200
     assert response.json()["id"] == FAKE_ID
+
+
+async def test_the_notifier_provider_reads_through_the_request_and_queues_on_the_app_queue(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    # The profile is committed on another connection: the notifier finds it through the profile service of
+    # the request's session, and the job goes to whatever `get_queue` gives (a recording queue here).
+    async with create_session_factory(db_engine)() as session, session.begin():
+        account = Account(last_login_at=datetime.now(UTC).replace(tzinfo=None))
+        session.add(account)
+        await session.flush()
+        account_id = account.id
+        session.add(AccountProfile(account_id=account_id, phone_number="+380000000001"))
+    app = make_app(module_database_url)
+    queue = FakeQueue()
+    app.dependency_overrides[get_queue] = lambda: queue
+
+    @app.post("/api/v1/_notify")
+    async def notify(
+        service: Annotated[NotifierService, Depends(get_notifier_service)],
+    ) -> dict[str, str]:
+        await service.notify_about_totp_code(account_id, "482913", [NotifierType.ALL])
+        return {"ok": "true"}
+
+    async with running_client(app) as client:
+        response = await client.post("/api/v1/_notify")
+
+    assert response.status_code == 200
+    assert queue.jobs == [
+        EnqueuedJob("send_totp_code", ("+380000000001", "482913"), {})
+    ]
+
+
+async def test_a_test_can_replace_the_notifier_service(
+    module_database_url: str,
+) -> None:
+    app = make_app(module_database_url)
+    seen: list[str] = []
+
+    async def notify(account_id: str, code: str, types: object) -> None:
+        seen.append(account_id)
+
+    app.dependency_overrides[get_notifier_service] = lambda: SimpleNamespace(
+        notify_about_totp_code=notify
+    )
+
+    @app.post("/api/v1/_notify")
+    async def route(
+        service: Annotated[NotifierService, Depends(get_notifier_service)],
+    ) -> dict[str, str]:
+        await service.notify_about_totp_code(FAKE_ID, "1", [NotifierType.ALL])
+        return {"ok": "true"}
+
+    async with running_client(app) as client:
+        response = await client.post("/api/v1/_notify")
+
+    assert (response.status_code, seen) == (200, [FAKE_ID])
