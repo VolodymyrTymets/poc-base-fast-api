@@ -57,6 +57,19 @@ secret logs everyone out.
   `SHUTDOWN_TIMEOUT_SECONDS` (10), runs the lifespan shutdown, then ends with the SIGTERM status (143 in a shell). That is how
   uvicorn behaves, not a crash.
 
+## Test levels and markers
+Three levels (ADR-0029): `tests/unit` (nothing outside the process), `tests/integration/db` and `tests/integration/http` (a real Postgres, the app in process) and `tests/e2e` (the app, the worker or a command as its own process).
+Markers are set by the folder and the fixtures a test uses; nothing to write in a test file. A test outside those folders stops the run.
+| Command | Runs | Needs |
+|---------|------|-------|
+| `uv run pytest -m unit` (or `tests/unit`) | the fast tier, for every save | nothing |
+| `uv run pytest -m "not db and not redis"` | unit plus the integration and e2e tests that need neither | nothing (no Docker) |
+| `uv run pytest -m "not e2e"` | unit and integration, before a push | Docker or `TEST_DATABASE_URL` |
+| `uv run pytest -m "integration and http"` | the endpoint tests | Docker, except the few with no database |
+| `uv run pytest -m db` / `-m redis` | everything that touches Postgres / Redis | Docker or the `TEST_*` URLs |
+| `uv run pytest tests/e2e` | process-level tests (server shutdown, worker, `python -m app.seeds`) | Docker, Redis |
+Markers: `unit`, `integration`, `e2e`, `db`, `http`, `redis` (descriptions in `pyproject.toml`; `--strict-markers` is on). `-ra` prints a reason line for every test that did not pass.
+
 ## Database tests
 The database tests run against a real Postgres (rule P8, ADR-0006). Where it comes from:
 - **Docker (default):** with `TEST_DATABASE_URL` unset, the first database test starts one `postgis/postgis:16-3.4` container
@@ -69,7 +82,7 @@ On that server the suite builds one template database per session with `alembic 
 module). Fixtures in `tests/conftest.py`: `database_url` (the server), `template_database`, `module_database_url`, `db_engine` (the app's
 engine on the module's database; commits stay for the module, so use it for checks across connections) and `db_session` (rolled back after
 each test, commits included; the default for a test that writes rows).
-The fixtures of `tests/conftest.py` only ever drop databases whose name starts with `poc_test_`; `tests/e2e/test_db_migrations.py` drops its own
+The fixtures of `tests/conftest.py` only ever drop databases whose name starts with `poc_test_`; `tests/integration/db/test_db_migrations.py` drops its own
 `poc_migrations_*` databases on the same server. A killed run can leave either kind on an existing server: drop it by hand. A container is
 reaped by testcontainers.
 
@@ -78,7 +91,7 @@ schema or tables on the server `database_url` gives, and drop only those. Postgr
 session to UTC.
 
 ## HTTP tests
-Which level and which fixture to use, with a unit and an e2e example, is in the `test-conventions` skill (`.claude/skills/test-conventions/SKILL.md`).
+Which level and which fixture to use, with a unit and an integration example, is in the `test-conventions` skill (`.claude/skills/test-conventions/SKILL.md`).
 
 Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
 - `asgi_app`: the real app from `create_app`, on the module's database. A test may add routes to it (`@asgi_app.get(...)`); they live for that test only.
@@ -110,7 +123,7 @@ Flushing Redis drops queued and in-flight jobs.
 
 The notifier (task 6.3) enqueues those jobs by channel. An enqueue that fails because Redis is unreachable (`QueueUnavailableError`) is logged as `could not queue <job> for account <id>` and the other channels still run; any other queue error and any database error propagate. Nothing there logs a code, a token, an email or a phone number.
 
-**Redis in the tests** (`tests/e2e/test_worker_arq.py`): with `TEST_REDIS_URL` unset, the first such test starts one `redis:7-alpine` container (testcontainers) for the session;
+**Redis in the tests** (`tests/e2e/test_worker_arq.py`, marker `redis`): with `TEST_REDIS_URL` unset, the first such test starts one `redis:7-alpine` container (testcontainers) for the session;
 set `TEST_REDIS_URL` (a `redis://` URL with host and port, in `.env.test` or exported) to use an existing server instead. The tests use database index 15 only and flush only that
 index, whatever the URL says, so a developer's default database and queue are left alone. Without Docker and without the variable the tests fail with a message; they never skip.
 
@@ -181,7 +194,7 @@ Node base's four Prisma migrations, and `0002_seed_history` adds the `SeedHistor
 - Point `DATABASE_URL` at the database you mean: `.env` is read when the variable is not exported, so check which one a bare
   `alembic upgrade head` will hit before running it.
 - A schema change is a new hand-written revision (`uv run alembic revision -m "<what>"`, then fill in `upgrade` and `downgrade`); an applied revision is never edited. Run `alembic check` after a model change: it names what the revision is missing.
-- The tests in `tests/e2e/test_db_migrations.py` create a database named `poc_migrations_<hex>` on the test server ("Database tests" above) for each
+- The tests in `tests/integration/db/test_db_migrations.py` create a database named `poc_migrations_<hex>` on the test server ("Database tests" above) for each
   test and drop it afterwards, so that role needs `CREATEDB` (and, for the extension, superuser rights). If a run is killed, drop any leftover `poc_migrations_*` database by hand.
 
 ## API contract
@@ -193,7 +206,7 @@ The OpenAPI document is committed as `openapi.json` at the repo root (ADR-0003).
 
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,
-`uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e`, `uv run poc-base-fast-api`, `uv run alembic upgrade head` and
+`uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/integration`, `uv run pytest tests/e2e`, `uv run poc-base-fast-api`, `uv run alembic upgrade head` and
 `uv run alembic check`. Coverage is a diagnostic, run by hand with `uv run pytest --cov=app`.
 
 ## Undocumented steps everyone knows

@@ -12,11 +12,12 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | format | `uv run ruff format --check .` |
 | typecheck | `uv run mypy` |
 | unit tests | `uv run pytest tests/unit` |
+| integration tests | `uv run pytest tests/integration` (real Postgres, needs Docker or `TEST_DATABASE_URL`; `-m "not db and not redis"` on the whole suite needs neither) |
 | affected tests | `uv run pytest <paths>` |
 | build | `uv build` |
 | dev server | `uv run poc-base-fast-api` |
 | worker | `uv run arq app.worker.WorkerSettings` (needs Redis and the same `REDIS_*` as the API) |
-| e2e | `uv run pytest tests/e2e` |
+| e2e | `uv run pytest tests/e2e` (the app, the worker or a command as a process; the worker file needs Redis) |
 | migrate | `uv run alembic upgrade head` (needs `DATABASE_URL`, a PostGIS database) |
 | migration check | `uv run alembic check` (same database; fails if models and revisions differ) |
 | openapi export | `uv run python -m app.cli --export-openapi` (rewrites the root `openapi.json`; never hand-edit it) |

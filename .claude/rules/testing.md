@@ -6,6 +6,7 @@ paths:
   - "**/__tests__/**"
   - "**/tests/**"
   - "e2e/**"
+  - "integration/**"
 ---
 
 # Testing rules
@@ -18,7 +19,7 @@ paths:
 6. **A flaky test is fixed or quarantined with a ticket in the same PR.** Re-running until green is a rule B3 violation.
 7. **Coverage is a diagnostic, not a target.** Business rules and shared code need tests; padding does not count.
 8. Test names state the behaviour — `rejects an order when the cart is empty`, not `works`.
-9. One assertion subject per test, arrange/act/assert visually separated. If a test needs a comment to explain what it asserts, split it.
+9. One assertion subject per test, arrange/act/assert visually separated and labelled `# Arrange`, `# Act`, `# Assert` (`testing-python.md` 17). If a test needs a comment to explain what it asserts, split it.
 10. Factories or fixtures for anything reused; each test creates what it needs and cleans up after itself.
 11. Assert on observable behaviour and public contracts, not on internal structure — a test that breaks on every refactor is a cost, not a safety net.
 12. The failure message must identify the cause without a debugger. Assert on values, not on booleans.
