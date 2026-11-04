@@ -136,7 +136,9 @@ async def test_without_a_database_url_a_session_route_names_the_setting_in_the_e
 async def test_without_a_database_url_the_client_gets_a_500_that_does_not_name_it() -> (
     None
 ):
-    app = create_app(Settings())
+    # `Settings()` defaults to `local`, the one environment whose 500 body carries the traceback (contract of task 4.2),
+    # so this test names a non-local one: the contract is "no stack outside local" (issue I.10).
+    app = create_app(Settings(app_env="test"))
     add_session_routes(app)
 
     async with client_for(app, raise_app_exceptions=False) as client:
