@@ -31,7 +31,6 @@ def generate_code() -> str:
 @dataclass(frozen=True)
 class IssuedOtp:
     account_id: str
-    phone_number: str
     # repr=False: a dataclass repr lands in logs and tracebacks, and the code must not (rules D8, P4).
     code: str = field(repr=False)
 
@@ -84,7 +83,7 @@ class OtpService:
             )
         )
         await self._session.flush()
-        return IssuedOtp(account.id, phone_number, code)
+        return IssuedOtp(account.id, code)
 
     async def deliver(self, issued: IssuedOtp) -> None:
         """Queue the SMS job for an issued code. A queue that is down is logged by the notifier, not raised (ADR-0027)."""

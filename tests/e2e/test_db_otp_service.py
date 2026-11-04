@@ -53,7 +53,7 @@ async def accounts_with_phone(session: AsyncSession, phone: str) -> int:
 
 
 def lines(caplog: pytest.LogCaptureFixture) -> str:
-    """The final JSON lines the worker would print, including the traceback text."""
+    """The final JSON lines the API process would print for the captured records, including the traceback text."""
     formatter = JsonFormatter()
     return "\n".join(formatter.format(record) for record in caplog.records)
 

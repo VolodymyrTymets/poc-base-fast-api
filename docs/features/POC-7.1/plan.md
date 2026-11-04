@@ -53,12 +53,12 @@ and `tests/unit/test_queue.py`. Behaviour from Node `auth/services/otp-auth-stra
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` (Docker; all green after R1), `uv run python -m app.cli --export-openapi --check`, `uv run alembic check`, `uv build`.
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-7.1/spec.md (ACs ticked)
-- [ ] docs/decisions/ADR-0028 (R2) and the status line in ADR-0008
-- [ ] docs/ARCHITECTURE.md: `services/otp.py`, `routers/auth.py` (one route), `core/hashing.py`, `get_otp_service`, the `pwdlib[argon2]` dependency row, ADR range to 0028 in the status line and Decided
-- [ ] docs/DOMAIN_GLOSSARY.md: "Sign-in code / OTP" (Argon2, `otpSalt` unused), a "Hashing" line
-- [ ] docs/RUNBOOK.md: the OTP request step and the I.10 line if R1 changes it
-- [ ] docs/api/ENDPOINTS.md (R4); `.claude/rules/routes-convention.md`: no change expected
+- [x] docs/features/POC-7.1/spec.md (ACs ticked)
+- [x] docs/decisions/ADR-0028 (R2) and the status line in ADR-0008
+- [x] docs/ARCHITECTURE.md: `services/otp.py`, `routers/auth.py` (one route), `core/hashing.py`, `get_otp_service`, the `pwdlib[argon2]` dependency row, ADR range to 0028 in the status line and Decided
+- [x] docs/DOMAIN_GLOSSARY.md: "Sign-in code / OTP" (Argon2, `otpSalt` unused), a "Hashing" line
+- [x] docs/RUNBOOK.md: the OTP request step and the I.10 line if R1 changes it
+- [x] docs/api/ENDPOINTS.md (R4); `.claude/rules/routes-convention.md`: no change expected
 - [ ] scope doc rows 7.1 and I.10 status: a human edits the Claude Docs doc (listed in the PR body)
 
 ## Risks

@@ -145,7 +145,10 @@ async def test_the_code_is_in_the_body_in_local_development_and_test(
     async with running_client(make_app(module_database_url, queue, app_env)) as client:
         response = await client.post(PATH, json={"phoneNumber": "+12125550145"})
 
-    assert (response.status_code, "code" in response.json()) == (200, True)
+    assert (
+        response.status_code,
+        bool(SIX_DIGITS.fullmatch(response.json().get("code", ""))),
+    ) == (200, True)
 
 
 async def test_the_code_key_is_absent_from_the_body_in_production_but_still_sent_by_sms(
