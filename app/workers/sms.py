@@ -9,7 +9,7 @@ _VISIBLE_DIGITS = 4
 
 
 def mask_phone(phone: str) -> str:
-    """`+12125550100` becomes `***0100`; anything with five digits or fewer is `***` (issue I.5, rule D8)."""
+    """`+12125550100` becomes `***0100`; anything with four digits or fewer is `***` (issue I.5, rule D8)."""
     digits = [char for char in phone if char.isdigit()]
     if len(digits) <= _VISIBLE_DIGITS:
         return "***"
