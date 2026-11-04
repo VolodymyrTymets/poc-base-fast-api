@@ -89,7 +89,7 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
   return `AuthTokens`; `.headers` is the Bearer header, `.refresh_headers` the `x-refresh-token` one. A wrong status fails the test with the status
   and the start of the body. Until task 7.3 exists only stub routes prove it, so its first real run is the 7.3 e2e suite.
 - `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. It satisfies the
-  `QueueClient` protocol of `app/core/queue.py`; to use it through the app, `asgi_app.dependency_overrides[get_queue] = lambda: queue`. A service is swapped the same way: `asgi_app.dependency_overrides[get_account_service] = lambda: fake` (ADR-0025).
+  `QueueClient` protocol of `app/core/queue.py`; to use it through the app, `asgi_app.dependency_overrides[get_queue] = lambda: queue`. A service is swappable the same way (`dependency_overrides[get_account_service]`, ADR-0025), but only for one that fronts an external edge or to test the wiring itself: data-layer behaviour is still tested on the real database (rule P8).
 - `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to
   expire a token or code instead of sleeping. `datetime.now(UTC)` and `utc_now()` (the same instant, naive) follow it; `time.monotonic` does not.
   **It moves this process only:** a database default such as `CURRENT_TIMESTAMP` still reads Postgres's clock, so code under test must pass `utc_now()`.

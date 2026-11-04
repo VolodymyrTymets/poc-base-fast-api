@@ -23,7 +23,7 @@ swap a service through `dependency_overrides`. Package 7 adds six auth routes; t
 | Alternative | Why not |
 |-------------|---------|
 | Providers and `XServiceDep` aliases in each `services/*.py` | a service would import `Depends`, against ADR-0011 rules 4 and 6 (no framework object in `services`), and `services` would import `dependencies` for the settings, a cycle with `require_roles` |
-| `Depends(XService)` on the class itself | the constructor takes plain arguments (a session, another service, settings) that FastAPI would read as query parameters |
+| `Depends(XService)` on the class itself | the constructor takes an `AsyncSession`, another service and settings, which FastAPI cannot read as request fields (it fails when the route is defined) |
 | A container object that builds all services | a second wiring mechanism beside `Depends`, and nothing to override per service |
 
 ## Consequences

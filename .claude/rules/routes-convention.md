@@ -3,6 +3,7 @@ description: How a route gets its services and who owns the transaction - one De
 paths:
   - "app/routers/**"
   - "app/dependencies.py"
+  - "tests/e2e/test_http_*.py"
 ---
 
 # Routes convention
@@ -14,4 +15,4 @@ Decided in ADR-0025 and ADR-0021. If they disagree with this file, the ADR wins 
 3. A route that writes ends with `await session.commit()` on the `session` from `Depends(get_session)`: it is the same session the providers used (cached per request). A route never uses `session.begin()` (ADR-0021).
 4. Guard order on a protected route is authenticate, then role (`require_roles`), then the per-record ownership check inside the service (rule P7). List the claims dependency before the service and session, so a bad token is a 401 even with no database.
 5. A route parses the request, calls a service and returns a response schema. No business logic, no ORM object in a response (`project-structure.md`).
-6. A test that needs a different service sets `app.dependency_overrides[get_x_service]`; it does not patch the class.
+6. A test that must replace a service sets `app.dependency_overrides[get_x_service]`; it does not patch the class. Do it for a service that fronts an external edge, or to test the wiring; never to fake the data layer: that is tested on a real Postgres (rule P8, `testing-python.md`).
