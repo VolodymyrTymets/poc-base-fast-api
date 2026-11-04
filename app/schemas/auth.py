@@ -1,4 +1,4 @@
-"""Request models of the /auth routes (task 4.3) and their response models, which arrive with tasks 7.1 to 7.6 (7.1: `OtpRequestResponse`)."""
+"""Request models of the /auth routes (task 4.3) and their response models, which arrive with tasks 7.1 to 7.6 (7.1: `OtpRequestResponse`; 7.2: `TokenResponse`)."""
 
 from typing import Annotated
 
@@ -25,6 +25,15 @@ class OtpRequestResponse(BaseModel):
 
     success: bool
     code: str | None = None
+
+
+class TokenResponse(BaseModel):
+    """`{accessToken, refreshToken}`, the answer of every successful sign-in (7.2 now; 7.3 and 7.4 reuse it)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    access_token: str
+    refresh_token: str
 
 
 class OtpVerifyInput(StrictModel):

@@ -9,6 +9,8 @@ from app.core.hashing import (
     ARGON2_PARALLELISM,
     ARGON2_TIME_COST,
     hash_secret,
+    hash_token,
+    token_matches,
     verify_secret,
 )
 
@@ -72,3 +74,29 @@ async def test_a_string_that_is_not_an_argon2_hash_verifies_false_and_is_logged_
         False,
         ["a stored hash is not in a readable format"],
     )
+
+
+def test_hash_token_is_the_known_sha256_hex() -> None:
+    # sha256("abc"), from FIPS 180-2.
+    assert (
+        hash_token("abc")
+        == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    )
+
+
+def test_a_token_matches_its_own_hash_only() -> None:
+    stored = hash_token("token-one")
+
+    assert token_matches("token-one", stored) is True
+    assert token_matches("token-two", stored) is False
+
+
+def test_a_missing_stored_hash_never_matches() -> None:
+    assert token_matches("token-one", None) is False
+
+
+def test_a_stored_token_hash_is_not_an_argon2_string() -> None:
+    stored = hash_token("token-one")
+
+    assert len(stored) == 64
+    assert not stored.startswith("$argon2")

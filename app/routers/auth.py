@@ -7,9 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.db import get_session
-from app.dependencies import app_settings, get_otp_service
-from app.schemas.auth import OtpRequestInput, OtpRequestResponse
+from app.dependencies import app_settings, get_otp_service, get_token_service
+from app.schemas.auth import (
+    OtpRequestInput,
+    OtpRequestResponse,
+    OtpVerifyInput,
+    TokenResponse,
+)
 from app.services.otp import OtpService
+from app.services.tokens import TokenService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -34,3 +40,25 @@ async def request_otp(
     await service.deliver(issued)
     in_body = settings.app_env in CODE_IN_BODY_ENVS
     return OtpRequestResponse(success=True, code=issued.code if in_body else None)
+
+
+@router.post("/otp/verify", response_model=TokenResponse)
+async def verify_otp(
+    body: OtpVerifyInput,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    otp: Annotated[OtpService, Depends(get_otp_service)],
+    tokens: Annotated[TokenService, Depends(get_token_service)],
+) -> TokenResponse:
+    """Exchange a sign-in code for an access and a refresh token; a bad, expired or spent code is 401 INVALID_CREDENTIALS."""
+    challenge = await otp.find_challenge(body.phone_number)
+    # End the read before the slow Argon2 check: this route is unauthenticated, and a connection held through the hash would let a flood of
+    # calls occupy the whole pool. Nothing is written yet; `spend` starts a new transaction and its conditional UPDATE stays race-safe.
+    await session.rollback()
+    await otp.check(challenge, body.code)
+    account_id = await otp.spend(challenge)
+    pair = await tokens.issue(account_id)
+    # One commit for the spent code, the verified phone and the new refresh hash: any failure above leaves the code usable.
+    await session.commit()
+    return TokenResponse(
+        access_token=pair.access_token, refresh_token=pair.refresh_token
+    )
