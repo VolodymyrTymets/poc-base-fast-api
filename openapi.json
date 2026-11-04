@@ -254,6 +254,45 @@
         "title": "OtpRequestResponse",
         "type": "object"
       },
+      "OtpVerifyInput": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 6,
+            "title": "Code",
+            "type": "string"
+          },
+          "phoneNumber": {
+            "title": "Phonenumber",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phoneNumber",
+          "code"
+        ],
+        "title": "OtpVerifyInput",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "description": "`{accessToken, refreshToken}`, the answer of every successful sign-in (7.2 now; 7.3 and 7.4 reuse it).",
+        "properties": {
+          "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+          },
+          "refreshToken": {
+            "title": "Refreshtoken",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
       "UpdateAccountProfileInput": {
         "additionalProperties": false,
         "description": "A field that is not sent stays unchanged; an explicit `null` clears a nullable one.\n\nRead `model_fields_set` to tell the two apart: both leave the attribute `None`.",
@@ -510,6 +549,58 @@
           }
         },
         "summary": "Request Otp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/otp/verify": {
+      "post": {
+        "description": "Exchange a sign-in code for an access and a refresh token; a bad, expired or spent code is 401 INVALID_CREDENTIALS.",
+        "operationId": "verify_otp_api_v1_auth_otp_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OtpVerifyInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "summary": "Verify Otp",
         "tags": [
           "auth"
         ]
