@@ -20,6 +20,7 @@ from app.dependencies import (
     get_account_role_service,
     get_account_service,
     get_notifier_service,
+    get_otp_service,
     get_queue,
     require_roles,
 )
@@ -27,6 +28,7 @@ from app.main import create_app
 from app.models import Account, AccountProfile, AccountRoleType
 from app.services.account_role import AccountRoleService
 from app.services.notifier import NotifierService, NotifierType
+from app.services.otp import OtpService
 
 CUSTOMER = AccountRoleType.CUSTOMER
 # Tokens carry a UUID subject; no such account exists, only the fake service knows it.
@@ -188,3 +190,25 @@ async def test_a_test_can_replace_the_notifier_service(
         response = await client.post("/api/v1/_notify")
 
     assert (response.status_code, seen) == (200, [FAKE_ID])
+
+
+async def test_a_test_can_replace_the_otp_service(module_database_url: str) -> None:
+    app = make_app(module_database_url)
+    seen: list[str] = []
+
+    async def issue(phone_number: str) -> None:
+        seen.append(phone_number)
+
+    app.dependency_overrides[get_otp_service] = lambda: SimpleNamespace(issue=issue)
+
+    @app.post("/api/v1/_otp")
+    async def route(
+        service: Annotated[OtpService, Depends(get_otp_service)],
+    ) -> dict[str, str]:
+        await service.issue("+380000000001")
+        return {"ok": "true"}
+
+    async with running_client(app) as client:
+        response = await client.post("/api/v1/_otp")
+
+    assert (response.status_code, seen) == (200, ["+380000000001"])

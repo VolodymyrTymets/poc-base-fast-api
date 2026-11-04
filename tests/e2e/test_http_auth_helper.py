@@ -13,6 +13,8 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, ValidationError
 from utils.auth import AuthTokens, sign_in, sign_up
 
+from app.core.errors import InvalidCredentialsError
+
 STUB_ACCESS = "stub-access-token"
 STUB_REFRESH = "stub-refresh-token"
 VALID_PHRASE = "correct-horse-battery"
@@ -39,7 +41,9 @@ def stub_auth_routes(asgi_app: FastAPI) -> None:
     @asgi_app.post("/api/v1/auth/sign-in", status_code=200)
     async def sign_in_stub(body: Credentials) -> dict[str, str]:
         if body.password != VALID_PHRASE:
-            raise HTTPException(status_code=401, detail="INVALID_CREDENTIALS")
+            # The domain error, as the real sign-in raises it: since task 4.2 an HTTPException 401 is always
+            # UNAUTHORIZED and its `detail` is dropped (issue I.10).
+            raise InvalidCredentialsError
         return {"accessToken": STUB_ACCESS, "refreshToken": STUB_REFRESH}
 
     @asgi_app.get("/api/v1/_whoami")

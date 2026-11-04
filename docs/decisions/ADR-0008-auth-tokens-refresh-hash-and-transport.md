@@ -1,7 +1,7 @@
 # ADR-0008 — Refresh tokens stored as sha256, sent in a header
 
 - **Date:** 2026-10-29
-- **Status:** accepted
+- **Status:** accepted; the password bullet of "Decision" is superseded by [ADR-0028](ADR-0028-argon2-hashing-pwdlib.md) (Argon2id instead of bcrypt); everything else stands
 - **Deciders:** volodymyr
 - **Ticket:** POC-1.1
 - **Supersedes:** none. It amends Node ADR-0004 (JWT access/refresh auth with OTP sign-in) and Node ADR-0011 (Email + password auth alongside OTP, with a log-only email worker), and closes the refresh-token item in Node ADR-0011's risk list. Decisions D5 and D6 of the scope doc; both confirmed by volodymyr on 2026-10-29.

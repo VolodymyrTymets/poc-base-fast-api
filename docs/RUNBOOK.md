@@ -114,6 +114,12 @@ The notifier (task 6.3) enqueues those jobs by channel. An enqueue that fails be
 set `TEST_REDIS_URL` (a `redis://` URL with host and port, in `.env.test` or exported) to use an existing server instead. The tests use database index 15 only and flush only that
 index, whatever the URL says, so a developer's default database and queue are left alone. Without Docker and without the variable the tests fail with a message; they never skip.
 
+## Sign-in code (OTP)
+`POST /api/v1/auth/otp/request` with `{"phoneNumber": "+12125550142"}` (task 7.1) answers `{"success": true, "code": "123456"}`. An unknown number becomes a customer account;
+a known one gets a new code that replaces the old. The code is stored only as an Argon2id hash (ADR-0028) and is valid for 2 minutes. The SMS job is queued after the database commit,
+and the worker logs `[SMS] TOTP code sent to ***0142` (last four digits, never the code). `code` is in the body only for `APP_ENV` `local`, `development` and `test`; in `production` the key is absent.
+With Redis down the call still answers 200 and the server logs `could not queue send_totp_code for account <id>`. The endpoint is not rate limited (issue I.8).
+
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
 - With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;

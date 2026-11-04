@@ -1,8 +1,9 @@
-"""Request models of the /auth routes (task 4.3). The response models come with tasks 7.1 to 7.6."""
+"""Request models of the /auth routes (task 4.3) and their response models, which arrive with tasks 7.1 to 7.6 (7.1: `OtpRequestResponse`)."""
 
 from typing import Annotated
 
-from pydantic import StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic.alias_generators import to_camel
 
 from app.core.validation import (
     CurrentPassword,
@@ -15,6 +16,15 @@ from app.core.validation import (
 
 class OtpRequestInput(StrictModel):
     phone_number: PhoneNumber
+
+
+class OtpRequestResponse(BaseModel):
+    """`{success, code?}`: `code` is present only in local, development and test, and the route leaves the key out otherwise."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    success: bool
+    code: str | None = None
 
 
 class OtpVerifyInput(StrictModel):
