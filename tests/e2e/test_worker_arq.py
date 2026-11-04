@@ -128,6 +128,32 @@ async def test_a_job_enqueued_by_the_client_runs_in_the_worker_process(
     )
 
 
+async def test_the_password_reset_job_logs_the_recipient_and_token_in_the_test_environment(
+    arq_client: ArqQueueClient, worker_logs: LogReader
+) -> None:
+    await worker_logs("worker startup")
+
+    await arq_client.enqueue(
+        "send_password_reset", "account-1", "reset.me@example.test", "fake-reset-value"
+    )
+    entry = await worker_logs(
+        "[EMAIL] Password reset for reset.me@example.test (account account-1): token fake-reset-value"
+    )
+
+    assert (entry["logger"], entry["level"]) == ("app.workers.email", "INFO")
+
+
+async def test_the_totp_job_logs_the_masked_phone_only(
+    arq_client: ArqQueueClient, worker_logs: LogReader
+) -> None:
+    await worker_logs("worker startup")
+
+    await arq_client.enqueue("send_totp_code", "+380000000001", "482913")
+    entry = await worker_logs("[SMS] TOTP code sent to ***0001")
+
+    assert (entry["logger"], entry["level"]) == ("app.workers.sms", "INFO")
+
+
 async def test_a_job_that_keeps_retrying_runs_three_times_with_growing_delays(
     redis_settings: Settings, arq_client: ArqQueueClient
 ) -> None:
