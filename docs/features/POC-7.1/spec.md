@@ -20,16 +20,16 @@ Goal 2 (authentication): the first half of the OTP sign-in a new POC relies on. 
   a real SMS provider, de-duplicating concurrent first requests for one phone (no unique index on the phone, as in Node), cache (9.x), any other route.
 
 ## Acceptance criteria
-- [ ] AC1 Unknown phone: 200 `{success: true, code}` (test env), one new `CUSTOMER` account with profile phone, role link and identity; a second request for the same phone adds no account.
-- [ ] AC2 The stored `otpHash` is an Argon2 hash that `verify_code(code, hash)` accepts and never equals or contains the code; `otpExpiresAt` is exactly 2 minutes after the (frozen) clock; a later request replaces hash and expiry.
-- [ ] AC3 An account that already has a password identity keeps its `hash` and `salt`; only the OTP columns change.
-- [ ] AC4 Exactly one `send_totp_code(phone, code)` job is enqueued per request, only after the commit (a job never refers to a code the database lacks).
-- [ ] AC5 `code` is absent from the body (key not present) when `APP_ENV=production`; present for local, development, test.
-- [ ] AC6 A malformed or missing `phoneNumber`, or an extra key, is 422 `VALIDATION_FAILED` and creates nothing.
-- [ ] AC7 Redis down: the call still answers 200 (logged by the notifier, 6.3); no log line holds the code or the phone (rules D8, P4).
-- [ ] AC8 Ported from Node `otp-code-generator` spec: a 6-character digit string in [100000, 999999], varying across calls; hash differs per call for one code; wrong, empty and foreign-hash codes verify false.
-- [ ] AC9 I.10: both tests pass with no `.env` in the working directory and under the developer's `.env`; no assertion weakened (rule B3).
-- [ ] AC10 `openapi.json` regenerated; the stale test passes; the response model holds no ORM class.
+- [x] AC1 Unknown phone: 200 `{success: true, code}` (test env), one new `CUSTOMER` account with profile phone, role link and identity; a second request for the same phone adds no account.
+- [x] AC2 The stored `otpHash` is an Argon2 hash that `verify_code(code, hash)` accepts and never equals or contains the code; `otpExpiresAt` is exactly 2 minutes after the (frozen) clock; a later request replaces hash and expiry.
+- [x] AC3 An account that already has a password identity keeps its `hash` and `salt`; only the OTP columns change.
+- [x] AC4 Exactly one `send_totp_code(phone, code)` job is enqueued per request, only after the commit (a job never refers to a code the database lacks).
+- [x] AC5 `code` is absent from the body (key not present) when `APP_ENV=production`; present for local, development, test.
+- [x] AC6 A malformed or missing `phoneNumber`, or an extra key, is 422 `VALIDATION_FAILED` and creates nothing.
+- [x] AC7 Redis down: the call still answers 200 (logged by the notifier, 6.3); no log line holds the code or the phone (rules D8, P4).
+- [x] AC8 Ported from Node `otp-code-generator` spec: a 6-character digit string in [100000, 999999], varying across calls; hash differs per call for one code; wrong, empty and foreign-hash codes verify false.
+- [x] AC9 I.10: both tests pass with no `.env` in the working directory and under the developer's `.env`; no assertion weakened (rule B3).
+- [x] AC10 `openapi.json` regenerated; the stale test passes; the response model holds no ORM class.
 
 ## Edge cases
 | Case | Expected | Decided by |
