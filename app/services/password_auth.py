@@ -1,5 +1,5 @@
 """PasswordAuthService: sign up with an email and a password, check a password for sign-in (`find_credential`, `check`), change it (`find_credential_for_account`, `change`)
-and recover it (`issue_reset_token`, `deliver_reset_token`; `find_reset_challenge` and `reset` follow in the same task). Ports the Node `JwtAuthStrategyService`.
+and recover it (`issue_reset_token`, `deliver_reset_token`, `find_reset_challenge`, `reset`). Ports the Node `JwtAuthStrategyService`.
 Tasks: 7.3, 7.5, 7.6. ADR-0021, ADR-0026, ADR-0027, ADR-0028.
 
 It writes and flushes but never commits (ADR-0021); the route commits after the tokens are issued. The sign-in check is two calls because the route ends the read transaction between them: Argon2 must not run with a pooled connection held (as in `OtpService`).
@@ -18,7 +18,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import utc_now, violated_index
-from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
+from app.core.errors import (
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+    InvalidResetTokenError,
+)
 from app.core.hashing import DUMMY_HASH, hash_secret, hash_token, verify_secret
 from app.models import Account, AccountIdentity, AccountProfile
 from app.services.account import AccountService
@@ -51,6 +55,15 @@ class IssuedReset:
     account_id: str
     # repr=False: a dataclass repr lands in logs and tracebacks, and the token must not (rules D8, P4).
     token: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class ResetChallenge:
+    """What `find_reset_challenge` read: plain values, so it stays valid after the session's transaction ends. Both `None` when the token cannot be used."""
+
+    identity_id: str | None
+    # repr=False: the token's hash must not land in logs or tracebacks (rules D8, P4).
+    token_hash: str | None = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -255,3 +268,49 @@ class PasswordAuthService:
         await self._notifier.notify_about_password_reset(
             issued.account_id, issued.token, [NotifierType.EMAIL]
         )
+
+    async def find_reset_challenge(self, token: str) -> ResetChallenge:
+        """Read whether `token` names a live, unexpired reset token; an empty challenge for unknown, used, expired and soft-deleted alike."""
+        token_hash = hash_token(token)
+        identity_id = await self._session.scalar(
+            select(AccountIdentity.id)
+            .join(Account, Account.id == AccountIdentity.account_id)
+            .where(
+                AccountIdentity.reset_token_hash == token_hash,
+                AccountIdentity.reset_token_expires_at > utc_now(),
+                AccountIdentity.deleted.is_(False),
+                Account.deleted.is_(False),
+            )
+        )
+        if identity_id is None:
+            return ResetChallenge(None, None)
+        return ResetChallenge(identity_id, token_hash)
+
+    async def reset(self, challenge: ResetChallenge, new_password: str) -> None:
+        """Set a new password with a reset token that `find_reset_challenge` accepted, and end every session. The caller commits.
+
+        An empty challenge is rejected before any hashing, so a garbage token costs no Argon2 work on this unauthenticated path. The Argon2 step runs before this
+        transaction's first query, so the caller must have ended the read that found the challenge (as `sign_in` does). The write is conditional on the token
+        still being there and unexpired: of two resets with one token, only the one that clears it changes the password. Every failure is `InvalidResetTokenError`.
+        """
+        if challenge.identity_id is None or challenge.token_hash is None:
+            raise InvalidResetTokenError
+        new_hash = await hash_secret(new_password)
+        changed = await self._session.scalar(
+            update(AccountIdentity)
+            .where(
+                AccountIdentity.id == challenge.identity_id,
+                AccountIdentity.reset_token_hash == challenge.token_hash,
+                AccountIdentity.reset_token_expires_at > utc_now(),
+                AccountIdentity.deleted.is_(False),
+                exists().where(
+                    Account.id == AccountIdentity.account_id,
+                    Account.deleted.is_(False),
+                ),
+            )
+            .values(**_credential_replacement(new_hash))
+            .returning(AccountIdentity.id)
+        )
+        if changed is None:
+            raise InvalidResetTokenError
+        await self._session.flush()

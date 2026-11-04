@@ -4,6 +4,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable
+from datetime import timedelta
 from typing import Any
 
 import pytest
@@ -16,8 +17,12 @@ from utils.queue import FakeQueue
 
 from app.config import Settings
 from app.core.db import create_session_factory, utc_now
-from app.core.errors import EmailAlreadyRegisteredError, InvalidCredentialsError
-from app.core.hashing import DUMMY_HASH, hash_token, verify_secret
+from app.core.errors import (
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+    InvalidResetTokenError,
+)
+from app.core.hashing import DUMMY_HASH, hash_secret, hash_token, verify_secret
 from app.core.logging import JsonFormatter
 from app.models import (
     Account,
@@ -571,3 +576,193 @@ async def test_issuing_and_delivering_log_no_token_or_email(
     formatter = JsonFormatter()
     output = "\n".join(formatter.format(record) for record in caplog.records)
     assert (issued.token in output, email in output) == (False, False)
+
+
+async def reset_password(
+    password_auth: PasswordAuthService, token: str, new: str
+) -> None:
+    """The two steps the route runs, without its rollback between them (the savepoint session of `db_session` must keep the rows)."""
+    challenge = await password_auth.find_reset_challenge(token)
+    await password_auth.reset(challenge, new)
+
+
+async def issued_token(session: AsyncSession) -> tuple[str, str, str]:
+    """A registered account's email, its id and a fresh reset token."""
+    email = await registered_email(session)
+    issued = await service(session).issue_reset_token(email)
+    assert issued is not None
+    return email, issued.account_id, issued.token
+
+
+async def test_reset_sets_the_new_password_and_clears_the_credentials_of_the_old_one(
+    db_session: AsyncSession,
+) -> None:
+    email, account_id, token = await issued_token(db_session)
+    await db_session.execute(
+        update(AccountIdentity)
+        .where(AccountIdentity.account_id == account_id)
+        .values(
+            refresh_token=STORED_REFRESH_HASH,
+            otp_hash="stored-otp-hash",
+            otp_salt="stored-otp-salt",
+            otp_expires_at=utc_now(),
+        )
+    )
+
+    await reset_password(service(db_session), token, NEW_PHRASE)
+
+    identity = await identity_of(db_session, account_id)
+    credential = await service(db_session).find_credential(email)
+    assert (
+        await service(db_session).check(credential, NEW_PHRASE),
+        identity.salt,
+        identity.refresh_token,
+        identity.reset_token_hash,
+        identity.reset_token_expires_at,
+        identity.otp_hash,
+        identity.otp_salt,
+        identity.otp_expires_at,
+    ) == (account_id, None, None, None, None, None, None, None)
+
+
+async def test_reset_stops_the_old_password(db_session: AsyncSession) -> None:
+    email, _, token = await issued_token(db_session)
+    await reset_password(service(db_session), token, NEW_PHRASE)
+
+    with pytest.raises(InvalidCredentialsError):
+        await sign_in(service(db_session), email, PHRASE)
+
+
+async def test_a_reset_token_works_once(db_session: AsyncSession) -> None:
+    _, _, token = await issued_token(db_session)
+    await reset_password(service(db_session), token, NEW_PHRASE)
+
+    with pytest.raises(InvalidResetTokenError):
+        await reset_password(service(db_session), token, "a-third-phrase-1")
+
+
+async def test_a_challenge_read_before_a_reset_cannot_reset_again_after_it(
+    db_session: AsyncSession,
+) -> None:
+    _, _, token = await issued_token(db_session)
+    stale = await service(db_session).find_reset_challenge(token)
+    await reset_password(service(db_session), token, NEW_PHRASE)
+
+    with pytest.raises(InvalidResetTokenError):
+        await service(db_session).reset(stale, "a-third-phrase-1")
+
+
+async def test_an_unknown_token_is_invalid_and_changes_nothing(
+    db_session: AsyncSession,
+) -> None:
+    email = await registered_email(db_session)
+
+    with pytest.raises(InvalidResetTokenError):
+        await reset_password(service(db_session), "0" * 64, NEW_PHRASE)
+
+    credential = await service(db_session).find_credential(email)
+    assert await service(db_session).check(credential, PHRASE)
+
+
+async def test_a_token_is_invalid_after_30_minutes(
+    db_session: AsyncSession, frozen_clock: TimeMachineFixture
+) -> None:
+    _, _, token = await issued_token(db_session)
+    frozen_clock.shift(RESET_TOKEN_TTL + timedelta(seconds=1))
+
+    with pytest.raises(InvalidResetTokenError):
+        await reset_password(service(db_session), token, NEW_PHRASE)
+
+
+async def test_a_token_that_expires_between_the_read_and_the_write_is_rejected(
+    db_session: AsyncSession, frozen_clock: TimeMachineFixture
+) -> None:
+    _, _, token = await issued_token(db_session)
+    challenge = await service(db_session).find_reset_challenge(token)
+    frozen_clock.shift(RESET_TOKEN_TTL + timedelta(seconds=1))
+
+    with pytest.raises(InvalidResetTokenError):
+        await service(db_session).reset(challenge, NEW_PHRASE)
+
+
+@pytest.mark.parametrize("record", ["account", "identity"])
+async def test_a_token_of_a_soft_deleted_account_or_identity_is_invalid(
+    db_session: AsyncSession, record: str
+) -> None:
+    _, account_id, token = await issued_token(db_session)
+    await db_session.execute(SOFT_DELETES[record](account_id))
+
+    with pytest.raises(InvalidResetTokenError):
+        await reset_password(service(db_session), token, NEW_PHRASE)
+
+
+async def test_an_account_with_no_password_sets_its_first_one_with_a_reset(
+    db_session: AsyncSession,
+) -> None:
+    email = unique_email()
+    account = await AccountService(db_session).create_customer("+380000007602")
+    assert account.profile is not None
+    account.profile.email = email
+    await db_session.flush()
+    issued = await service(db_session).issue_reset_token(email)
+    assert issued is not None
+
+    await reset_password(service(db_session), issued.token, NEW_PHRASE)
+
+    assert await sign_in(service(db_session), email, NEW_PHRASE) == account.id
+
+
+async def test_a_garbage_token_runs_no_argon2_work(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hashed: list[str] = []
+
+    async def counting_hash_secret(secret: str) -> str:
+        hashed.append(secret)
+        return await hash_secret(secret)
+
+    monkeypatch.setattr("app.services.password_auth.hash_secret", counting_hash_secret)
+
+    with pytest.raises(InvalidResetTokenError):
+        await reset_password(service(db_session), "garbage", NEW_PHRASE)
+
+    assert hashed == []
+
+
+async def test_two_racing_resets_with_one_token_apply_exactly_one(
+    db_engine: AsyncEngine,
+) -> None:
+    factory = create_session_factory(db_engine)
+    async with factory() as setup:
+        email = await registered_email(setup)
+        issued = await service(setup).issue_reset_token(email)
+        assert issued is not None
+        await setup.commit()
+
+    async with factory() as first, factory() as second:
+        # Both read the same live token. The first reset holds its transaction open, so it holds the row lock; the second waits on its UPDATE.
+        # Only when the test has seen it wait does the first commit, so the second really races a committed reset, and its conditional
+        # write must find the token gone.
+        first_challenge = await service(first).find_reset_challenge(issued.token)
+        second_challenge = await service(second).find_reset_challenge(issued.token)
+        await service(first).reset(first_challenge, NEW_PHRASE)
+        loser = asyncio.create_task(
+            service(second).reset(second_challenge, "the-losing-phrase")
+        )
+        await wait_for_a_lock_waiter(db_engine)
+        await first.commit()
+        with pytest.raises(InvalidResetTokenError):
+            await asyncio.wait_for(loser, timeout=10)
+        await second.rollback()
+
+    async with factory() as check:
+        stored = await check.scalar(
+            select(AccountIdentity.hash).where(
+                AccountIdentity.account_id == issued.account_id
+            )
+        )
+    assert stored is not None
+    assert (
+        await verify_secret(NEW_PHRASE, stored),
+        await verify_secret("the-losing-phrase", stored),
+    ) == (True, False)
