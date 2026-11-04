@@ -108,6 +108,8 @@ Jobs today: `ping` (logs `ping job ran`), `send_totp_code(phone, code)` (logs `[
 doubles the wait from 5 s); results are not kept. Job arguments must be JSON values. arq's own first two start-up lines are plain text (its CLI prints them before our hook runs).
 Flushing Redis drops queued and in-flight jobs.
 
+The notifier (task 6.3) enqueues those jobs by channel. An enqueue that fails because Redis is unreachable (`QueueUnavailableError`) is logged as `could not queue <job> for account <id>` and the other channels still run; any other queue error and any database error propagate. Nothing there logs a code, a token, an email or a phone number.
+
 **Redis in the tests** (`tests/e2e/test_worker_arq.py`): with `TEST_REDIS_URL` unset, the first such test starts one `redis:7-alpine` container (testcontainers) for the session;
 set `TEST_REDIS_URL` (a `redis://` URL with host and port, in `.env.test` or exported) to use an existing server instead. The tests use database index 15 only and flush only that
 index, whatever the URL says, so a developer's default database and queue are left alone. Without Docker and without the variable the tests fail with a message; they never skip.

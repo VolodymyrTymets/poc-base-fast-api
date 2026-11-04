@@ -19,13 +19,13 @@ Goal 2 (authentication): 7.1 and 7.6 start on a tested notifier. Goal 1: a fork 
 - **out (explicit):** any route or caller (7.1, 7.6), rate limiting, a real provider, job retention or retry settings (arq in 6.1), delivery receipts, new jobs, new dependencies, `openapi.json` changes.
 
 ## Acceptance criteria
-- [ ] AC1 Given an account with phone and email, `SMS` + OTP enqueues exactly `send_totp_code(phone, code)`; `EMAIL` + reset enqueues exactly `send_password_reset(account_id, email, token)`; `ALL` does both for the matching message kind and nothing else.
-- [ ] AC2 An account with no phone gets no SMS job; with no email gets no email job; a missing, soft-deleted or unknown account gets none and no error.
-- [ ] AC3 `SMS` on a reset and `EMAIL` on an OTP enqueue nothing (Node spec case 3).
-- [ ] AC4 When the queue raises `QueueUnavailableError` for one channel, both methods return normally, the failure is logged with the account id, and the other selected channels still run.
-- [ ] AC5 No log line from the service holds the code, the token, the email or the phone (rules D8, P4); checked on the formatted JSON.
-- [ ] AC6 An empty `types` list enqueues nothing.
-- [ ] AC7 `get_notifier_service` gives the request's `AccountProfileService` and `get_queue`; a test can swap it with `dependency_overrides`; `openapi.json` unchanged; no new dependency.
+- [x] AC1 Given an account with phone and email, `SMS` + OTP enqueues exactly `send_totp_code(phone, code)`; `EMAIL` + reset enqueues exactly `send_password_reset(account_id, email, token)`; `ALL` does both for the matching message kind and nothing else.
+- [x] AC2 An account with no phone gets no SMS job; with no email gets no email job; a missing, soft-deleted or unknown account gets none and no error.
+- [x] AC3 `SMS` on a reset and `EMAIL` on an OTP enqueue nothing (Node spec case 3).
+- [x] AC4 When the queue raises `QueueUnavailableError` for one channel, both methods return normally, the failure is logged with the account id, and the other selected channels still run.
+- [x] AC5 No log line from the service holds the code, the token, the email or the phone (rules D8, P4); checked on the formatted JSON.
+- [x] AC6 An empty `types` list enqueues nothing.
+- [x] AC7 `get_notifier_service` gives the request's `AccountProfileService` and `get_queue`; a test can swap it with `dependency_overrides`; `openapi.json` unchanged; no new dependency.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
