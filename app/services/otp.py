@@ -52,13 +52,17 @@ class OtpService:
         The hash and the expiry replace any earlier code; a password identity on the account keeps its own columns. The
         caller commits, then calls `deliver`. `phone_number` is already normalised (`PhoneNumber`).
         """
+        # Hash before the first query: this endpoint is unauthenticated, and an await on the hash thread pool with a
+        # transaction already open would hold a pooled connection for every queued request (a flood would starve
+        # the authenticated routes of connections).
+        code = generate_code()
+        otp_hash = await hash_secret(code)
+        expires_at = utc_now() + OTP_TTL
+
         account = await self._accounts.get_by_phone(phone_number)
         if account is None:
             account = await self._accounts.create_customer(phone_number)
 
-        code = generate_code()
-        otp_hash = await hash_secret(code)
-        expires_at = utc_now() + OTP_TTL
         # One statement, not select-then-insert: the identity may not exist yet and two requests may race on it.
         # `otpSalt` is cleared, not written: the Argon2 string carries its own salt (ADR-0028).
         statement = insert(AccountIdentity).values(
