@@ -34,7 +34,7 @@ serve, when the database is unreachable, was never migrated (`relation "SeedHist
 After a `git pull` that adds a migration, run steps 2 and 3 again before starting.
 
 `DATABASE_URL` (`postgresql+asyncpg://...`, nothing else is accepted) is optional: unset or blank, steps 1 to 3 do not apply, the server still
-boots and `/api/v1/health` answers, and only a route that needs a database session fails. There is no cache or queue. `uv build` writes the
+boots and `/api/v1/health` answers, and only a route that needs a database session fails. There is no cache. `uv build` writes the
 wheel and sdist into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
@@ -88,13 +88,29 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
 - `utils.auth`: `sign_up(client, email, password)` and `sign_in(...)` post to `/api/v1/auth/sign-up` (expects 201) and `/sign-in` (expects 200) and
   return `AuthTokens`; `.headers` is the Bearer header, `.refresh_headers` the `x-refresh-token` one. A wrong status fails the test with the status
   and the start of the body. Until task 7.3 exists only stub routes prove it, so its first real run is the 7.3 e2e suite.
-- `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. The real
-  queue protocol comes with task 6.1, which adapts the fake.
+- `queue`: a `FakeQueue` that records `enqueue(job_name, *args, **kwargs)` calls (`jobs`, `named(name)`, `clear()`) and never touches Redis. It satisfies the
+  `QueueClient` protocol of `app/core/queue.py`; to use it through the app, `asgi_app.dependency_overrides[get_queue] = lambda: queue`.
 - `frozen_clock`: stops the process clock at `FROZEN_NOW` (2026-01-01 12:00 UTC); `frozen_clock.shift(timedelta(...))` moves it. Use it to
   expire a token or code instead of sleeping. `datetime.now(UTC)` and `utc_now()` (the same instant, naive) follow it; `time.monotonic` does not.
   **It moves this process only:** a database default such as `CURRENT_TIMESTAMP` still reads Postgres's clock, so code under test must pass `utc_now()`.
   List `frozen_clock` after the database fixtures in a test's arguments: the first database test of a session starts the container and
   builds the template, and that wait should run on the real clock.
+
+## Redis, the queue and the worker
+The API enqueues jobs and a separate process runs them (ADR-0005, ADR-0024). Settings: `REDIS_HOST` (default `localhost`), `REDIS_PORT` (6379),
+`REDIS_DATABASE` (0) and an optional `REDIS_PASSWORD`. The API needs no Redis to boot: the connection opens on the first enqueue, and an enqueue with Redis
+down fails at once. Start a Redis (for example `docker run -d --name poc-base-redis -p 6379:6379 redis:7-alpine`), then the worker, which needs the same
+`REDIS_*` values as the API:
+```bash
+uv run arq app.worker.WorkerSettings    # logs JSON on stdout; SIGTERM or Ctrl-C lets a running job finish
+```
+Today the only job is `ping`, which logs `ping job ran`; the SMS and email jobs come with task 6.2. A job is tried at most 3 times (`Retry(defer=retry_delay(ctx["job_try"]))`
+doubles the wait from 5 s); results are not kept. Job arguments must be JSON values. arq's own first two start-up lines are plain text (its CLI prints them before our hook runs).
+Flushing Redis drops queued and in-flight jobs.
+
+**Redis in the tests** (`tests/e2e/test_worker_arq.py`): with `TEST_REDIS_URL` unset, the first such test starts one `redis:7-alpine` container (testcontainers) for the session;
+set `TEST_REDIS_URL` (a `redis://` URL with host and port, in `.env.test` or exported) to use an existing server instead. The tests use database index 15 only and flush only that
+index, whatever the URL says, so a developer's default database and queue are left alone. Without Docker and without the variable the tests fail with a message; they never skip.
 
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.

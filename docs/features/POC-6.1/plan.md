@@ -42,12 +42,12 @@ Pattern followed: `app/core/db.py` (`create_engine` built in `create_app`, opens
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/e2e` (Docker or `TEST_DATABASE_URL` and `TEST_REDIS_URL`), `uv run python -m app.cli --export-openapi --check`, `uv build`. Whatever cannot run goes under "Not verified".
 
 ## Docs to update in this PR (rule E1)
-- [ ] docs/features/POC-6.1/spec.md (ACs ticked)
-- [ ] docs/ARCHITECTURE.md: `core/queue.py`, `workers/` and `worker.py` built; "No cache or queue is wired" reworded; ADR-0024 in Decided
-- [ ] docs/RUNBOOK.md: `REDIS_*`, database 15 of `TEST_REDIS_URL` is wiped by the tests, how to start the worker, the Redis test fixture and `TEST_REDIS_URL`; the "There is no cache or queue" sentence
-- [ ] docs/DOMAIN_GLOSSARY.md: terms "Job" and "Queue client"
-- [ ] docs/decisions/ADR-0024 (R3); `.claude/skills/test-conventions/SKILL.md`: the `queue` fixture note and `redis_url`
-- [ ] `.env.example` / `.env.development.example` (R1)
+- [x] docs/features/POC-6.1/spec.md (ACs ticked)
+- [x] docs/ARCHITECTURE.md: `core/queue.py`, `workers/` and `worker.py` built; "No cache or queue is wired" reworded; ADR-0024 in Decided
+- [x] docs/RUNBOOK.md: `REDIS_*`, database 15 of `TEST_REDIS_URL` is wiped by the tests, how to start the worker, the Redis test fixture and `TEST_REDIS_URL`; the "There is no cache or queue" sentence
+- [x] docs/DOMAIN_GLOSSARY.md: terms "Job" and "Queue client"
+- [x] docs/decisions/ADR-0024 (R3); `.claude/skills/test-conventions/SKILL.md`: the `queue` fixture note and `redis_url`
+- [x] `.env.example` / `.env.development.example` (R1)
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

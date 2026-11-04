@@ -73,8 +73,8 @@ def test_a_reset_window_closes_after_its_time_to_live(
 ## 3. E2E example (copy into `tests/e2e/test_<flow>.py`)
 
 A real row through `db_session`, and a request through `client` on a test-only route that enqueues a job (one subject per test: the response, then the side effect). The route is added to
-`asgi_app` for this test only. The app does not use the queue until task 6.1, so the route calls `queue.enqueue` itself; once 6.1
-lands, assert on the real endpoint and drop the stub route.
+`asgi_app` for this test only. The app has a `get_queue` dependency since task 6.1 (`app.state.queue`, an `ArqQueueClient`); a test that wants the fake sets `asgi_app.dependency_overrides[get_queue] = lambda: queue`. The stub
+route below calls `queue.enqueue` itself because no real endpoint enqueues yet; once one does, assert on that endpoint and drop the stub. A test of the real client or worker uses the `redis_settings` fixture (real Redis, database 15 only; see the RUNBOOK) in `tests/e2e/test_worker_arq.py`.
 
 ```python
 import httpx
@@ -103,7 +103,7 @@ async def test_an_account_row_is_written_and_read_back(
 
 @pytest.fixture
 def example_route(asgi_app: FastAPI, queue: FakeQueue) -> None:
-    # The app does not use the queue until task 6.1, so the test route calls it itself.
+    # No real endpoint enqueues yet (6.2 and later), so the test route calls the queue itself.
     @asgi_app.post("/api/v1/_example", status_code=202)
     async def example() -> dict[str, str]:
         await queue.enqueue("example_job", "+380000000001")
