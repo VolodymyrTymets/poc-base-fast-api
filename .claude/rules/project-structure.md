@@ -21,7 +21,7 @@ poc-base-fast-api/
 │   ├── cli.py            # project commands that need the whole app: `python -m app.cli --export-openapi` (ADR-0020)
 │   ├── worker.py         # the arq worker entrypoint: `arq app.worker.WorkerSettings` (ADR-0024); nothing imports it
 │   ├── config.py         # settings, validated once at boot
-│   ├── dependencies.py   # shared Depends: current account, require_roles
+│   ├── dependencies.py   # shared Depends: current account, require_roles, one get_x_service provider per service (ADR-0025)
 │   ├── routers/          # one APIRouter per module
 │   ├── schemas/          # Pydantic request and response models
 │   ├── models/           # SQLAlchemy tables
@@ -39,7 +39,7 @@ poc-base-fast-api/
 
 ## Import direction
 4. `routers` use `services`, `schemas` and `dependencies`. `services` use `models`, `schemas`, `core` and `config`. `models` import only from `core` and from sibling models (relationships). `core` imports from no layer and may read `config`. `schemas` import nothing from `services`, `models` or `routers`. `dependencies` use `services`, `core` and `config`. `workers` use `services`, `models`, `core` and `config`; `seeds` use those and `schemas` (ADR-0023). `config` may be imported by anything except `models` and `schemas`. A module may import siblings in its own layer if there is no cycle. The full statement is in ADR-0011 and ADR-0023.
-5. No business logic in a router: it parses the request, calls a service, returns a schema. A response model is never an ORM object.
+5. No business logic in a router: it parses the request, takes a service from its provider in `dependencies.py` (`routes-convention.md`, ADR-0025), calls it, returns a schema. A response model is never an ORM object.
 6. A service never receives a framework object (request, response, headers, `Depends`). Plain values, models and Pydantic `schemas` (plain data) may go in and out (ADR-0003, ADR-0011).
 7. No module imports from `routers` except `main.py`. A circular import means the logic is in the wrong layer.
 
