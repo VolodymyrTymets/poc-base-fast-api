@@ -17,10 +17,13 @@ from utils.jwt import ACCESS_KEY, REFRESH_KEY
 from utils.queue import FakeQueue
 
 from app.config import Settings
+from app.core.db import create_session_factory
 from app.core.logging import JsonFormatter
+from app.core.security import TokenType, issue_token
 from app.dependencies import get_queue
 from app.main import create_app
 from app.models import Account, AccountIdentity, AccountProfile
+from app.services.account import AccountService
 
 SIGN_OUT_PATH = "/api/v1/auth/sign-out"
 REFRESH_PATH = "/api/v1/auth/refresh"
@@ -141,6 +144,24 @@ async def test_a_second_sign_out_is_204(module_database_url: str) -> None:
         second = await client.post(SIGN_OUT_PATH, headers=tokens.headers)
 
     assert (first.status_code, second.status_code) == (204, 204)
+
+
+async def test_sign_out_of_an_account_with_no_identity_row_is_204(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    settings = Settings(
+        app_env="test", jwt_secret=ACCESS_KEY, jwt_refresh_token_secret=REFRESH_KEY
+    )
+    # An account made without a sign-in has no identity row yet; the token is signed for it directly.
+    async with create_session_factory(db_engine)() as session:
+        account = await AccountService(session).create_customer("+12125550175")
+        await session.commit()
+        access = issue_token(settings, account.id, TokenType.ACCESS)
+
+    async with running_client(make_app(module_database_url)) as client:
+        response = await client.post(SIGN_OUT_PATH, headers=bearer(access))
+
+    assert response.status_code == 204
 
 
 async def test_sign_out_of_a_soft_deleted_account_is_204(

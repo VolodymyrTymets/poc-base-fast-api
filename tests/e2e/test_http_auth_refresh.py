@@ -186,6 +186,8 @@ async def test_a_soft_deleted_account_cannot_refresh(
 async def test_two_parallel_refreshes_with_one_token_give_one_200_and_one_401(
     module_database_url: str, db_engine: AsyncEngine
 ) -> None:
+    """The outcome over HTTP. Whether the second request lost on the swap or on the hash check depends on timing; the swap itself is
+    proved by `test_two_rotations_with_one_token_give_one_winner_and_one_rejection` in `test_db_token_service.py`."""
     email = unique_email()
     async with running_client(make_app(module_database_url)) as client:
         tokens = await sign_up(client, email, PHRASE)

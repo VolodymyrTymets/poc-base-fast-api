@@ -9,7 +9,7 @@ OTP service's to set.
 
 from dataclasses import dataclass, field
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,6 +84,8 @@ class TokenService:
                 AccountIdentity.account_id == account_id,
                 AccountIdentity.refresh_token == stored,
                 AccountIdentity.deleted.is_(False),
+                # The account too: a soft-delete between the SELECT and this UPDATE must not get one last refresh.
+                exists().where(Account.id == account_id, Account.deleted.is_(False)),
             )
             .values(refresh_token=hash_token(pair.refresh_token))
             .returning(AccountIdentity.id)
