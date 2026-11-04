@@ -16,6 +16,7 @@ from app.core.body_limit import BodyLimitMiddleware
 from app.core.db import create_engine, create_session_factory
 from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
+from app.core.queue import ArqQueueClient
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
 from app.seeds.registry import seed_items
@@ -54,9 +55,10 @@ class HealthResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # The arq pool (6.1) and the cache (9.x) are started before the yield and closed after
-    # it. The engine is built in create_app (it opens no connection) and closed here.
+    # The cache (9.x) is started before the yield and closed after it. The engine and the queue client are built in
+    # create_app (neither opens a connection) and closed here.
     engine: AsyncEngine | None = app.state.engine
+    queue: ArqQueueClient = app.state.queue
     logger.info("application startup")
     try:
         session_factory = app.state.session_factory
@@ -66,6 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await run_seeds(session_factory, seed_items(app.state.settings))
         yield
     finally:
+        await queue.close()
         if engine is not None:
             await engine.dispose()
         logger.info("application shutdown")
@@ -85,6 +88,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine) if engine else None
+    # Task 6.1: the Redis pool opens on the first enqueue, so the app boots with no Redis.
+    app.state.queue = ArqQueueClient(settings)
     # Added before CORS on purpose: the last middleware added is the outermost, and a 413
     # must still carry the CORS headers or a browser reports a CORS error instead.
     app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)

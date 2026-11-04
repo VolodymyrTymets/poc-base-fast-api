@@ -43,6 +43,7 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
    | the app over HTTP with no database | `running_client(create_app(Settings()))` from `utils.client` |
    | a signed-in caller | `sign_up` / `sign_in` from `utils.auth` (`.headers`, `.refresh_headers`) |
    | the jobs an endpoint or service enqueued | `queue` (`FakeQueue`: `jobs`, `named(...)`, `clear()`) |
+   | the real arq client or worker, a real Redis | `redis_settings` (`Settings` for the test Redis, index 15 flushed around the test) |
    | tokens, codes or links that expire | `frozen_clock` (`frozen_clock.shift(timedelta(...))`) |
    The database fixtures start Docker on first use, or use `TEST_DATABASE_URL`; they fail loudly, never skip.
 8. `module_database_url` gives each test module its own database, so rows from a committing test stay until the module ends. Do not
@@ -58,8 +59,9 @@ exists (rule D1): no second client helper, no second fake queue, no second clock
 11. **Mock only the boundary**, and nothing you own and can run cheaply (`testing.md` 3): the clock, the job queue, outbound
     network, SMS and email providers, randomness. **Never mock the database** (P8), the session, a service in a router test, or
     the unit under test.
-12. Use what exists before writing a fake: `frozen_clock` for time, `FakeQueue` for jobs. The app does not use the queue
-    until task 6.1, so until then a test route that needs it calls `queue.enqueue(...)` itself.
+12. Use what exists before writing a fake: `frozen_clock` for time, `FakeQueue` for jobs. The app builds an `ArqQueueClient` (task 6.1);
+    override `get_queue` with `FakeQueue` (`asgi_app.dependency_overrides`), or call `queue.enqueue(...)` from a test route while no real endpoint enqueues.
+    A test of the real client or worker uses the `redis_settings` fixture (real Redis, index 15 only; `TEST_REDIS_URL` or a container) and lives in e2e.
 13. A new boundary gets a small hand-written fake (same interface, fails loudly on a wrong call) in `tests/utils/`, not
     `MagicMock`. When `mock` is unavoidable, use `create_autospec` or `spec=True` and assert on the effect. Patch where the code
     under test looks the name up (`monkeypatch.setattr(module_under_test, "name", fake)`), not where it is defined.

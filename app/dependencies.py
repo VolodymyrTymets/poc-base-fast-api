@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, and require_roles. Tasks: 4.4, 5.2.
+"""Shared FastAPI dependencies: the current account from the Bearer token, the refresh account, and require_roles. Tasks: 4.4, 5.2, 6.1.
 
 Task 4.4 builds the two token dependencies. They verify the token only and return its claims;
 loading the account (and rejecting a deleted one) is done by the route that needs it, as `GET /account` does
@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.core.db import get_session
 from app.core.errors import ForbiddenError, UnauthorizedError
+from app.core.queue import QueueClient
 from app.core.security import TokenClaims, TokenType, verify_token
 from app.models import AccountRoleType
 from app.services.account_role import AccountRoleService
@@ -33,6 +34,12 @@ def app_settings(request: Request) -> Settings:
     """The settings the app was built with (`create_app` stores them), not a second read of the environment."""
     settings: Settings = request.app.state.settings
     return settings
+
+
+def get_queue(request: Request) -> QueueClient:
+    """The queue a route or service enqueues jobs on (task 6.1); tests override it with `FakeQueue`."""
+    queue: QueueClient = request.app.state.queue
+    return queue
 
 
 async def current_account(

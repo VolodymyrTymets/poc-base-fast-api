@@ -5,7 +5,9 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi import FastAPI
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from time_machine import TimeMachineFixture
 from utils.client import running_client
@@ -20,6 +22,12 @@ from utils.db import (
     resolve_server_url,
 )
 from utils.queue import FakeQueue
+from utils.redis import (
+    TEST_REDIS_DATABASE,
+    RedisTarget,
+    new_redis,
+    resolve_redis_target,
+)
 
 from app.config import Settings, get_settings
 from app.core.db import create_engine, create_session_factory
@@ -34,6 +42,52 @@ class DatabaseEnv(BaseSettings):
     model_config = SettingsConfigDict(env_file=REPO_ROOT / ".env.test", extra="ignore")
 
     test_database_url: str | None = None
+    test_redis_url: str | None = None
+
+
+@pytest.fixture(scope="session")
+def redis_target() -> Iterator[RedisTarget]:
+    """The Redis server the queue tests run against: `TEST_REDIS_URL`, else one container for the session."""
+    stack = ExitStack()
+
+    def start() -> RedisTarget:
+        container = new_redis()
+        stack.callback(container.stop)
+        container.start()
+        return RedisTarget(
+            container.get_container_host_ip(),
+            int(container.get_exposed_port(container.port)),
+        )
+
+    try:
+        yield resolve_redis_target(DatabaseEnv().test_redis_url, start)
+    finally:
+        stack.close()
+
+
+@pytest.fixture
+async def redis_settings(redis_target: RedisTarget) -> AsyncIterator[Settings]:
+    """Settings that point at the test Redis, index 15; that index is emptied before and after the test."""
+    settings = Settings(
+        redis_host=redis_target.host,
+        redis_port=redis_target.port,
+        redis_database=TEST_REDIS_DATABASE,
+        redis_password=(
+            SecretStr(redis_target.password) if redis_target.password else None
+        ),
+    )
+    client = Redis(
+        host=redis_target.host,
+        port=redis_target.port,
+        db=TEST_REDIS_DATABASE,
+        password=redis_target.password,
+    )
+    try:
+        await client.flushdb()
+        yield settings
+        await client.flushdb()
+    finally:
+        await client.aclose()
 
 
 @pytest.fixture(scope="session")
@@ -203,6 +257,10 @@ def isolated_settings_env(
         "MAX_REQUEST_BODY_BYTES",
         "SHUTDOWN_TIMEOUT_SECONDS",
         "DATABASE_URL",
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_DATABASE",
+        "REDIS_PASSWORD",
         "JWT_SECRET",
         "JWT_REFRESH_TOKEN_SECRET",
         "JWT_ACCESS_TOKEN_EXPIRES_IN",

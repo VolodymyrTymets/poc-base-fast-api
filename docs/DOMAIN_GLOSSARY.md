@@ -20,6 +20,8 @@ domain and does not repurpose these names. Python identifiers are decided for al
 | Password reset token | `resetTokenHash` | A random single-use token valid 30 minutes, stored only as a sha256 hash and sent to the account's email. | OTP code, refresh token |
 | Seed item | none (Node: migration item) | One unit of base data the app creates for itself (the two roles; in development environments also the sample admin and three sample customers). It has a unique name, a check for whether it is needed, and a run. Never a schema change. | Alembic revision, which changes the schema |
 | Seed history | `SeedHistory` (Node: `Migration`, a different table) | One row per seed item: whether its last run succeeded and, if not, the error text. Updated in place on a retry. | `alembic_version`, which records schema revisions |
+| Job | none (Node: a BullMQ job) | A named unit of background work the API hands to the worker with JSON arguments (`ping` today; SMS and email in task 6.2). Tried at most 3 times; its result is not kept. | Seed item, which runs once at boot |
+| Queue client | none | The `QueueClient` protocol (`enqueue(job_name, *args, **kwargs)`) that services use to hand over a job; `ArqQueueClient` in production, `FakeQueue` in tests. | The worker, which runs jobs |
 | Refresh token | `refreshToken` | A long-lived JWT used only to get a new access token. Stored as sha256 (decision D5), not bcrypt. | Access token (short-lived, 15 min default) |
 
 ## Naming rules that follow from the above

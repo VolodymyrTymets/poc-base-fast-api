@@ -15,6 +15,7 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | affected tests | `uv run pytest <paths>` |
 | build | `uv build` |
 | dev server | `uv run poc-base-fast-api` |
+| worker | `uv run arq app.worker.WorkerSettings` (needs Redis and the same `REDIS_*` as the API) |
 | e2e | `uv run pytest tests/e2e` |
 | migrate | `uv run alembic upgrade head` (needs `DATABASE_URL`, a PostGIS database) |
 | migration check | `uv run alembic check` (same database; fails if models and revisions differ) |
