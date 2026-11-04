@@ -1,13 +1,15 @@
 """Argon2id hashing for secrets a user chooses or receives: sign-in codes (task 7.1) and, later, passwords (task 7.3). ADR-0028.
 
 The salt and the cost parameters live inside the hash string, so a stored value is checked by itself and no salt column is
-needed. Refresh and reset tokens are not hashed here: they are high-entropy and use sha256 (ADR-0008).
+needed. Refresh and reset tokens are high-entropy, so they use a plain sha256 (`hash_token`, `token_matches`; ADR-0008, rule P5), not Argon2.
 
 Hashing is CPU and memory heavy, so both functions run in a worker thread and never block the event loop. The `PasswordHash`
 object holds no mutable state, so sharing it between threads is safe.
 """
 
 import asyncio
+import hashlib
+import hmac
 import logging
 
 from pwdlib import PasswordHash
@@ -46,3 +48,15 @@ async def verify_secret(secret: str, hashed: str) -> bool:
         # A corrupt stored value is a data problem worth a trace, but the value itself is never logged (rules D8, P4).
         logger.warning("a stored hash is not in a readable format")
         return False
+
+
+def hash_token(token: str) -> str:
+    """The sha256 of a refresh or reset token as 64 hex characters: what the database stores instead of the token (rule P5)."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def token_matches(token: str, stored: str | None) -> bool:
+    """Whether `token` hashes to the `stored` value, in constant time; a missing stored value never matches."""
+    if stored is None:
+        return False
+    return hmac.compare_digest(hash_token(token), stored)
