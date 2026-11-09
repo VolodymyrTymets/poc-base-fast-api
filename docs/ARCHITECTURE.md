@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0031 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0032 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -24,7 +24,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | `pyproject.toml` | project metadata, `requires-python >=3.14`, runtime `dependencies` (fastapi, uvicorn, pydantic-settings, sentry-sdk, sqlalchemy[asyncio], asyncpg, alembic, email-validator, phonenumbers, pyjwt, arq, pwdlib[argon2]: a deploy runs `alembic upgrade head`), a `dev` group (ruff, mypy, pytest and plugins, httpx, testcontainers, types-docker, time-machine), the tool settings for ruff, mypy (which also checks `migrations/`) and pytest, script `poc-base-fast-api` (`app.main:run`, ADR-0012), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |
 | `uv.lock`, `.python-version` | lockfile (uv-owned) and the interpreter pin (3.14) | — | generated / backend |
 | `.env.example`, `.env.development.example` | env templates with placeholders only; a real `.env` is gitignored | — | backend |
-| `docs/`, `.claude/`, `.github/` | agent config, knowledge docs, PR template and the evidence-check workflow | — | backend |
+| `docs/`, `.claude/`, `.github/` | agent config, knowledge docs, PR template, the evidence-check workflow (`agent-checks.yml`) and the CI workflow (`ci.yml`, task 11.4, [ADR-0032](decisions/ADR-0032-ci-workflow.md): jobs `static`, `tests` and `e2e` in parallel, Docker on the runner, no secrets) | — | backend |
 
 There is a single root-level `app/` package, laid out by layer ([ADR-0011](decisions/ADR-0011-project-structure.md), rule file `.claude/rules/project-structure.md`). No `src/`, `api/` or `web/` directory is part of the repo.
 
@@ -54,7 +54,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0031, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0032, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -97,6 +97,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   ([ADR-0028](decisions/ADR-0028-argon2-hashing-pwdlib.md)).
 - One image, targets `development` and `worker`; the entrypoint owns the wait, the migration and the seeds, and the worker never migrates; `HOST` (default `127.0.0.1`, `0.0.0.0` in the image) is the bind address; `scripts/` is the new tooling directory
   ([ADR-0030](decisions/ADR-0030-container-image.md)).
+- CI: one workflow with three parallel jobs (static, tests, e2e), pinned uv, real Postgres through testcontainers, no secret
+  ([ADR-0032](decisions/ADR-0032-ci-workflow.md)).
 - Compose stack of four services (no web); containers read `.env.development`, the root `.env` sets host ports, the two scripts live at the root
   ([ADR-0031](decisions/ADR-0031-compose-stack-and-ports.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.

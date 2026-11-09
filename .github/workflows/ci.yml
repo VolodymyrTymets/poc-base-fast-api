@@ -1,0 +1,70 @@
+name: ci
+
+# Task 11.4, ADR-0032. Commands are command-map rows or the RUNBOOK test selections; `uv sync --locked` is the stricter form of `uv sync`.
+# No secret and no .env is read.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the older run. A push to main is never cancelled, so every commit on main gets a result.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Keep equal to the uv image the Dockerfile copies (`ghcr.io/astral-sh/uv:0.12.22`); `uv sync --locked` fails if uv.lock is stale.
+  UV_VERSION: "0.12.22"
+
+jobs:
+  static:
+    name: lint, types, contract, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      # The Python version comes from .python-version (3.14); uv downloads it.
+      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - name: openapi.json is current
+        run: uv run python -m app.cli --export-openapi --check
+      - run: uv build
+
+  tests:
+    name: unit and integration (real Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --locked
+      # testcontainers starts postgis/postgis:16-3.4 on the runner's Docker (rule P8, ADR-0006).
+      - run: uv run pytest -m "not e2e"
+
+  e2e:
+    name: e2e (processes, Redis, image builds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --locked
+      - run: uv run pytest tests/e2e
