@@ -277,4 +277,5 @@ No release process exists: no staging or production, and nothing ships anywhere.
   | `lint, types, contract, build` | `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, `uv run python -m app.cli --export-openapi --check`, `uv build` | the named step failed; a stale `openapi.json` is fixed by `uv run python -m app.cli --export-openapi` |
   | `unit and integration (real Postgres)` | `uv run pytest -m "not e2e"` (Docker) | a test failed; the log names it |
   | `e2e (processes, Redis, image builds)` | `uv run pytest tests/e2e` (Docker) | a process-level test failed, or an image no longer builds |
-  CI installs with `uv sync --locked`, so a PR that changes `pyproject.toml` without `uv.lock` fails every job. It reads no secret and no `.env`. Making the three jobs required checks is a GitHub repository setting (an admin), not part of the repo.
+
+  CI installs with `uv sync --locked`, so a PR that changes the dependencies in `pyproject.toml` without regenerating `uv.lock` fails every job. It reads no secret and no `.env`. Making the three jobs required checks is a GitHub repository setting (an admin), not part of the repo.

@@ -16,7 +16,7 @@ Goal 3 (test base): the real-database suite keeps working because every PR runs 
 - [x] AC3 Given a PR that changes a route without regenerating `openapi.json`, then the static job is red at the openapi step; given lint, format or type errors, red at that step.
 - [x] AC4 CI installs with `uv sync --locked` (a stale `uv.lock` fails it), uses the Python of `.python-version`, and the uv version equals the one the Dockerfile pins.
 - [x] AC5 The suite needs no secret and no `.env`: no repository secret is read, `permissions` is `contents: read`, and the run is the same with no `.env.test`.
-- [x] AC6 A new push to the same PR cancels the older run; each job has a timeout.
+- [x] AC6 A new push to the same PR cancels the older run, a push to `main` is never cancelled; each job has a timeout.
 - [x] AC7 `agent-checks.yml` is untouched and still runs beside it.
 
 ## Edge cases
@@ -32,6 +32,6 @@ Goal 3 (test base): the real-database suite keeps working because every PR runs 
 |---|----------|-------------------|----------------|
 | A1 | Triggers | `pull_request` and `push` to `main` | no |
 | A2 | Jobs | `static` (ruff, format, mypy, openapi, build), `tests` (`pytest -m "not e2e"`, Postgres), `e2e` (`pytest tests/e2e`, Docker image build and worker with Redis), three parallel jobs | confirm |
-| A3 | Action versions | pinned to a major tag (`actions/checkout@v4`, `astral-sh/setup-uv`), verified against their docs before use; not pinned to a commit SHA | yes, confirm (SHA pinning is stricter) |
+| A3 | Action versions | `actions/checkout` by major tag (v5); `astral-sh/setup-uv` by commit SHA with its version in a comment, because it publishes no floating major tag (changed from the approved major-tag pin once its docs were read; stricter, called out in the PR body) | yes, confirm (SHA pinning is stricter) |
 | A4 | Make the jobs required checks | a repo admin does it in GitHub settings; I only name the check names in the PR body | yes |
 | A5 | The red-PR evidence (AC2) | a throwaway draft PR from a scratch branch with one deliberately failing assertion, closed unmerged and the branch deleted | yes, confirm |

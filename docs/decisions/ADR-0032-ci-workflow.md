@@ -10,14 +10,15 @@
 Until now ruff, mypy, pytest, the `openapi.json` check and the image build ran only on a developer's machine (rule B1 had no enforcement). The Node base's CI also ran a web typecheck and build; this repo has no `web/` (ADR-0010).
 
 ## Decision
-- One workflow, `.github/workflows/ci.yml`, on `pull_request` and on `push` to `main`, with `permissions: contents: read`, a `concurrency` group that cancels an older run of the same ref, and a `timeout-minutes` on each job.
+- One workflow, `.github/workflows/ci.yml`, on `pull_request` and on `push` to `main`, with `permissions: contents: read`, a `concurrency` group that cancels an older run of the same pull request but never a run on `main` (so every commit on `main` gets a result), and a `timeout-minutes` on each job.
 - Three jobs run in parallel on `ubuntu-latest`, each doing `uv sync --locked` first:
   - `static` ("lint, types, contract, build"): `ruff check`, `ruff format --check`, `mypy`, `python -m app.cli --export-openapi --check`, `uv build`.
   - `tests` ("unit and integration (real Postgres)"): `pytest -m "not e2e"`. testcontainers starts `postgis/postgis:16-3.4` on the runner's Docker (rule P8, ADR-0006); there is no service container and no `TEST_DATABASE_URL`.
   - `e2e` ("e2e (processes, Redis, image builds)"): `pytest tests/e2e`, which holds the shutdown, seed and worker tests (a Redis container) and the two image builds of ADR-0030. It has its own job because the image builds make it the slowest, so the other two report first.
-- Every command is a row of the command map in `CLAUDE.md` (rule T1). The suite reads no secret and no `.env`.
+- Each command is a row of the command map in `CLAUDE.md` (rule T1) or a test selection documented in the RUNBOOK (`pytest -m "not e2e"` covers `tests/unit` and `tests/integration`); `uv sync --locked` is the stricter form of the map's `uv sync`. The suite reads no secret and no `.env`.
 - uv is pinned to `0.12.22`, the version the `Dockerfile` copies, in one `UV_VERSION` variable with a comment naming the other place. Python comes from `.python-version` (3.14); uv downloads it. A stale `uv.lock` fails `uv sync --locked`.
 - Actions: `actions/checkout@v5` by major tag, as `agent-checks.yml` does with v4; `astral-sh/setup-uv` by commit SHA with its version in a comment, because its documentation pins it that way and publishes no floating major tag.
+- `checkout` runs with `persist-credentials: false`; `setup-uv` caches uv's downloads by default, and a PR's cache is scoped to its own ref, so a fork PR cannot poison the cache `main` uses.
 - No web step (no `web/`), and nothing here ships to an environment (none is defined, rule C5).
 - Making the three jobs required checks is a repository setting an admin changes in GitHub; the check names are the job names above.
 
