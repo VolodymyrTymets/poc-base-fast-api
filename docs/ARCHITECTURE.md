@@ -3,7 +3,7 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0030 but not yet
+**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0031 but not yet
 built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
 
 ## Current
@@ -19,6 +19,7 @@ built. "Planned" is still intent from the scope doc and is decided by the task n
 | `tests/` | `unit/` (no Docker, database or network), `integration/db/` and `integration/http/` (real Postgres; services, models, seeds and migrations, and the endpoints) and `e2e/` (the app, the worker or a command as a process), flat `test_<subject>.py` files with names unique across all folders, markers set by folder and fixture ([ADR-0029](decisions/ADR-0029-three-test-levels.md)); the conventions are in `.claude/rules/testing-python.md` and the `test-conventions` skill (task 3.3). `conftest.py` and `utils/db.py` (task 3.1, [ADR-0006](decisions/ADR-0006-test-database-testcontainers.md)): a PostGIS container per session (or `TEST_DATABASE_URL`), a template database built with `alembic upgrade head` and the seeds (a second, unseeded template, copied once per test, is the start of the seed tests: fixture `unseeded_database_url`), one copy per test module, and a `db_session` fixture. Task 3.2: `utils/client.py` (`client_for`, `running_client`), `utils/auth.py` (sign-up and sign-in helper), `utils/queue.py` (`FakeQueue`), `utils/clock.py` (`FROZEN_NOW`) and the fixtures `asgi_app`, `client`, `queue` and `frozen_clock`. Task 6.1: `utils/redis.py` and the fixtures `redis_target` (a Redis container per session, or `TEST_REDIS_URL`) and `redis_settings` (database 15 only, flushed around each test) serve the queue tests in `tests/e2e/test_worker_arq.py`, which need Redis but no Postgres. `testcontainers[postgres]`, `types-docker` and `time-machine` are dev dependencies | — | backend |
 | `alembic.ini`, `migrations/` | the Alembic setup (task 2.4, [ADR-0017](decisions/ADR-0017-alembic-migrations-directory.md)): `env.py` is async, takes the URL from `Settings` and compares models with the database; `versions/0001_init.py` is the final state of the four Prisma migrations, hand-written and frozen; `0002_seed_history.py` adds `SeedHistory` (task 5.1). Tooling beside `app/`, not part of the wheel | — | backend |
 | `Dockerfile`, `docker-entrypoint.sh`, `.dockerignore` | the container image (task 11.1, [ADR-0030](decisions/ADR-0030-container-image.md)): stages `base`, `development` (the API) and `worker`; the entrypoint waits for Postgres, runs `alembic upgrade head` and `python -m app.seeds` (skipped when `RUN_MIGRATIONS=0`, which the worker sets), then `exec`s the command; non-root user `app`; no secret in the image | yes: the API and the worker images | backend |
+| `docker-compose.yml`, `set-ports.sh`, `move-env.sh` | the development stack (task 11.2, [ADR-0031](decisions/ADR-0031-compose-stack-and-ports.md)): compose runs `db`, `redis`, `api` and `worker` from `.env.development`; `set-ports.sh <BASE>` writes the host ports (API = BASE, Postgres = BASE+1, Redis = BASE+2) into `.env` for a second stack; `move-env.sh [--force] <dir>` copies the gitignored env files to another checkout. At the root because people call them; `scripts/` holds what the image runs | yes: the four services | backend |
 | `scripts/` | tooling beside `app/`, not in the wheel and importing nothing from `app` (ADR-0030): `wait_for_postgres.py`, the counted wait the entrypoint runs (`DB_WAIT_ATTEMPTS`, `DB_WAIT_INTERVAL_SECONDS`) | — | backend |
 | `pyproject.toml` | project metadata, `requires-python >=3.14`, runtime `dependencies` (fastapi, uvicorn, pydantic-settings, sentry-sdk, sqlalchemy[asyncio], asyncpg, alembic, email-validator, phonenumbers, pyjwt, arq, pwdlib[argon2]: a deploy runs `alembic upgrade head`), a `dev` group (ruff, mypy, pytest and plugins, httpx, testcontainers, types-docker, time-machine), the tool settings for ruff, mypy (which also checks `migrations/`) and pytest, script `poc-base-fast-api` (`app.main:run`, ADR-0012), build backend `uv_build` with `module-name = "app"` and `module-root = ""` | — | backend |
 | `uv.lock`, `.python-version` | lockfile (uv-owned) and the interpreter pin (3.14) | — | generated / backend |
@@ -53,7 +54,7 @@ The REST contract is written down in [docs/api/ENDPOINTS.md](api/ENDPOINTS.md). 
 | staging | not defined | | team |
 | production | not defined | | **not the agent** (rule C5) |
 
-## Decided (ADR-0003 to ADR-0030, built by the scope-doc tasks)
+## Decided (ADR-0003 to ADR-0031, built by the scope-doc tasks)
 Supersession applies to this repo only; the Node repo's ADRs stay in force there.
 
 - REST with FastAPI under `/api/v1`, Pydantic models, error body `{"error": {...}}`, contract exported to a root `openapi.json`
@@ -96,6 +97,8 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
   ([ADR-0028](decisions/ADR-0028-argon2-hashing-pwdlib.md)).
 - One image, targets `development` and `worker`; the entrypoint owns the wait, the migration and the seeds, and the worker never migrates; `HOST` (default `127.0.0.1`, `0.0.0.0` in the image) is the bind address; `scripts/` is the new tooling directory
   ([ADR-0030](decisions/ADR-0030-container-image.md)).
+- Compose stack of four services (no web); containers read `.env.development`, the root `.env` sets host ports, the two scripts live at the root
+  ([ADR-0031](decisions/ADR-0031-compose-stack-and-ports.md)).
 - The console script `poc-base-fast-api` runs uvicorn on `PORT` ([ADR-0012](decisions/ADR-0012-console-script-runs-the-server.md)); it supersedes the script line of ADR-0011.
 - Refresh tokens stored as sha256, sent in `x-refresh-token`
   ([ADR-0008](decisions/ADR-0008-auth-tokens-refresh-hash-and-transport.md)).
@@ -121,6 +124,7 @@ described in the Node base's `docs/ARCHITECTURE.md`; the REST versions are speci
 | none yet | SMS and email stay log-only (out of scope) | — | — |
 
 ## Known constraints and landmines
+- The scope doc's row 11.2 says `docker compose up -d` starts "all six services" and names `api/` paths; there are four services here (no `web/`, ADR-0031).
 - The scope doc still says Python 3.12 (task 1.3, `python:3.12-slim`); [ADR-0002](decisions/ADR-0002-python-3-14.md) pins 3.14 and wins. Docker tasks must use the pinned version.
 - The first half of the scope doc's row 1.3 (copy `web/`, compose files and ports, work in `api/`) and the ADR-P0x names are stale; [ADR-0010](decisions/ADR-0010-repo-layout-and-configuration.md) drops `web/` and `api/`, and [ADR-0011](decisions/ADR-0011-project-structure.md) puts the package at `app/`. The commands in `CLAUDE.md` assume the repo root.
 - `uv.lock` is committed; `.venv/` and `dist/` are not.

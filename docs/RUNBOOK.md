@@ -222,6 +222,34 @@ docker stop poc-api                      # graceful; the exit status is 0 (143 u
 - The image sets `HOST=0.0.0.0`; outside a container `HOST` stays `127.0.0.1`. `docker run <image> sh` still waits and migrates first; use `--entrypoint sh` to skip that.
 - Tests: `tests/e2e/test_docker_image.py` builds both targets and runs them against the test Postgres (and Redis for the worker); it needs Docker, so it is selected by `-m db` and never by `-m "not db and not redis"`.
 
+## Docker Compose
+`docker-compose.yml` starts four services (task 11.2, ADR-0031): `db` (PostGIS), `redis`, `api` and `worker`, built from the image of the previous section. The containers read `.env.development`; the root `.env` only sets the published host ports.
+```bash
+cp .env.development.example .env.development   # gitignored
+# edit it: set JWT_SECRET and JWT_REFRESH_TOKEN_SECRET to two different values of 32+ characters (openssl rand -hex 32),
+# and keep POSTGRES_PASSWORD equal to the password in DATABASE_URL
+docker compose up -d --build
+docker compose ps                              # db and redis healthy, api and worker running
+curl localhost:3001/api/v1/health              # {"status":"ok"}
+docker compose logs -f worker                  # the job log, for example the [SMS] and [EMAIL] lines
+docker compose down                            # keeps the data; adding the volumes flag deletes the database and the queue
+```
+- `api` and `worker` stop at boot with `jwt_secret must be at least 32 characters` while the placeholder secrets are in place: `APP_ENV=development` checks them (see "Token secrets").
+- `api` migrates and seeds, `worker` never does (ADR-0030). The stack needs Docker only; the host needs no Python.
+- **A second stack** runs beside the first from a second checkout or worktree (compose names the project after the directory):
+  ```bash
+  git worktree add ../poc-base-fast-api-2
+  ./move-env.sh ../poc-base-fast-api-2           # copies .env, .env.development, .env.test that exist; refuses to overwrite one there unless --force
+  cd ../poc-base-fast-api-2 && ./set-ports.sh 4000   # API 4000, Postgres 4001, Redis 4002
+  docker compose up -d --build
+  curl localhost:4000/api/v1/health
+  ```
+  `set-ports.sh` writes the three `EXPOSE_*` ports to `.env`, and also `PORT`, `REDIS_PORT` and the port of `DATABASE_URL` there for a run outside Docker. Container-internal ports stay 3001, 5432 and 6379. Because `PORT` in `.env` becomes the published port, a local `uv run poc-base-fast-api` and the `api` container cannot share a checkout at once.
+  A published port already in use on the host fails `up` with a bind error: pick another base.
+- The stack is local-only: ports are published on `127.0.0.1` (`EXPOSE_HOST`, in `.env` or the shell, changes that). With `APP_ENV=development` the API returns OTP codes and has a seeded admin, and Redis has no password, so do not open the ports to a network, and change the `change-me` database password if you do.
+- `move-env.sh <dir>` takes a path relative to where you run it and refuses to target its own checkout.
+- On Apple Silicon `db` runs under emulation and Docker prints a platform warning; it still becomes healthy.
+
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy`, `uv run pytest tests/unit`, `uv run pytest tests/integration`, `uv run pytest tests/e2e`, `uv run poc-base-fast-api`, `uv run alembic upgrade head` and
