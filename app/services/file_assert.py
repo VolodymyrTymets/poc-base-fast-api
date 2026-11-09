@@ -24,7 +24,7 @@ def _upload_detail(message: str, error_type: str) -> list[ErrorDetail]:
     return [{"in": "body", "field": "file", "message": message, "type": error_type}]
 
 
-def _media_type(mime_type: str) -> str:
+def media_type(mime_type: str) -> str:
     # `image/PNG; charset=x` is the type `image/png`.
     return mime_type.split(";", 1)[0].strip().lower()
 
@@ -43,7 +43,7 @@ class FileAssertService:
             raise PayloadTooLargeError(
                 details=_upload_detail("File is too large", "file_too_large")
             )
-        if not mime_type or _media_type(mime_type) not in self._allowed_mime_types:
+        if not mime_type or media_type(mime_type) not in self._allowed_mime_types:
             raise ValidationFailedError(
                 details=_upload_detail(
                     "File type is not allowed", "file_type_not_allowed"
