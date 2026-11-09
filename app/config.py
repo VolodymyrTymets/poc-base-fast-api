@@ -146,6 +146,10 @@ class Settings(BaseSettings):
     redis_database: int = Field(default=0, ge=0, le=15)
     redis_password: Annotated[SecretStr | None, BeforeValidator(_blank_to_none)] = None
 
+    # Task 9.2 (ADR-0035): the Redis read cache, on the same Redis as the queue. Off, every read goes to the database; with it on and
+    # Redis down, reads still work (the cache fails open).
+    cache_enabled: bool = True
+
     @field_validator("database_url")
     @classmethod
     def _require_asyncpg_scheme(cls, value: str | None) -> str | None:
