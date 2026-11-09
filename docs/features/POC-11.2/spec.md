@@ -15,13 +15,13 @@ Goal 1 (scaffolding): `docker compose up -d` is the whole first run for a fork, 
   bind mounts or hot reload for the API; a compose healthcheck for the API; production compose; changing the Dockerfile or the entrypoint.
 
 ## Acceptance criteria
-- [ ] AC1 Given `.env.development` copied from the example, with secrets set, when `docker compose up -d --build`, then `db`, `redis`, `api` and `worker` run, `db` and `redis` report healthy first, and `GET /api/v1/health` answers on the host.
-- [ ] AC2 Given the stack is up, when the OTP request/verify flow is called, then the SMS job runs in the `worker` container (its log shows `[SMS] TOTP code sent to ***`): the API and the worker share Redis.
-- [ ] AC3 `./set-ports.sh 4000` writes `EXPOSE_API_PORT`, `EXPOSE_POSTGRES_PORT` and `EXPOSE_REDIS_PORT` (4000, 4001, 4002) to `.env`, and `PORT`, `REDIS_PORT` and the `DATABASE_URL` port to `.env` for a non-docker run; container-internal ports never change; running it twice gives the same file; a bad argument exits 1 with the usage and writes nothing.
-- [ ] AC4 A second checkout, given its env files by `move-env.sh` and its ports by `./set-ports.sh 4000`, runs `docker compose up -d` beside the first stack, and both answer `/api/v1/health` on their own ports.
-- [ ] AC5 `move-env.sh <dir>` copies `.env`, `.env.development` and `.env.test` that exist, says which it skipped, fails with usage when `<dir>` is missing or not a directory, and refuses to overwrite a file already in `<dir>` unless `--force` is given.
-- [ ] AC6 No secret in `docker-compose.yml`; the files it reads are gitignored; `docker compose config` is valid after the examples are copied to `.env.development`.
-- [ ] AC7 The RUNBOOK's Docker Compose section, followed verbatim, gives a running stack.
+- [x] AC1 Given `.env.development` copied from the example, with secrets set, when `docker compose up -d --build`, then `db`, `redis`, `api` and `worker` run, `db` and `redis` report healthy first, and `GET /api/v1/health` answers on the host.
+- [x] AC2 Given the stack is up, when the OTP request/verify flow is called, then the SMS job runs in the `worker` container (its log shows `[SMS] TOTP code sent to ***`): the API and the worker share Redis.
+- [x] AC3 `./set-ports.sh 4000` writes `EXPOSE_API_PORT`, `EXPOSE_POSTGRES_PORT` and `EXPOSE_REDIS_PORT` (4000, 4001, 4002) to `.env`, and `PORT`, `REDIS_PORT` and the `DATABASE_URL` port to `.env` for a non-docker run; container-internal ports never change; running it twice gives the same file; a bad argument exits 1 with the usage and writes nothing.
+- [x] AC4 A second checkout, given its env files by `move-env.sh` and its ports by `./set-ports.sh 4000`, runs `docker compose up -d` beside the first stack, and both answer `/api/v1/health` on their own ports.
+- [x] AC5 `move-env.sh <dir>` copies `.env`, `.env.development` and `.env.test` that exist, says which it skipped, fails with usage when `<dir>` is missing or not a directory, and refuses to overwrite a file already in `<dir>` unless `--force` is given.
+- [x] AC6 No secret in `docker-compose.yml`; the files it reads are gitignored; `docker compose config` is valid after the examples are copied to `.env.development`.
+- [x] AC7 The RUNBOOK's Docker Compose section, followed verbatim, gives a running stack.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
