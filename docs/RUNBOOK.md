@@ -51,6 +51,8 @@ secret logs everyone out.
 ## Logging, errors and shutdown
 - Logs are one JSON object per line on stdout, uvicorn's included. `LOG_LEVEL` sets the level. Tokens, passwords, DOB and
   phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
+- **Request id (task 11.6, ADR-0033):** every response has an `X-Request-ID` header. Send your own (1 to 64 characters of letters, digits, `.`, `_`, `-`) and it is echoed; otherwise one is generated, and a malformed one is replaced and never logged. Every JSON log line written while the request is handled, uvicorn's access line included, has the same `request_id`, so `grep '"request_id": "abc-123"'` follows one request. A line outside a request, such as start-up, has none. An unhandled 500 carries the id too, in the header and in its `unhandled error` log line. Worker jobs do not carry it yet.
+- **Security headers (task 11.6):** every response the app sends has `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. An unhandled 500 does not (Starlette answers it outside the middleware, the same limit as CORS: `docs/api/ERRORS.md`). No HSTS and no Content-Security-Policy are sent: the app speaks plain HTTP behind whatever ends TLS, which sets HSTS, and the Swagger UI loads a script from a CDN.
 - Sentry starts only when `APP_ENV` is not `local` and `SENTRY_DSN` is set; with no DSN nothing is sent. See ADR-0013.
 - Redaction and the JSON format are set up by `uv run poc-base-fast-api` (`app.main:run`). Starting the app another way, for example
   `uvicorn app.main:create_app --factory`, skips them; a container command must use the console script, as the image of task 11.1 does (see "Docker").
@@ -205,7 +207,7 @@ The OpenAPI document is committed as `openapi.json` at the repo root (ADR-0003).
 - `uv run python -m app.cli --export-openapi` rewrites it from `create_app()`; the output is sorted and stable, so a second run changes nothing.
 - `uv run python -m app.cli --export-openapi --check` exits 1 without writing when the file is stale. `tests/unit/test_openapi_stale.py` does the same check, so
   a route added without regenerating fails `uv run pytest tests/unit`.
-- `/docs` (Swagger UI) and `/openapi.json` are served by the running app and list the six feature tags.
+- `/docs` (Swagger UI), `/redoc` and `/openapi.json` are served by the running app for `APP_ENV` `local` and `development` only and list the six feature tags; with `test` or `production` they answer 404 (task 11.6, ADR-0033). The export command above works in every environment: it does not use the served route.
 
 ## Docker
 One `Dockerfile` at the repo root, two targets (task 11.1, ADR-0030): `development` (the API, with the dev group and `tests/`) and `worker`. Both need `DATABASE_URL`; the worker needs `REDIS_*`. Nothing secret is in the image: pass settings with `-e` or `--env-file` at run time.
