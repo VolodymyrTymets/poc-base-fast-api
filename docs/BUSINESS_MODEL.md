@@ -10,8 +10,10 @@ customer-facing product. It provides the pieces a new POC would otherwise rebuil
 authentication with JWT access/refresh tokens, roles, file storage in Postgres, seed data, a background
 worker, a Redis read cache and a real-database test base.
 
-The work plan is the doc "Scope Breakdown: poc-base on Python + FastAPI (REST)" (49 tasks, about 175 h).
-Status today: only the `uv init` skeleton exists; nothing in that plan is built yet.
+The work plan is the doc "Scope Breakdown: poc-base on Python + FastAPI (REST)" (41 tasks, about 153 h; there is no `web/`, so package 10 and task 11.3 are dropped).
+Status today (2026-11-09): built are the project skeleton and tooling, the database and migrations, the test base, the REST foundation, accounts, roles and seeds, the notifier and
+worker, the authentication routes, the container image, the compose stack and CI. Not built: the file routes (tasks 8.2 and 8.3), the Redis read cache and the list helpers
+(package 9) and the hardening pass (task 11.6). The details are in `docs/ARCHITECTURE.md`.
 
 ## Ranked goals
 Carried over from `poc-base`; confirmed by volodymyr on 2026-10-29 (POC-1.1).
