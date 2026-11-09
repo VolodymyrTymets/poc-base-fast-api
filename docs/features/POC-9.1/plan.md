@@ -30,12 +30,12 @@ No precedent for a tagged JSON codec; the new pattern gets ADR-0034 (rule D1).
 - risk: canonical form must not depend on dict insertion order; tested by two orderings.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-9.1/spec.md (acceptance criteria checked off)
-- [ ] docs/decisions/ADR-0034-cache-serializer-and-keys.md (new, `proposed` until the human accepts it: Q1)
-- [ ] docs/ARCHITECTURE.md — `app/core/` row lists `cache.py`; "Decided" bullet; "Planned" cache bullet says 9.1 is built and 9.2 is not
-- [ ] docs/DOMAIN_GLOSSARY.md — terms "Cache key" and "Stale window"
-- [ ] docs/BUSINESS_MODEL.md — status line (9.1 built, 9.2 and 9.3 not)
-- [ ] `.claude/rules/project-structure.md` — only if it lists `core` modules (checked while implementing)
+- [x] docs/features/POC-9.1/spec.md (acceptance criteria checked off)
+- [x] docs/decisions/ADR-0034-cache-serializer-and-keys.md (new, `accepted`: the approval of the plan answered Q1)
+- [x] docs/ARCHITECTURE.md — `app/core/` row lists `cache.py`; "Decided" bullet; "Planned" cache bullet says 9.1 is built and 9.2 is not
+- [x] docs/DOMAIN_GLOSSARY.md — terms "Cache key" and "Stale window"
+- [x] docs/BUSINESS_MODEL.md — status line (9.1 built, 9.2 and 9.3 not)
+- [x] `.claude/rules/project-structure.md` — no change: it already names `cache` under `core/`
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |

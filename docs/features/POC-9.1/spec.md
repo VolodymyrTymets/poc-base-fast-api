@@ -11,13 +11,13 @@ A pure, tested seam in `app/core/cache.py` that task 9.2 (read-through cache and
 - **out (explicit):** any Redis I/O, `get`/`set`/`SCAN` invalidation and the read-through wrapper (task 9.2); wiring into services; pagination helpers (9.3); a new runtime dependency (the module imports the standard library only); caching of anything other than the listed types; a cache-hit log hook.
 
 ## Acceptance criteria
-- [ ] AC1 Given a dict holding an aware `datetime`, when serialized and deserialized, then the result equals the input and its `tzinfo` offset is the same; a naive `datetime` stays naive.
-- [ ] AC2 Given a `Decimal("1234.56")` (and `Decimal("1E+3")`, `Decimal("NaN")`), when round-tripped, then the result is a `Decimal` that equals it with the same exponent, not a `str` or `float`.
-- [ ] AC3 Given `bytes`, a 2^63 int and plain values (str, None, bool, nested list and dict), when round-tripped, then the result equals the input and `bytes` comes back as `bytes`.
-- [ ] AC4 Given `{"$cacheType": "Unknown", "value": "x"}` as text, when deserialized, then `CacheDecodeError` is raised naming the tag; given text that is not JSON it raises `CacheDecodeError` too.
-- [ ] AC5 Given a value of any other type (for example `set`, `UUID`) or a dict with the key `$cacheType`, when serialized, then it raises `TypeError` / `ValueError`; nothing is stored silently as a wrong shape (rule D5).
-- [ ] AC6 Given the same model and the same args in any key order, when `cache_key` is called, then the key is identical and has the form `cache*Account*<64 hex>`; different args or model give different keys; `*` in a model name is rejected.
-- [ ] AC7 `CACHE_TTL_SECONDS == 60` and `CACHE_STALE_SECONDS == 30`.
+- [x] AC1 Given a dict holding an aware `datetime`, when serialized and deserialized, then the result equals the input and its `tzinfo` offset is the same; a naive `datetime` stays naive.
+- [x] AC2 Given a `Decimal("1234.56")` (and `Decimal("1E+3")`, `Decimal("NaN")`), when round-tripped, then the result is a `Decimal` that equals it with the same exponent, not a `str` or `float`.
+- [x] AC3 Given `bytes`, a 2^63 int and plain values (str, None, bool, nested list and dict), when round-tripped, then the result equals the input and `bytes` comes back as `bytes`.
+- [x] AC4 Given `{"$cacheType": "Unknown", "value": "x"}` as text, when deserialized, then `CacheDecodeError` is raised naming the tag; given text that is not JSON it raises `CacheDecodeError` too.
+- [x] AC5 Given a value of any other type (for example `set`, `UUID`) or a dict with the key `$cacheType`, when serialized, then it raises `TypeError` / `ValueError`; nothing is stored silently as a wrong shape (rule D5).
+- [x] AC6 Given the same model and the same args in any key order, when `cache_key` is called, then the key is identical and has the form `cache*Account*<64 hex>`; different args or model give different keys; `*` in a model name is rejected.
+- [x] AC7 `CACHE_TTL_SECONDS == 60` and `CACHE_STALE_SECONDS == 30`.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
