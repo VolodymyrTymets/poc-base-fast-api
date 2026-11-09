@@ -106,7 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     api = APIRouter(prefix=API_PREFIX)
 
-    @api.get("/health")
+    @api.get("/health", summary="Scratch summary that is not in openapi.json")
     async def health() -> HealthResponse:
         return HealthResponse(status="ok")
 
