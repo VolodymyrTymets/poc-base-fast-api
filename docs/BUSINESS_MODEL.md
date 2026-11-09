@@ -12,7 +12,7 @@ worker, a Redis read cache and a real-database test base.
 
 The work plan is the doc "Scope Breakdown: poc-base on Python + FastAPI (REST)" (41 tasks, about 153 h; there is no `web/`, so package 10 and task 11.3 are dropped).
 Status today (2026-11-09): built are the project skeleton and tooling, the database and migrations, the test base, the REST foundation, accounts, roles and seeds, the notifier and
-worker, the authentication routes, the file routes (upload, update, metadata and content), the container image, the compose stack, CI and the hardening pass. Package 9 is started: the cache codec and key builder are built (task 9.1); not built: the read-through cache and invalidation (9.2) and the list helpers (9.3). The details are in `docs/ARCHITECTURE.md`.
+worker, the authentication routes, the file routes (upload, update, metadata and content), the container image, the compose stack, CI and the hardening pass. Not built: the Redis read cache and the list helpers (package 9). The details are in `docs/ARCHITECTURE.md`.
 
 ## Ranked goals
 Carried over from `poc-base`; confirmed by volodymyr on 2026-10-29 (POC-1.1).
