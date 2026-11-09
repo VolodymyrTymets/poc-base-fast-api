@@ -1,0 +1,80 @@
+# The development stack (task 11.2, ADR-0031): Postgres, Redis, the API and the worker.
+#   cp .env.development.example .env.development   # then set two different 32+ character JWT secrets
+#   docker compose up -d --build
+# Containers read .env.development. The root .env is read by compose only to fill the ${EXPOSE_*} host ports below
+# (./set-ports.sh writes them); container-internal ports never change.
+
+services:
+  # PostgreSQL with PostGIS (the first Alembic revision creates the extension)
+  db:
+    image: postgis/postgis:16-3.4
+    restart: always
+    env_file:
+      - .env.development
+    ports:
+      - "${EXPOSE_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - my_network
+
+  # Redis: the arq queue (and, later, the read cache)
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "${EXPOSE_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - my_network
+
+  # The API. Its entrypoint waits for Postgres, migrates and seeds, then serves (ADR-0030).
+  api:
+    build:
+      context: .
+      target: development
+    ports:
+      - "${EXPOSE_API_PORT:-3001}:3001"
+    env_file:
+      - .env.development
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - my_network
+
+  # The arq worker. It never migrates; the API container owns the schema.
+  worker:
+    build:
+      context: .
+      target: worker
+    env_file:
+      - .env.development
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - my_network
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  my_network:
+    driver: bridge
