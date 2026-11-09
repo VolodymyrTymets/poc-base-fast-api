@@ -26,6 +26,7 @@ from app.dependencies import (
 )
 from app.main import create_app
 from app.models import Account, AccountProfile, AccountRoleType
+from app.schemas.account import AccountResponse
 from app.services.account_role import AccountRoleService
 from app.services.notifier import NotifierService, NotifierType
 from app.services.otp import OtpService
@@ -119,13 +120,13 @@ async def test_a_test_can_replace_the_account_service_behind_a_real_route(
     app = make_app(module_database_url)
     created = datetime(2026, 1, 1, tzinfo=UTC).replace(tzinfo=None)
 
-    async def fake_account(account_id: str) -> SimpleNamespace:
-        return SimpleNamespace(
+    async def fake_snapshot(account_id: str) -> AccountResponse:
+        return AccountResponse(
             id=account_id, created_at=created, updated_at=None, profile=None
         )
 
     app.dependency_overrides[get_account_service] = lambda: SimpleNamespace(
-        get_by_id=fake_account
+        get_snapshot=fake_snapshot
     )
 
     async with running_client(app) as client:
