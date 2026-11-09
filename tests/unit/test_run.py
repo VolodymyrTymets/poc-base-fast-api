@@ -13,6 +13,7 @@ def test_run_passes_the_shutdown_timeout_and_json_logging_to_uvicorn(
     monkeypatch.setenv("SHUTDOWN_TIMEOUT_SECONDS", "7")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
     monkeypatch.setenv("PORT", "4100")
+    monkeypatch.setenv("HOST", "10.0.0.5")
     # The seams: the server and the global logging setup are not started in a unit test.
     monkeypatch.setattr(
         "app.main.uvicorn.run", lambda *args, **kwargs: calls.append(kwargs)
@@ -25,6 +26,7 @@ def test_run_passes_the_shutdown_timeout_and_json_logging_to_uvicorn(
     assert calls == [
         {
             "factory": True,
+            "host": "10.0.0.5",
             "port": 4100,
             "log_config": None,
             "timeout_graceful_shutdown": 7,

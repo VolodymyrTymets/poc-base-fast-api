@@ -124,6 +124,7 @@ def run() -> None:
     uvicorn.run(
         "app.main:create_app",
         factory=True,
+        host=settings.host,
         port=settings.port,
         # log_config=None keeps uvicorn's own handlers off, so its lines use our JSON format.
         log_config=None,
