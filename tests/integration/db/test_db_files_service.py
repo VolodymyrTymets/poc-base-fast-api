@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.db import utc_now
-from app.core.errors import PayloadTooLargeError
+from app.core.errors import NotFoundError, PayloadTooLargeError
 from app.models import Account, File
 from app.services.file_assert import FileAssertService
 from app.services.files import FilesService
@@ -163,3 +163,52 @@ async def test_update_with_a_file_that_fails_the_limits_changes_nothing(
 
     # Assert
     assert await stored(db_session, created.id) == (PNG, len(PNG), "image/png")
+
+
+async def test_get_content_returns_the_stored_bytes_and_mime_type(
+    db_session: AsyncSession,
+) -> None:
+    # Arrange
+    owner = await make_account(db_session)
+    files = service(db_session)
+    created = await files.create(owner, PNG, "image/png", "a.png", None)
+    db_session.expunge_all()
+
+    # Act
+    result = await files.get_content(created.id, owner)
+
+    # Assert
+    assert (result.content, result.mime_type) == (PNG, "image/png")
+
+
+async def test_get_content_returns_the_replacement_after_an_update(
+    db_session: AsyncSession,
+) -> None:
+    # Arrange
+    owner = await make_account(db_session)
+    files = service(db_session)
+    created = await files.create(owner, PNG, "image/png", "a.png", None)
+    new_bytes = b"\xff\xd8\xff-jpeg"
+    await files.update(created.id, owner, content=new_bytes, mime_type="image/jpeg")
+
+    # Act
+    result = await files.get_content(created.id, owner)
+
+    # Assert
+    assert (result.content, result.mime_type) == (new_bytes, "image/jpeg")
+
+
+async def test_get_content_of_a_row_with_no_bytes_is_not_found(
+    db_session: AsyncSession,
+) -> None:
+    # Arrange
+    owner = await make_account(db_session)
+    row = File(name="x", mime_type="image/png", size=0, created_by_id=owner)
+    db_session.add(row)
+    await db_session.flush()
+    file_id = row.id
+    db_session.expunge_all()
+
+    # Act
+    with pytest.raises(NotFoundError):
+        await service(db_session).get_content(file_id, owner)
