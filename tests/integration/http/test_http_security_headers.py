@@ -5,10 +5,15 @@ from fastapi.testclient import TestClient
 from httpx import Response
 
 from app.config import DEFAULT_CORS_ORIGINS, Settings
-from app.core.security_headers import SECURITY_HEADERS
 from app.main import create_app
 
-EXPECTED = {name.lower(): value for name, value in SECURITY_HEADERS}
+# Written out, not built from SECURITY_HEADERS: changing a value or dropping a header must fail here.
+EXPECTED = {
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+    "cache-control": "no-store",
+}
 WEB_APP = "http://localhost:5173"
 
 

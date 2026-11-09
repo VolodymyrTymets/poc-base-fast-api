@@ -1,7 +1,8 @@
 """Security response headers on every response the app sends. Tasks: 11.6 (ADR-0033).
 
-Pure ASGI, as body_limit.py: BaseHTTPMiddleware would buffer a streamed body. It is the outermost
-middleware, so a 413 from the body limit and a CORS preflight carry the headers too. A response that
+Pure ASGI, as body_limit.py: BaseHTTPMiddleware would buffer a streamed body. It sits outside CORS and
+the body limit (inside the request-id middleware), so a 413 from the body limit and a CORS preflight carry the headers too;
+Starlette's own error middleware is outside it, so an unhandled 500 does not. A response that
 already sets one of them keeps its own value (a later file route may want another Cache-Control).
 
 Not sent on purpose: Strict-Transport-Security (the app speaks plain HTTP behind whatever ends TLS,

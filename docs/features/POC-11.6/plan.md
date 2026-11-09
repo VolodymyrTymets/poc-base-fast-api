@@ -5,6 +5,8 @@ Approved-by: Volodymyr - 2026-11-09 (approved in chat, including A1, A3 and A4)
 
 Pattern followed: `app/core/body_limit.py` for a pure ASGI middleware (no `BaseHTTPMiddleware`, which buffers; `http` scope only; JSON bodies built with `error_body`), `create_app` in `app/main.py` for where middleware is added and in what order, `app/core/logging.py` (`JsonFormatter`, `configure_logging`) for the log fields, `tests/unit/test_logging.py` and `tests/integration/http/test_http_*.py` with `running_client(create_app(Settings()))` (no database needed) for the tests, ADR-0020 for putting project code in the layer where it belongs (`core/` imports no layer). The new pattern (docs gating, the request-id contextvar, the security-header set) is recorded in ADR-0033 (rule D1).
 
+> Changed during R3 (recorded here, ADR-0033 has the final order): `RequestIdMiddleware` is the outermost of our middleware and `SecurityHeadersMiddleware` sits inside it, the reverse of what R2 and R3 say below; and the 500 handler in `app/core/errors.py` also reads the id from the scope, logs it and returns it, because the ContextVar is reset before Starlette's error middleware runs.
+
 ## Contract changes
 - boundary: `/docs`, `/redoc`, `/openapi.json` disappear outside `local` and `development`; every response gains four security headers and `X-Request-ID`. `openapi.json` must not change (no route changes, and headers are not in it).
 - config: none (derived from `APP_ENV`). dependencies: none. generated output: none.

@@ -2,7 +2,7 @@
 
 from starlette.types import Message, Receive, Scope, Send
 
-from app.core.security_headers import SECURITY_HEADERS, SecurityHeadersMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 
 
 def make_app(headers: list[tuple[bytes, bytes]]) -> SecurityHeadersMiddleware:
@@ -42,9 +42,12 @@ async def test_the_four_headers_are_added_to_a_response_that_has_none() -> None:
     sent = await run(app)
 
     # Assert
-    assert sorted(start_headers(sent)) == sorted(
-        (name.lower().encode(), value.encode()) for name, value in SECURITY_HEADERS
-    )
+    assert sorted(start_headers(sent)) == [
+        (b"cache-control", b"no-store"),
+        (b"referrer-policy", b"no-referrer"),
+        (b"x-content-type-options", b"nosniff"),
+        (b"x-frame-options", b"DENY"),
+    ]
 
 
 async def test_a_header_the_response_already_sets_keeps_its_own_value() -> None:

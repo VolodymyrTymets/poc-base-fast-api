@@ -10,7 +10,7 @@ Goal 2 (authentication a new POC can rely on as-is) and goal 1 (a fork starts fr
 - in:
   - `/docs`, `/redoc` and `/openapi.json` served only for `APP_ENV` `local` and `development` (the scope row says "off outside local/development");
   - security response headers on every response the app itself sends;
-  - a request id: accepted from `X-Request-ID` when well-formed, otherwise generated; echoed in the response header; present on every JSON log line written while the request is handled;
+  - a request id: accepted from `X-Request-ID` when well-formed, otherwise generated; echoed in the response header; present on every JSON log line written while the request is handled (for an unhandled 500: its `unhandled error` line, not uvicorn's access and traceback lines);
   - a status, with its evidence, for each issue I.1 to I.10;
   - ADR-0033, RUNBOOK, ARCHITECTURE, `docs/api/ENDPOINTS.md` (the header convention) and DOMAIN_GLOSSARY (request id).
 - **out (explicit):** rate limiting, email verification, re-authentication on email change, httpOnly-cookie refresh tokens (issue I.8 stays open, out of scope for the whole base); HSTS and a Content-Security-Policy (see edge cases); a request id inside worker jobs; a request-id tag on Sentry events; changing the exported `openapi.json`; a new setting.

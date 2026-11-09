@@ -112,10 +112,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
         allow_headers=["*"],
     )
-    # Added last, so it is the outermost: the 413 of the body limit and a CORS preflight carry the headers too.
+    # Outside CORS and the body limit, so the 413 and a CORS preflight carry the headers too; the request id is added
+    # after it and sits outside it. Starlette's own error middleware is still outside all of ours.
     app.add_middleware(SecurityHeadersMiddleware)
-    # Outermost of all: the id is set before anything else runs, so every log line of the request and every
-    # response, a 413 and a preflight included, carries it.
+    # The outermost of our middleware: the id is set before anything of ours runs, so a 413 and a preflight carry it.
+    # Starlette's error middleware is outside it, which is why an unhandled 500 gets its id from the scope instead
+    # (app/core/errors.py).
     app.add_middleware(RequestIdMiddleware)
 
     register_error_handlers(app, expose_trace=settings.app_env == "local")

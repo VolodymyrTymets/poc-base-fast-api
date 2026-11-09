@@ -111,7 +111,7 @@ class JsonFormatter(logging.Formatter):
         # after the middleware has finished, app/core/errors.py) keeps it.
         request_id = request_id_var.get()
         if request_id is not None and "request_id" not in entry:
-            entry["request_id"] = request_id
+            entry["request_id"] = redact(request_id)
         if record.exc_info:
             entry["exception"] = redact(self.formatException(record.exc_info))
         return json.dumps(
