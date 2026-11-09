@@ -1355,6 +1355,67 @@
         ]
       }
     },
+    "/api/v1/files/{id}/content": {
+      "get": {
+        "description": "The bytes of the caller's file, read whole from the database (ADR-0009); 404 when the row holds none.\n\nIt reads and never commits, so it takes no session of its own. `nosniff` because the type is the uploader's declaration.",
+        "operationId": "get_file_content_api_v1_files__id__content_get",
+        "parameters": [
+          {
+            "description": "The file's id",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The file's id",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The file's bytes, with the stored mime type as `Content-Type`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get File Content",
+        "tags": [
+          "files"
+        ]
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",

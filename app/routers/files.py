@@ -1,8 +1,8 @@
-"""The /files routes: upload, update and metadata (task 8.2); the content route is task 8.3."""
+"""The /files routes: upload, update, metadata (task 8.2) and content (task 8.3)."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Path, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Path, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
@@ -72,4 +72,35 @@ async def get_file(
     """The metadata of the caller's file, with `contentUrl`; the bytes are served by the content route (task 8.3)."""
     return FileMetadataResponse.model_validate(
         await service.get(file_id, claims.account_id)
+    )
+
+
+@router.get(
+    "/{id}/content",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "The file's bytes, with the stored mime type as `Content-Type`",
+            "content": {
+                "application/octet-stream": {
+                    "schema": {"type": "string", "format": "binary"}
+                }
+            },
+        }
+    },
+)
+async def get_file_content(
+    file_id: FileId,
+    claims: Caller,
+    service: Annotated[FilesService, Depends(get_files_service)],
+) -> Response:
+    """The bytes of the caller's file, read whole from the database (ADR-0009); 404 when the row holds none.
+
+    It reads and never commits, so it takes no session of its own. `nosniff` because the type is the uploader's declaration.
+    """
+    stored = await service.get_content(file_id, claims.account_id)
+    return Response(
+        content=stored.content,
+        media_type=stored.mime_type or "application/octet-stream",
+        headers={"X-Content-Type-Options": "nosniff"},
     )

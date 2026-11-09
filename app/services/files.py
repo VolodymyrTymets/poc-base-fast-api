@@ -1,17 +1,29 @@
-"""FilesService: create, rename, replace and read a file's metadata. Ports the Node `FilesService`. Tasks: 8.2 (the size, type and owner checks are services/file_assert.py, task 8.1).
+"""FilesService: create, rename, replace and read a file's metadata. Ports the Node `FilesService`. Tasks: 8.2, 8.3 (the size, type and owner checks are services/file_assert.py, task 8.1).
 
 The shape of a service (class over a session, flush but never commit) is ADR-0021. Differences from Node, on purpose
 (ENDPOINTS decision 10): a file is created with its bytes, and its size and mime type come from the upload, never from the client.
 """
 
+from dataclasses import dataclass
+
 from pydantic import TypeAdapter, ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError
 from app.core.validation import FileName
 from app.models import File
 from app.services.file_assert import FileAssertService, media_type
 
 _FILE_NAME = TypeAdapter(FileName)
+
+
+@dataclass(frozen=True)
+class FileContent:
+    """What the content route sends: plain data, so the route needs no ORM object (`project-structure.md` rule 6)."""
+
+    content: bytes
+    mime_type: str | None
 
 
 def _name_or_filename(name: str | None, filename: str | None) -> str | None:
@@ -88,3 +100,18 @@ class FilesService:
     async def get(self, file_id: str, account_id: str) -> File:
         """The caller's file with its metadata and without its bytes (`ForbiddenError` as in `update`)."""
         return await self._file_assert.get_owned_file(file_id, account_id)
+
+    async def get_content(self, file_id: str, account_id: str) -> FileContent:
+        """The stored bytes and mime type of the caller's file. Reads only: nothing is flushed or changed.
+
+        The owner check comes first, so an unknown, foreign or soft-deleted file is the same `ForbiddenError` as for the
+        metadata. A row with no stored bytes (only Node's two-step upload could make one, ENDPOINTS decision 19) is
+        `NotFoundError`. The bytes are selected here because `get_owned_file` leaves `content` unloaded on purpose (task 8.1).
+        """
+        file = await self._file_assert.get_owned_file(file_id, account_id)
+        content = await self._session.scalar(
+            select(File.content).where(File.id == file.id)
+        )
+        if content is None:
+            raise NotFoundError
+        return FileContent(content=content, mime_type=file.mime_type)

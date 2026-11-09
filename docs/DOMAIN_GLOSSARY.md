@@ -14,7 +14,7 @@ domain and does not repurpose these names. Python identifiers are decided for al
 | Identity / credentials | `AccountIdentity` | Password and OTP hash material, the password-reset token hash and the refresh-token hash. Never exposed through the API. | Profile |
 | Role | `AccountRole` (`CUSTOMER`, `ADMIN`), `AccountOnRole` | A named permission bucket; an Account is placed in roles many-to-many. | — |
 | File | `File` | A tracked upload: bytes in a Postgres `bytea` column, mime type, size. | an external object store; bytes live in the database |
-| File content URL | `contentUrl` | The path `/api/v1/files/{id}/content` in a file's metadata (task 8.2). It needs the owner's Bearer token and answers once task 8.3 is built. | a public or signed URL that an `<img src>` could use |
+| File content URL | `contentUrl` | The path `/api/v1/files/{id}/content` in a file's metadata (task 8.2). It needs the owner's Bearer token and answers with the bytes (task 8.3). | a public or signed URL that an `<img src>` could use |
 | Notification | `Notification`, `NotificationRecipient` | A message plus the accounts it was sent to. | — |
 | Deletion record | `DeletedHistory` | A bookkeeping row naming a record that was deleted (`relationId`), by whom (`deletedBy`, optional) and a `deletedAt` flag. No code writes it yet. | Soft delete: the `deleted` column on domain tables is what marks a row deleted |
 | Sign-in code / OTP | OTP code | The one-time code sent to a phone number to authenticate; hashed at rest with Argon2id (ADR-0028; `otpSalt` is unused, the salt is in the hash), 2 minute TTL, never logged. | JWT tokens, issued after verification |
