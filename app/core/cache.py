@@ -9,6 +9,7 @@ import base64
 import binascii
 import hashlib
 import json
+import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -34,10 +35,11 @@ def _tagged(kind: str, value: str) -> dict[str, str]:
 
 
 def _encode(value: object) -> object:
-    # bool is an int subclass and must stay a JSON boolean, so it is checked before int.
-    if value is None or isinstance(value, bool | str | float):
+    # Exact types only: a StrEnum or IntEnum member (AccountRoleType) is a str or int subclass that would come back as the plain
+    # str or int, so a hit would differ from a database read. It raises TypeError below instead; the caller converts it first.
+    if value is None or type(value) in (bool, str, float):
         return value
-    if isinstance(value, int):
+    if type(value) is int:
         return value if abs(value) <= MAX_PLAIN_INT else _tagged("BigInt", str(value))
     if isinstance(value, datetime):
         return _tagged("DateTime", value.isoformat())
@@ -77,11 +79,15 @@ def serialize(value: object) -> str:
     return _dumps(value, sort_keys=False)
 
 
+_INT_TEXT = re.compile(r"-?[0-9]+", re.ASCII)
+
+
 def _decode_tagged(obj: dict[str, object]) -> object:
     kind = obj.get(TAG)
     text = obj.get("value")
-    if not isinstance(text, str):
-        raise CacheDecodeError(f"cache tag {kind!r} has no text value")
+    # The encoder writes exactly these two keys; anything else is not an entry of this version.
+    if obj.keys() != {TAG, "value"} or not isinstance(text, str):
+        raise CacheDecodeError(f"cache tag {kind!r} is not a {TAG}/value pair")
     try:
         if kind == "DateTime":
             return datetime.fromisoformat(text)
@@ -89,11 +95,11 @@ def _decode_tagged(obj: dict[str, object]) -> object:
             return Decimal(text)
         if kind == "Bytes":
             return base64.b64decode(text, validate=True)
-        if kind == "BigInt":
+        if kind == "BigInt" and _INT_TEXT.fullmatch(text):
             return int(text)
     except (ValueError, InvalidOperation, binascii.Error) as error:
         raise CacheDecodeError(f"cache tag {kind!r} holds a bad value") from error
-    raise CacheDecodeError(f"unknown cache type tag: {kind!r}")
+    raise CacheDecodeError(f"unknown or bad cache type tag: {kind!r}")
 
 
 def _hook(obj: dict[str, object]) -> object:
@@ -108,15 +114,34 @@ def deserialize(text: str) -> object:
         raise CacheDecodeError("cache entry is not valid JSON") from error
 
 
+# Characters that mean something in a Redis `SCAN MATCH` glob. A model name holding one would make the invalidation pattern match
+# other models (`*`, `?`, `[`) or too few (`\\`), so `cache_key` refuses it.
+_GLOB_CHARACTERS = frozenset("*?[]\\")
+
+
+def _check_model(model: str) -> None:
+    if not model or _GLOB_CHARACTERS & set(model):
+        raise ValueError(
+            "a cache model name is not empty and has no glob character (* ? [ ] \\)"
+        )
+
+
 def cache_key(model: str, args: object) -> str:
     """The key `cache*<model>*<sha256 hex of the args>` of one read.
 
     The hash is over the args serialized with sorted keys, so the same arguments in any dict order give one key, and a `datetime`
-    or `bytes` in them hashes by value. Invalidation (task 9.2) scans `cache*<model>*`, so the model name may not hold the delimiter.
+    or `bytes` in them hashes by value. Invalidation (task 9.2) scans `invalidation_pattern(model)`.
     """
-    if not model or CACHE_KEY_DELIMITER in model:
-        raise ValueError(
-            f"a cache model name is not empty and has no {CACHE_KEY_DELIMITER!r}"
-        )
+    _check_model(model)
     digest = hashlib.sha256(_dumps(args, sort_keys=True).encode("utf-8")).hexdigest()
     return CACHE_KEY_DELIMITER.join((CACHE_KEY_PREFIX, model, digest))
+
+
+def invalidation_pattern(model: str) -> str:
+    r"""The `SCAN MATCH` pattern for every key of `model`: `cache\*Account\**`.
+
+    The delimiter is also the glob wildcard, so the two literal ones are escaped; an unescaped `cache*Account*` would match
+    `AccountProfile` and `AccountRole` keys too.
+    """
+    _check_model(model)
+    return f"{CACHE_KEY_PREFIX}\\{CACHE_KEY_DELIMITER}{model}\\{CACHE_KEY_DELIMITER}{CACHE_KEY_DELIMITER}"

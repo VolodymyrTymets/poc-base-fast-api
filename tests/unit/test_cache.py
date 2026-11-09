@@ -3,6 +3,8 @@
 import re
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
+from enum import StrEnum
+from fnmatch import fnmatchcase
 from uuid import uuid4
 
 import pytest
@@ -14,6 +16,7 @@ from app.core.cache import (
     CacheDecodeError,
     cache_key,
     deserialize,
+    invalidation_pattern,
     serialize,
 )
 
@@ -186,6 +189,8 @@ def test_an_unknown_tag_raises_and_names_it() -> None:
         '{"$cacheType":"Decimal","value":"abc"}',
         '{"$cacheType":"DateTime","value":"yesterday"}',
         '{"$cacheType":"BigInt","value":"1.5"}',
+        '{"$cacheType":"BigInt","value":" 1_0 "}',
+        '{"$cacheType":"Bytes","value":"AA==","extra":1}',
     ],
     ids=[
         "not-json",
@@ -195,6 +200,8 @@ def test_an_unknown_tag_raises_and_names_it() -> None:
         "bad-decimal",
         "bad-datetime",
         "bad-int",
+        "int-with-spaces",
+        "extra-key",
     ],
 )
 def test_an_unreadable_entry_raises_cache_decode_error(text: str) -> None:
@@ -203,10 +210,14 @@ def test_an_unreadable_entry_raises_cache_decode_error(text: str) -> None:
         deserialize(text)
 
 
+class Role(StrEnum):
+    ADMIN = "ADMIN"
+
+
 @pytest.mark.parametrize(
     "value",
-    [{1, 2}, {"id": uuid4()}, object(), {1: "a"}],
-    ids=["set", "uuid", "object", "int-key"],
+    [{1, 2}, {"id": uuid4()}, object(), {1: "a"}, {"role": Role.ADMIN}],
+    ids=["set", "uuid", "object", "int-key", "str-enum"],
 )
 def test_a_value_that_cannot_be_cached_raises_type_error(value: object) -> None:
     # Act / Assert
@@ -220,10 +231,15 @@ def test_a_nan_float_raises_value_error() -> None:
         serialize({"x": float("nan")})
 
 
-def test_a_dict_with_the_tag_key_raises_value_error() -> None:
+@pytest.mark.parametrize(
+    "value",
+    [{"$cacheType": "Date", "value": "x"}, [{"a": {"$cacheType": "Bytes"}}]],
+    ids=["top-level", "nested"],
+)
+def test_a_dict_with_the_tag_key_raises_value_error(value: object) -> None:
     # Act / Assert
     with pytest.raises(ValueError, match="cacheType"):
-        serialize({"$cacheType": "Date", "value": "x"})
+        serialize(value)
 
 
 def test_a_key_has_the_prefix_the_model_and_a_sha256_hex() -> None:
@@ -263,21 +279,61 @@ def test_another_model_gives_another_key() -> None:
 
 def test_args_with_a_datetime_and_bytes_give_a_stable_key() -> None:
     # Arrange
-    args = {"since": datetime(2026, 1, 1, tzinfo=UTC), "blob": b"\x01"}
+    first_args = {"since": datetime(2026, 1, 1, tzinfo=UTC), "blob": b"\x01"}
+    second_args = {"since": datetime(2026, 1, 1, tzinfo=UTC), "blob": bytes([1])}
 
     # Act
-    first = cache_key("File", args)
-    second = cache_key("File", dict(args))
+    first = cache_key("File", first_args)
+    second = cache_key("File", second_args)
 
     # Assert
     assert first == second
 
 
-@pytest.mark.parametrize("model", ["", "Acc*ount"], ids=["empty", "delimiter"])
+@pytest.mark.parametrize(
+    "model",
+    ["", "Acc*ount", "Acc?ount", "Acc[ount", "Acc\\ount"],
+    ids=["empty", "star", "question", "bracket", "backslash"],
+)
 def test_a_bad_model_name_raises_value_error(model: str) -> None:
     # Act / Assert
     with pytest.raises(ValueError, match="model name"):
         cache_key(model, {})
+
+
+def as_fnmatch(pattern: str) -> str:
+    # Redis writes a literal star as `\\*`, fnmatch as `[*]`.
+    return pattern.replace("\\*", "[*]")
+
+
+def test_the_invalidation_pattern_matches_the_keys_of_its_model() -> None:
+    # Arrange
+    key = cache_key("Account", {"id": "a1"})
+
+    # Act
+    matched = fnmatchcase(key, as_fnmatch(invalidation_pattern("Account")))
+
+    # Assert
+    assert matched is True
+
+
+def test_the_invalidation_pattern_escapes_the_delimiters() -> None:
+    # Act
+    pattern = invalidation_pattern("Account")
+
+    # Assert
+    assert pattern == "cache\\*Account\\**"
+
+
+def test_the_invalidation_pattern_does_not_match_a_longer_model_name() -> None:
+    # Arrange
+    other = cache_key("AccountProfile", {"id": "a1"})
+
+    # Act
+    matched = fnmatchcase(other, as_fnmatch(invalidation_pattern("Account")))
+
+    # Assert
+    assert matched is False
 
 
 def test_the_ttl_is_60_seconds_and_the_stale_window_30() -> None:

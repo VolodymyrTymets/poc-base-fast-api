@@ -16,7 +16,7 @@ No precedent for a tagged JSON codec; the new pattern gets ADR-0034 (rule D1).
 ## Requirements (ordered; branch `feat/POC-9.1-cache-serializer`, one draft PR, one commit each)
 
 ### R1 — `serialize` / `deserialize` (M)
-- files: `app/core/cache.py` (new: `CacheDecodeError`; `serialize` with a recursive encoder that tags `datetime` (isoformat, offset kept), `Decimal` (`str`), `bytes` (base64), big `int` (str); `deserialize` with `object_hook`, unknown tag raises `CacheDecodeError`; `json.dumps(..., allow_nan=False)` is not used because Decimal NaN is a tagged string, not a float; dict key `$cacheType` rejected)
+- files: `app/core/cache.py` (new: `CacheDecodeError`; `serialize` with a recursive encoder that tags `datetime` (isoformat, offset kept), `Decimal` (`str`), `bytes` (base64), big `int` (str); `deserialize` with `object_hook`, unknown tag raises `CacheDecodeError`; `json.dumps(..., allow_nan=False)` so a NaN float is refused (a Decimal NaN is a tagged string); dict key `$cacheType` rejected)
 - layer: core
 - test: `tests/unit/test_cache.py` (new) — AC1 to AC5, one assertion subject each, AAA labels; the Node cases map 1:1 (Date, Decimal, bytes+bigint+plain, bytes type, unknown tag); plus the extra edge rows
 - executed how: `uv run pytest tests/unit/test_cache.py`, and a one-off `uv run python -c` round trip of a record shaped like an `AccountProfile` row, output pasted in the PR
@@ -48,3 +48,6 @@ No precedent for a tagged JSON codec; the new pattern gets ADR-0034 (rule D1).
 - Q2 and Q3 of the spec; Q1 needs a human.
 - The branch starts from `main` at `388be12` (8.3 merged). The untracked `Scope Breakdown ... .md`, `.serena/` and `dump.rdb` are not part of this PR.
 - Python `int` is unbounded, so the big-int tag is for parity with the Node `BigInt` and for non-Python readers, not for a Python need.
+
+## Deviations (found in review, recorded here and in the PR)
+- `app/core/cache.py`: exact types only (a `StrEnum` raises `TypeError` instead of coming back as `str`), a strict decoder (only the keys `$cacheType` and `value`, `BigInt` text is digits), and an unplanned `invalidation_pattern(model)` because the `*` delimiter is also a glob wildcard: model names with `* ? [ ] \` are refused. ADR-0034 and the glossary say so.
