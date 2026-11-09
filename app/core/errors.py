@@ -18,6 +18,8 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.request_id import REQUEST_ID_HEADER, request_id_of
+
 logger = logging.getLogger(__name__)
 
 # A validation entry (`field`, `in`, `message`, `type`) or one traceback string: the only
@@ -250,11 +252,22 @@ def register_error_handlers(app: FastAPI, *, expose_trace: bool) -> None:
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
         # The stack goes to the log in every environment, never into the body outside local.
         # No body, headers or query string are logged (rules D8, P4).
+        # The request-id middleware has finished when this runs, so the id comes from the scope and is logged
+        # and returned explicitly: it is the line and the header an incident is followed by.
+        request_id = request_id_of(request.scope)
         logger.error(
-            "unhandled error on %s %s", request.method, request.url.path, exc_info=exc
+            "unhandled error on %s %s",
+            request.method,
+            request.url.path,
+            exc_info=exc,
+            extra={"request_id": request_id} if request_id else None,
         )
         details: list[ErrorDetail] = []
         if expose_trace:
             details.append("".join(traceback.format_exception(exc)))
         error = InternalServerError(details=details)
-        return JSONResponse(error.body(), status_code=error.status_code)
+        return JSONResponse(
+            error.body(),
+            status_code=error.status_code,
+            headers={REQUEST_ID_HEADER: request_id} if request_id else None,
+        )

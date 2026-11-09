@@ -17,6 +17,8 @@ from app.core.db import create_engine, create_session_factory
 from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
 from app.core.queue import ArqQueueClient
+from app.core.request_id import RequestIdMiddleware
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
 from app.seeds.registry import seed_items
@@ -48,6 +50,9 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 logger = logging.getLogger(__name__)
 
+# The environments that serve /docs, /redoc and /openapi.json (task 11.6): the two a developer runs by hand.
+CONTRACT_PAGE_ENVS = frozenset({"local", "development"})
+
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
@@ -77,11 +82,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
+    # The Swagger UI, ReDoc and /openapi.json are served for local work only. `app.openapi()` does not need the served
+    # route, so `python -m app.cli --export-openapi` works in every environment (POC-11.6, ADR-0033).
+    serves_contract = settings.app_env in CONTRACT_PAGE_ENVS
     app = FastAPI(
         title="poc-base-fast-api",
         lifespan=lifespan,
         openapi_tags=TAGS,
         responses=ERROR_RESPONSES,
+        docs_url="/docs" if serves_contract else None,
+        redoc_url="/redoc" if serves_contract else None,
+        openapi_url="/openapi.json" if serves_contract else None,
     )
     # Read by the auth dependencies (app/dependencies.py), so they see what the app booted with.
     app.state.settings = settings
@@ -101,6 +112,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
         allow_headers=["*"],
     )
+    # Outside CORS and the body limit, so the 413 and a CORS preflight carry the headers too; the request id is added
+    # after it and sits outside it. Starlette's own error middleware is still outside all of ours.
+    app.add_middleware(SecurityHeadersMiddleware)
+    # The outermost of our middleware: the id is set before anything of ours runs, so a 413 and a preflight carry it.
+    # Starlette's error middleware is outside it, which is why an unhandled 500 gets its id from the scope instead
+    # (app/core/errors.py).
+    app.add_middleware(RequestIdMiddleware)
 
     register_error_handlers(app, expose_trace=settings.app_env == "local")
 
