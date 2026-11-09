@@ -17,13 +17,13 @@ Goal 1 (scaffolding): the base is clonable and understandable in under a day (BU
 - **out (explicit):** any code, test or workflow change; new decisions (a rule file restates, never decides: a gap becomes a follow-up, not an ADR here); the scope doc itself (a Claude Docs document outside the repo: its statuses are listed in the PR body); `web/`; rewriting ADRs (only status lines).
 
 ## Acceptance criteria
-- [ ] AC1 Given a clean `git clone` and only the RUNBOOK, when its first-run steps are followed (uv path and the Docker Compose path), then the API answers `/api/v1/health` and the OTP flow reaches the worker log; any step that failed or was missing is fixed in the RUNBOOK (evidence: the commands run in a scratch clone).
-- [ ] AC2 `README.md` is non-empty, under 60 lines, and every command in it is a command-map row or a RUNBOOK section it links to.
-- [ ] AC3 `CLAUDE.md` stays under 200 lines; its command map lists every command a developer or CI runs (compose up/down, the CI test selection, `uv sync --locked`, the two scripts); `P2` points to the current ADR range.
-- [ ] AC4 `backend-fastapi.md` and `api-rest.md` exist with `paths:` front matter like `routes-convention.md`; every rule cites the ADR or doc it restates, and none contradicts one (checked by a reviewer pass, listed in the PR body).
-- [ ] AC5 `protected-paths.md` lists every generated or secret path the repo has (`openapi.json`, `migrations/versions/**`, `.env.development`, `uv.lock`); a path this task finds missing is added.
-- [ ] AC6 Every ADR that another ADR supersedes in part says so in its status line, with a link.
-- [ ] AC7 No file under `docs/` or `.claude/` states something the code no longer does (the sweep lists each fix; each claim changed was checked against the code or a command run).
+- [ ] AC1 (uv path done on a clean clone; the Docker Compose path from a clean clone is pending, see the PR) Given a clean `git clone` and only the RUNBOOK, when its first-run steps are followed (uv path and the Docker Compose path), then the API answers `/api/v1/health` and the OTP flow reaches the worker log; any step that failed or was missing is fixed in the RUNBOOK (evidence: the commands run in a scratch clone).
+- [x] AC2 `README.md` is non-empty, under 60 lines, and every command in it is a command-map row or a RUNBOOK section it links to.
+- [x] AC3 `CLAUDE.md` stays under 200 lines; its command map lists every command a developer or CI runs (compose up/down, the CI test selection, `uv sync --locked`, the two scripts); `P2` points to the current ADR range.
+- [x] AC4 `backend-fastapi.md` and `api-rest.md` exist with `paths:` front matter like `routes-convention.md`; every rule cites the ADR or doc it restates, and none contradicts one (checked by a reviewer pass, listed in the PR body).
+- [x] AC5 `protected-paths.md` lists every generated or secret path the repo has (`openapi.json`, `migrations/versions/**`, `.env.development`, `uv.lock`); a path this task finds missing is added.
+- [x] AC6 Every ADR that another ADR supersedes in part says so in its status line, with a link.
+- [x] AC7 No file under `docs/` or `.claude/` states something the code no longer does (the sweep lists each fix; each claim changed was checked against the code or a command run).
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
