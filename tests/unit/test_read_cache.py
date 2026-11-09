@@ -1,13 +1,12 @@
 """ReadCache: read-through, fail open, invalidation by SCAN (task 9.2, ADR-0035). Uses a small in-memory store, not Redis."""
 
 import logging
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from fnmatch import fnmatchcase
 
 import pytest
 from redis.exceptions import AuthenticationError, ResponseError
 from redis.exceptions import ConnectionError as RedisConnectionError
+from utils.cache import MemoryStore
 
 from app.core.cache import (
     CACHE_TTL_SECONDS,
@@ -22,54 +21,6 @@ from app.core.cache import (
 MODEL = "Account"
 ARGS = {"accountId": "a1"}
 AT = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-
-
-class MemoryStore:
-    """An in-memory `CacheStore`. `keys` is deliberately absent: a call to it is an AttributeError, so KEYS cannot slip in."""
-
-    def __init__(
-        self, fail_with: Exception | None = None, fail_on: str | None = None
-    ) -> None:
-        self.data: dict[str, str] = {}
-        self.ttls: dict[str, int] = {}
-        self.fail_with = fail_with
-        self.fail_on = (
-            fail_on  # None: every call fails; else only the call of that name
-        )
-        self.calls: list[str] = []
-        self.delete_batches: list[int] = []
-
-    def _check(self, name: str) -> None:
-        self.calls.append(name)
-        if self.fail_with is not None and self.fail_on in (None, name):
-            raise self.fail_with
-
-    async def get(self, key: str) -> str | None:
-        self._check("get")
-        return self.data.get(key)
-
-    async def set(self, key: str, value: str, *, ex: int) -> None:
-        self._check("set")
-        self.data[key] = value
-        self.ttls[key] = ex
-
-    async def scan_iter(self, match: str) -> AsyncIterator[str]:
-        self._check("scan_iter")
-        # Redis writes a literal star as `\*`, fnmatch as `[*]`.
-        glob = match.replace("\\*", "[*]")
-        for key in list(self.data):
-            if fnmatchcase(key, glob):
-                yield key
-
-    async def delete(self, *keys: str) -> int:
-        self._check("delete")
-        self.delete_batches.append(len(keys))
-        for key in keys:
-            self.data.pop(key, None)
-        return len(keys)
-
-    async def close(self) -> None:
-        self.calls.append("close")
 
 
 class Loader:

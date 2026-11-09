@@ -11,7 +11,11 @@ from sqlalchemy.orm import selectinload
 from app.core.cache import Cache, NullReadCache
 from app.core.db import utc_now
 from app.models import Account, AccountIdentity, AccountProfile, AccountRoleType
+from app.schemas.account import AccountResponse
 from app.services.account_role import AccountRoleService
+
+# The cache model of the account snapshot; the profile update invalidates it (ADR-0035).
+ACCOUNT_CACHE_MODEL = "Account"
 
 
 class AccountService:
@@ -26,6 +30,25 @@ class AccountService:
             _live_accounts().where(Account.id == account_id)
         )
         return result.one_or_none()
+
+    async def get_snapshot(self, account_id: str) -> AccountResponse | None:
+        """The live account with its live profile as plain data, through the read cache (ADR-0035). `None` is never cached.
+
+        Used by `GET /account`. It is a copy: a caller that changes the account reads it with `get_by_id`, which never touches the
+        cache. A profile update invalidates the `Account` model (`ACCOUNT_CACHE_MODEL`) after its commit.
+        """
+
+        async def load() -> AccountResponse | None:
+            account = await self.get_by_id(account_id)
+            return None if account is None else AccountResponse.model_validate(account)
+
+        return await self._cache.get_or_load(
+            ACCOUNT_CACHE_MODEL,
+            {"accountId": account_id},
+            load,
+            encode=lambda snapshot: snapshot.model_dump(),
+            decode=AccountResponse.model_validate,
+        )
 
     async def get_by_phone(self, phone_number: str) -> Account | None:
         """The oldest live account whose live profile has this phone number; `None` when there is none."""

@@ -19,9 +19,9 @@ async def read_account(
     service: Annotated[AccountService, Depends(get_account_service)],
 ) -> AccountResponse:
     """The caller's own account, read from the token: authentication is the only layer (ADR-0022)."""
-    account = await service.get_by_id(claims.account_id)
+    account = await service.get_snapshot(claims.account_id)
     if account is None:
         # The token is valid but no longer maps to a live account (ENDPOINTS decisions 2 and 16): the same 401
         # as `current_account`, with its Bearer challenge.
         raise HTTPException(status_code=401, headers={"WWW-Authenticate": "Bearer"})
-    return AccountResponse.model_validate(account)
+    return account

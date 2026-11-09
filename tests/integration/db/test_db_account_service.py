@@ -1,13 +1,16 @@
 """AccountService on a real Postgres (the template database holds the seeded roles). Task: 5.3."""
 
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
+from utils.cache import MemoryStore
+from utils.sql import count_statements
 
+from app.core.cache import ReadCache
 from app.core.db import create_session_factory, utc_now
 from app.models import (
     Account,
@@ -205,3 +208,68 @@ async def test_a_password_account_without_a_salt_keeps_the_salt_null(
         select(AccountIdentity).where(AccountIdentity.account_id == account.id)
     )
     assert result.one().salt is None
+
+
+async def test_a_snapshot_read_a_second_time_runs_no_sql_and_is_equal(
+    db_session: AsyncSession, db_engine: AsyncEngine
+) -> None:
+    # Arrange
+    service = AccountService(db_session, cache=ReadCache(MemoryStore()))
+    account = await service.create_customer("+380501234501")
+    first = await service.get_snapshot(account.id)
+
+    # Act
+    with count_statements(db_engine) as statements:
+        second = await service.get_snapshot(account.id)
+
+    # Assert
+    assert (statements, second) == ([], first)
+
+
+async def test_a_snapshot_from_the_cache_has_the_same_types_as_one_from_the_database(
+    db_session: AsyncSession,
+) -> None:
+    # Arrange
+    service = AccountService(db_session, cache=ReadCache(MemoryStore()))
+    account = await service.create_customer("+380501234502")
+    await service.get_snapshot(account.id)
+
+    # Act
+    hit = await service.get_snapshot(account.id)
+
+    # Assert
+    assert hit is not None
+    assert (
+        isinstance(hit.created_at, datetime),
+        hit.profile is not None and hit.profile.phone_number,
+    ) == (True, "+380501234502")
+
+
+async def test_a_snapshot_of_an_unknown_account_is_none_and_is_not_stored(
+    db_session: AsyncSession,
+) -> None:
+    # Arrange
+    store = MemoryStore()
+    service = AccountService(db_session, cache=ReadCache(store))
+
+    # Act
+    snapshot = await service.get_snapshot(str(uuid.uuid4()))
+
+    # Assert
+    assert (snapshot, store.data) == (None, {})
+
+
+async def test_without_a_cache_every_snapshot_read_goes_to_the_database(
+    db_session: AsyncSession, db_engine: AsyncEngine
+) -> None:
+    # Arrange
+    service = AccountService(db_session)
+    account = await service.create_customer("+380501234503")
+    await service.get_snapshot(account.id)
+
+    # Act
+    with count_statements(db_engine) as statements:
+        await service.get_snapshot(account.id)
+
+    # Assert
+    assert len(statements) > 0

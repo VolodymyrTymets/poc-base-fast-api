@@ -9,6 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cache import Cache, NullReadCache
 from app.models import AccountOnRole, AccountRole, AccountRoleType
 
+# The cache model of a role read (ADR-0035).
+ROLE_CACHE_MODEL = "AccountRole"
+
+
+def _decode_roles(raw: object) -> list[AccountRoleType]:
+    if isinstance(raw, list):
+        return [AccountRoleType(item) for item in raw]
+    # A ValueError is what `ReadCache` takes for an entry it cannot rebuild: a miss, not a crash.
+    raise ValueError("cached roles are not a list")
+
 
 class RoleNotFoundError(RuntimeError):
     """The role type has no `AccountRole` row: the base data was never seeded. A server fault, so a 500."""
@@ -21,7 +31,26 @@ class AccountRoleService:
         self._cache: Cache = NullReadCache() if cache is None else cache
 
     async def get_account_roles(self, account_id: str) -> list[AccountRoleType]:
-        """The role types the account holds. A soft-deleted link or role does not count (rule P6)."""
+        """The role types the account holds, through the read cache (ADR-0035). A soft-deleted link or role does not count (rule P6).
+
+        An empty list is not cached: an account with no role is the abnormal case, and a role added to it a moment later must show.
+        Roles change only when an account is created, so nothing invalidates `ROLE_CACHE_MODEL` today; a future route that
+        changes them must call `cache.invalidate` after its commit.
+        """
+
+        async def load() -> list[AccountRoleType] | None:
+            return await self._load_roles(account_id) or None
+
+        roles = await self._cache.get_or_load(
+            ROLE_CACHE_MODEL,
+            {"accountId": account_id},
+            load,
+            encode=lambda held: [role.value for role in held],
+            decode=_decode_roles,
+        )
+        return roles or []
+
+    async def _load_roles(self, account_id: str) -> list[AccountRoleType]:
         rows = await self._session.scalars(
             select(AccountRole.type)
             .join(AccountOnRole, AccountOnRole.role_id == AccountRole.id)
