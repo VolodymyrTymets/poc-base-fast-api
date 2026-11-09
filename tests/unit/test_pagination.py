@@ -237,3 +237,15 @@ def test_apply_page_carries_limit_and_offset_as_parameters() -> None:
 
     # Assert
     assert sorted(values.values()) == [7, 21]
+
+
+def test_apply_page_refuses_a_hostile_sort_instead_of_building_sql() -> None:
+    # Arrange
+    params = PageParams(limit=5, offset=0, sort="name;select 1", search=None)
+
+    # Act
+    with pytest.raises(ValidationFailedError) as info:
+        apply_page(sa.select(ITEMS.c.id), params, ALLOWED, [ITEMS.c.id])
+
+    # Assert
+    assert info.value.status_code == 422

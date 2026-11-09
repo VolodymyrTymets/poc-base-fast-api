@@ -19,7 +19,7 @@ from app.core.errors import ValidationFailedError
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
-# The largest int32: a bigger OFFSET is a 422 here instead of a database error (a 500) in the service.
+# A chosen bound, the largest int32: far inside bigint, so no real list reaches it, and a value near 2**63 never gets to the database.
 MAX_OFFSET = 2**31 - 1
 MAX_SEARCH_LENGTH = 100
 # A generous cap on the raw `sort` text; the number of terms is checked when it is parsed.
