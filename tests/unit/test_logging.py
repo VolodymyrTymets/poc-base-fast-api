@@ -12,6 +12,7 @@ from app.core.logging import (
     redact,
     redact_mapping,
 )
+from app.core.request_id import request_id_var
 
 JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
 
@@ -166,3 +167,44 @@ def test_formatter_drops_uvicorns_colour_copy_of_the_message() -> None:
     record = make_record("Started", color_message="\x1b[36mStarted\x1b[0m")
 
     assert "color_message" not in json.loads(JsonFormatter().format(record))
+
+
+def test_formatter_adds_the_request_id_of_the_request_being_handled() -> None:
+    # Arrange
+    token = request_id_var.set("abc-123")
+
+    # Act
+    try:
+        entry = json.loads(JsonFormatter().format(make_record("hello")))
+    finally:
+        request_id_var.reset(token)
+
+    # Assert
+    assert entry["request_id"] == "abc-123"
+
+
+def test_formatter_adds_no_request_id_outside_a_request() -> None:
+    # Arrange
+    record = make_record("hello")
+
+    # Act
+    entry = json.loads(JsonFormatter().format(record))
+
+    # Assert
+    assert "request_id" not in entry
+
+
+def test_a_record_that_carries_its_own_request_id_keeps_it() -> None:
+    # Arrange
+    record = make_record("hello")
+    record.request_id = "from-the-record"
+    token = request_id_var.set("from-the-variable")
+
+    # Act
+    try:
+        entry = json.loads(JsonFormatter().format(record))
+    finally:
+        request_id_var.reset(token)
+
+    # Assert
+    assert entry["request_id"] == "from-the-record"

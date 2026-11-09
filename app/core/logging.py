@@ -13,6 +13,8 @@ import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
 
+from app.core.request_id import request_id_var
+
 REDACTED = "[REDACTED]"
 
 # Keys are compared lower-cased with "-" and "_" removed, so "x-refresh-token",
@@ -105,6 +107,11 @@ class JsonFormatter(logging.Formatter):
                 entry[key] = (
                     REDACTED if is_sensitive_key(key) else redact_mapping(value)
                 )
+        # The request being handled, if any. A record that carries its own request_id (an error handler that runs
+        # after the middleware has finished, app/core/errors.py) keeps it.
+        request_id = request_id_var.get()
+        if request_id is not None and "request_id" not in entry:
+            entry["request_id"] = request_id
         if record.exc_info:
             entry["exception"] = redact(self.formatException(record.exc_info))
         return json.dumps(

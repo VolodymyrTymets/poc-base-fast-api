@@ -17,6 +17,7 @@ from app.core.db import create_engine, create_session_factory
 from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
 from app.core.queue import ArqQueueClient
+from app.core.request_id import RequestIdMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
@@ -113,6 +114,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # Added last, so it is the outermost: the 413 of the body limit and a CORS preflight carry the headers too.
     app.add_middleware(SecurityHeadersMiddleware)
+    # Outermost of all: the id is set before anything else runs, so every log line of the request and every
+    # response, a 413 and a preflight included, carries it.
+    app.add_middleware(RequestIdMiddleware)
 
     register_error_handlers(app, expose_trace=settings.app_env == "local")
 
