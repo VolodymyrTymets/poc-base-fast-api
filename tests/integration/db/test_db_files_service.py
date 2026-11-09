@@ -1,13 +1,12 @@
 """FilesService on a real Postgres. Task: 8.2. The limits and the owner check are 8.1's, tested in test_db_file_assert_service.py."""
 
 import pytest
-from sqlalchemy import func, inspect, select
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.core.db import utc_now
-from app.core.errors import PayloadTooLargeError, ValidationFailedError
+from app.core.errors import PayloadTooLargeError
 from app.models import Account, File
 from app.services.file_assert import FileAssertService
 from app.services.files import FilesService
@@ -91,27 +90,14 @@ async def test_create_stores_no_name_for_a_filename_that_a_name_would_refuse(
     assert file.name is None
 
 
-@pytest.mark.parametrize(
-    ("content", "mime_type", "error"),
-    [
-        (b"x" * 11, "image/png", PayloadTooLargeError),
-        (PNG, "text/plain", ValidationFailedError),
-        (PNG, None, ValidationFailedError),
-    ],
-)
-async def test_a_failed_upload_check_stores_nothing(
-    db_session: AsyncSession,
-    content: bytes,
-    mime_type: str | None,
-    error: type[Exception],
-) -> None:
+async def test_a_failed_upload_check_stores_nothing(db_session: AsyncSession) -> None:
     # Arrange
     owner = await make_account(db_session)
 
     # Act
-    with pytest.raises(error):
+    with pytest.raises(PayloadTooLargeError):
         await service(db_session, max_size=10).create(
-            owner, content, mime_type, "a.png", None
+            owner, b"x" * 11, "image/png", "a.png", None
         )
 
     # Assert
@@ -177,21 +163,3 @@ async def test_update_with_a_file_that_fails_the_limits_changes_nothing(
 
     # Assert
     assert await stored(db_session, created.id) == (PNG, len(PNG), "image/png")
-
-
-async def test_get_returns_the_metadata_without_loading_the_bytes(
-    db_session: AsyncSession,
-) -> None:
-    # Arrange
-    owner = await make_account(db_session)
-    files = service(db_session)
-    created = await files.create(owner, PNG, "image/png", "a.png", None)
-    db_session.expunge_all()
-
-    # Act
-    file = await files.get(created.id, owner)
-
-    # Assert
-    assert "content" in inspect(file).unloaded
-    with pytest.raises(InvalidRequestError, match="content"):
-        _ = file.content

@@ -17,7 +17,7 @@ flushes, route owns the commit; ADR-0025 one provider per service; `require_role
 ## Requirements (ordered; branch `feat/POC-8.2-file-routes`, one draft PR, one commit each)
 
 ### R1 — Dependency and response model (S)
-- files: `pyproject.toml` + `uv.lock` (via `uv add python-multipart`, after approval), `app/schemas/files.py` (`FileResponse`: camelCase like `AccountProfileResponse`,
+- files: `pyproject.toml` + `uv.lock` (via `uv add python-multipart`, after approval), `app/schemas/files.py` (`FileMetadataResponse`: camelCase like `AccountProfileResponse`,
   `content_url` computed from the id, no `content` field; `FileName = Annotated[str, StringConstraints(max_length=255)]`)
 - layer: schemas
 - test: `tests/unit/test_file_schemas.py` — wire names, `contentUrl` is `/api/v1/files/{id}/content`, the model has no bytes field, a 256-char name is rejected
@@ -37,7 +37,7 @@ flushes, route owns the commit; ADR-0025 one provider per service; `require_role
 
 ### R3 — Routes (M)
 - files: `app/routers/files.py` (`POST ""` 201, `PATCH "/{id}"`, `GET "/{id}"`; `file: UploadFile`, `name: Annotated[str | None, Form(max_length=255)]`;
-  `Depends(require_roles(ADMIN, CUSTOMER))`, service, `get_session` for the commit; `response_model=FileResponse`; reads the bytes and passes their length to `assert_upload` (FastAPI has already parsed the form before the handler, so the memory bound is the 12 MiB body middleware, not this read)),
+  `Depends(require_roles(ADMIN, CUSTOMER))`, service, `get_session` for the commit; `response_model=FileMetadataResponse`; reads the bytes and passes their length to `assert_upload` (FastAPI has already parsed the form before the handler, so the memory bound is the 12 MiB body middleware, not this read)),
   `openapi.json` (regenerated), `docs/api/ENDPOINTS.md` (rows marked built)
 - layer: routers
 - test: `tests/integration/http/test_http_files.py` — AC1 to AC7 over `client` with the auth helper: 201 shape, 401, missing file 422, bad type 422, 413 over limit, PATCH name-only and replace, 403 for another account / unknown id, GET has no bytes,
@@ -59,7 +59,7 @@ flushes, route owns the commit; ADR-0025 one provider per service; `require_role
 | Risk | Impact | Cheapest way to find out early |
 |------|--------|-------------------------------|
 | `python-multipart` not approved | routes cannot take multipart; plan blocked | Q1, answered before R1 |
-| Whole upload held in memory (up to 12 MiB through the body limit) | memory per request | read `max_size + 1` bytes only; the 12 MiB middleware cap bounds it; no test needed beyond the 413 case |
+| Whole upload held in memory (up to 12 MiB through the body limit) | memory per request | the form is parsed before the handler, so the 12 MiB middleware cap is the bound (the route reads the whole part); no test needed beyond the 413 cases |
 | 8.1's `get_owned_file` returns a row with `content` raising on access | `update` crashes when replacing bytes | the replace-content test in R2 |
 | Form validation errors use FastAPI's default shape | breaks the error contract | the missing-file and long-name tests assert the `{"error": ...}` body |
 

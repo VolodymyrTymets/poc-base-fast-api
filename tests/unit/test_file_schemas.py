@@ -4,7 +4,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from app.core.validation import FileName
-from app.schemas.files import FileResponse
+from app.schemas.files import FileMetadataResponse
 
 FILE_ID = "123e4567-e89b-12d3-a456-426614174000"
 
@@ -25,7 +25,9 @@ def test_the_response_uses_camel_case_names_and_a_content_url() -> None:
     row = _Row()
 
     # Act
-    body = FileResponse.model_validate(row).model_dump(by_alias=True, mode="json")
+    body = FileMetadataResponse.model_validate(row).model_dump(
+        by_alias=True, mode="json"
+    )
 
     # Assert
     assert body == {
@@ -39,7 +41,7 @@ def test_the_response_uses_camel_case_names_and_a_content_url() -> None:
 
 
 def test_the_response_has_no_field_for_the_bytes() -> None:
-    assert "content" not in FileResponse.model_fields
+    assert "content" not in FileMetadataResponse.model_fields
 
 
 def test_a_file_name_of_255_characters_is_valid() -> None:

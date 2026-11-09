@@ -10,7 +10,7 @@ Goal 1 (scaffolding: file storage in Postgres is one of the pieces a POC would r
 
 ## Scope
 - in: `FilesService` (`create`, `update`, `get`); `POST /api/v1/files` (multipart, 201), `PATCH /api/v1/files/{id}` (multipart, 200), `GET /api/v1/files/{id}`
-  (metadata, 200); the response model `FileResponse` `{id, name, mimeType, size, createdAt, contentUrl}`; a `get_files_service` provider; regenerated `openapi.json`.
+  (metadata, 200); the response model `FileMetadataResponse` `{id, name, mimeType, size, createdAt, contentUrl}`; a `get_files_service` provider; regenerated `openapi.json`.
 - **out (explicit):** `GET /files/{id}/content` (task 8.3; `contentUrl` is only the path, it resolves after 8.3), deleting a file, listing files, `FileType`
   (no column uses it), image content sniffing (the declared type is trusted, as in Node), virus scanning, rate limiting (issue I.8).
 
@@ -31,7 +31,7 @@ Goal 1 (scaffolding: file storage in Postgres is one of the pieces a POC would r
 | PATCH `name` only on a row with no content | 200, renamed | ENDPOINTS `updateFile` |
 | Empty `file` part (0 bytes) with a filename | allowed by size; type still checked | `assert_upload` accepts 0 |
 | 0-byte `file` part with an empty filename | 422, FastAPI treats it as a missing part | framework (gate finding) |
-| `file` or `name` sent twice | the last part wins, no error (Starlette keeps the last value) | framework (gate finding); a test pins it |
+| `file` or `name` sent twice | the last part wins, no error (Starlette keeps the last value) | framework (gate finding); a test pins it for `name` (the same parser handles `file`) |
 | Body between `FILE_MAX_SIZE` and `MAX_REQUEST_BODY_BYTES` (12 MiB) | 413 from the service check | 8.1, RUNBOOK |
 | Body over 12 MiB | 413 from the middleware before routing | task 1.6 |
 | Mime type with parameters (`image/PNG; charset=x`) | accepted as `image/png`; the stored type is the declared one, trimmed to the media type (assumption Q3) | 8.1 `_media_type` |

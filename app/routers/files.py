@@ -10,7 +10,7 @@ from app.core.security import TokenClaims
 from app.core.validation import FileName
 from app.dependencies import get_files_service, require_roles
 from app.models import AccountRoleType
-from app.schemas.files import FileResponse
+from app.schemas.files import FileMetadataResponse
 from app.services.files import FilesService
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -23,7 +23,7 @@ Caller = Annotated[
 FileId = Annotated[str, Path(alias="id", description="The file's id")]
 
 
-@router.post("", status_code=201, response_model=FileResponse)
+@router.post("", status_code=201, response_model=FileMetadataResponse)
 async def create_file(
     claims: Caller,
     # The form is parsed before this runs, so the memory bound is the body-limit middleware, not a read here (task 1.6).
@@ -33,16 +33,16 @@ async def create_file(
     service: Annotated[FilesService, Depends(get_files_service)],
     session: Annotated[AsyncSession, Depends(get_session)],
     name: Annotated[FileName | None, Form()] = None,
-) -> FileResponse:
+) -> FileMetadataResponse:
     """Store an upload for the caller; the size and mime type come from the upload, never from the client."""
     created = await service.create(
         claims.account_id, await file.read(), file.content_type, file.filename, name
     )
     await session.commit()
-    return FileResponse.model_validate(created)
+    return FileMetadataResponse.model_validate(created)
 
 
-@router.patch("/{id}", response_model=FileResponse)
+@router.patch("/{id}", response_model=FileMetadataResponse)
 async def update_file(
     file_id: FileId,
     claims: Caller,
@@ -50,7 +50,7 @@ async def update_file(
     session: Annotated[AsyncSession, Depends(get_session)],
     file: Annotated[UploadFile | None, File()] = None,
     name: Annotated[FileName | None, Form()] = None,
-) -> FileResponse:
+) -> FileMetadataResponse:
     """Rename the caller's file, replace its bytes, or both; what is not sent stays as it is."""
     updated = await service.update(
         file_id,
@@ -60,14 +60,16 @@ async def update_file(
         mime_type=file.content_type if file is not None else None,
     )
     await session.commit()
-    return FileResponse.model_validate(updated)
+    return FileMetadataResponse.model_validate(updated)
 
 
-@router.get("/{id}", response_model=FileResponse)
+@router.get("/{id}", response_model=FileMetadataResponse)
 async def get_file(
     file_id: FileId,
     claims: Caller,
     service: Annotated[FilesService, Depends(get_files_service)],
-) -> FileResponse:
+) -> FileMetadataResponse:
     """The metadata of the caller's file, with `contentUrl`; the bytes are served by the content route (task 8.3)."""
-    return FileResponse.model_validate(await service.get(file_id, claims.account_id))
+    return FileMetadataResponse.model_validate(
+        await service.get(file_id, claims.account_id)
+    )

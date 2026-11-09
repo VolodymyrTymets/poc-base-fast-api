@@ -277,7 +277,7 @@
         "title": "ErrorResponse",
         "type": "object"
       },
-      "FileResponse": {
+      "FileMetadataResponse": {
         "description": "A file's metadata as the API shows it; the bytes are only ever served by `GET /files/{id}/content` (ADR-0009).\n\nIt lists the fields one by one, so `File.content` can never reach a response.",
         "properties": {
           "contentUrl": {
@@ -329,7 +329,7 @@
           "createdAt",
           "contentUrl"
         ],
-        "title": "FileResponse",
+        "title": "FileMetadataResponse",
         "type": "object"
       },
       "HealthResponse": {
@@ -1190,7 +1190,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileResponse"
+                  "$ref": "#/components/schemas/FileMetadataResponse"
                 }
               }
             },
@@ -1250,7 +1250,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileResponse"
+                  "$ref": "#/components/schemas/FileMetadataResponse"
                 }
               }
             },
@@ -1317,7 +1317,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileResponse"
+                  "$ref": "#/components/schemas/FileMetadataResponse"
                 }
               }
             },

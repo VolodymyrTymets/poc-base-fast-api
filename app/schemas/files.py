@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, computed_field
 from pydantic.alias_generators import to_camel
 
 
-class FileResponse(BaseModel):
+class FileMetadataResponse(BaseModel):
     """A file's metadata as the API shows it; the bytes are only ever served by `GET /files/{id}/content` (ADR-0009).
 
     It lists the fields one by one, so `File.content` can never reach a response.
