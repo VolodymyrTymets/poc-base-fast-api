@@ -14,13 +14,13 @@ Goal 1 (scaffolding: file storage in Postgres is only useful if the bytes can be
   true streaming from the database (the value is read whole, ADR-0009), image resizing, deleting a file, `Content-Disposition` unless Q1 says otherwise.
 
 ## Acceptance criteria
-- [ ] AC1 Given the owner's Bearer token, `GET /files/{id}/content` answers 200 with exactly the bytes that were uploaded, `Content-Type` equal to the stored mime type (for a `text/*` type Starlette appends `; charset=utf-8`; the default jpeg and png list has none), `Content-Length` equal to the byte count and `X-Content-Type-Options: nosniff`.
-- [ ] AC2 After `PATCH` replaced the content, the route returns the new bytes with the new `Content-Type`.
-- [ ] AC3 No token is 401 `UNAUTHORIZED`; an account with no role is 403; another account's file, an unknown id and a soft-deleted file are the same 403 `FORBIDDEN` (task 8.1, ENDPOINTS decision 3).
-- [ ] AC4 A file row with no stored bytes (`content` is null, possible only for rows from Node's two-step upload) is 404 `NOT_FOUND` (ENDPOINTS decision 19), after the owner check.
-- [ ] AC5 The route is read-only: it never commits and changes no row.
-- [ ] AC6 An upload over `FILE_MAX_SIZE` is 413 (already 8.2; covered by its tests, not repeated here). `openapi.json` is regenerated, documents a binary 200 body and the 422/500 error body every route inherits (401, 403 and 404 are not documented per route, as on the other file routes), and the stale test passes.
-- [ ] AC7 `tests/unit/test_response_models.py` still fails a route with no response model, except this one, which is named there with its reason.
+- [x] AC1 Given the owner's Bearer token, `GET /files/{id}/content` answers 200 with exactly the bytes that were uploaded, `Content-Type` equal to the stored mime type (for a `text/*` type Starlette appends `; charset=utf-8`; the default jpeg and png list has none), `Content-Length` equal to the byte count and `X-Content-Type-Options: nosniff`.
+- [x] AC2 After `PATCH` replaced the content, the route returns the new bytes with the new `Content-Type`.
+- [x] AC3 No token is 401 `UNAUTHORIZED`; an account with no role is 403; another account's file, an unknown id and a soft-deleted file are the same 403 `FORBIDDEN` (task 8.1, ENDPOINTS decision 3).
+- [x] AC4 A file row with no stored bytes (`content` is null, possible only for rows from Node's two-step upload) is 404 `NOT_FOUND` (ENDPOINTS decision 19), after the owner check.
+- [x] AC5 The route is read-only: it never commits and changes no row.
+- [x] AC6 An upload over `FILE_MAX_SIZE` is 413 (already 8.2; covered by its tests, not repeated here). `openapi.json` is regenerated, documents a binary 200 body and the 422/500 error body every route inherits (401, 403 and 404 are not documented per route, as on the other file routes), and the stale test passes.
+- [x] AC7 `tests/unit/test_response_models.py` still fails a route with no response model, except this one, which is named there with its reason.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

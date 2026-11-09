@@ -37,13 +37,13 @@ No precedent for a route that returns bytes: it needs no ADR, because ADR-0009 d
 - risk: FastAPI must not try to serialise `Response` or add a JSON model: `response_class=Response` plus a `Response` return annotation; checked by the openapi export and the round-trip test.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-8.3/spec.md (acceptance criteria checked off)
-- [ ] docs/ARCHITECTURE.md — route count and the content route in "Boundaries and contracts"; remove the "Planned" file-content bullet and fix the status line (the file routes are done, only the cache is not); `FilesService.get_content`
-- [ ] docs/BUSINESS_MODEL.md — status line: the file routes are built
-- [ ] docs/api/ENDPOINTS.md — the `(new)` row marked built, with Roles `ADMIN` or `CUSTOMER` already set; decisions: whole body with `Content-Length`, null mime type, 404 for no content
-- [ ] docs/RUNBOOK.md — "Files": the download call, the `cmp` check, the inline-content risk of a widened allowlist (Q1)
-- [ ] docs/DOMAIN_GLOSSARY.md — the `contentUrl` row: it now answers
-- [ ] .claude/rules/api-rest.md rule 2 — names the exemption test; rule 12 unchanged
+- [x] docs/features/POC-8.3/spec.md (acceptance criteria checked off)
+- [x] docs/ARCHITECTURE.md — route count and the content route in "Boundaries and contracts"; remove the "Planned" file-content bullet and fix the status line (the file routes are done, only the cache is not); `FilesService.get_content`
+- [x] docs/BUSINESS_MODEL.md — status line: the file routes are built
+- [x] docs/api/ENDPOINTS.md — the `(new)` row marked built, with Roles `ADMIN` or `CUSTOMER` already set; decisions: whole body with `Content-Length`, null mime type, 404 for no content
+- [x] docs/RUNBOOK.md — "Files": the download call, the `cmp` check, the inline-content risk of a widened allowlist (Q1)
+- [x] docs/DOMAIN_GLOSSARY.md — the `contentUrl` row: it now answers
+- [x] .claude/rules/api-rest.md rule 2 — names the exemption test; rule 12 unchanged
 - [ ] ADR: none; ADR-0009 is followed as written (its word "chunked" is recorded in ENDPOINTS as a whole body with `Content-Length`)
 
 ## Risks

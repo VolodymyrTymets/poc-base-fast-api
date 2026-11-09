@@ -15,7 +15,7 @@ Each line restates a decision and names it. If a line disagrees with its source,
 
 ## Shape
 1. Routes live under `/api/v1`, one `APIRouter` per module with its own tag (ADR-0003, ADR-0011). Bodies are JSON, except file upload, which is `multipart/form-data` (ADR-0009). Field names are camelCase, as in the Node base (`docs/api/ENDPOINTS.md`).
-2. Request and response bodies are Pydantic models. A response model is never an ORM object, and every route declares one, except a 204 and the byte-streaming content route of task 8.3; `tests/unit/test_response_models.py` fails otherwise (ADR-0003, task 4.1).
+2. Request and response bodies are Pydantic models. A response model is never an ORM object, and every route declares one, except a 204 and the content route of task 8.3, which is named in `BYTE_ROUTES` of `tests/unit/test_response_models.py`; that test fails for any other route (ADR-0003, task 4.1).
 3. Request models extend `StrictModel` (`extra="forbid"`) and use the field types of `app/core/validation.py` (email, a new password of 8 to 72 bytes, a current password of 1 to 72, phone, UUID, no control characters); a field not in the model is a 422, not ignored (task 4.3).
 4. Response shapes are fixed; there is no field selection (ADR-0003).
 5. A response never carries a stored hash or salt, an `AccountIdentity`, a password-reset token, or the one-time sign-in code outside `local`, `development` and `test` (ENDPOINTS.md `signInOtp` and `restorePassword`, ADR-0028). It does carry what the contract lists: the access and refresh tokens of a sign-in, and the profile's phone number and date of birth. Logs are the place the no-secrets rule applies (rules D8, P4).
