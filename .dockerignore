@@ -1,15 +1,16 @@
 # Keep secrets, caches and local state out of the build context (rules A6, C3).
+# `**/` because a pattern without it only matches at the root of the context.
 .git
 .venv
-.env
-.env.*
-!.env.example
-!.env.*.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
 .claude
 .serena
 .idea
-__pycache__
-*.py[oc]
+**/__pycache__
+**/*.py[oc]
 .ruff_cache
 .mypy_cache
 .pytest_cache

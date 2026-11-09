@@ -19,7 +19,7 @@ Goal 1 (scaffolding: a fork starts the API and the worker from one image).
 - [x] AC3 `worker` runs no migration or seed and waits only for Postgres: it runs `arq app.worker.WorkerSettings` with no migration or seed (the API container owns them), and logs JSON.
 - [x] AC4 The wait makes exactly `DB_WAIT_ATTEMPTS` (default 30) connection attempts, `DB_WAIT_INTERVAL_SECONDS` (default 1) apart, then exits 1 naming the count (issue I.6). No password in its output (rule D8).
 - [x] AC5 A failing migration or seed stops the container with a non-zero status; nothing is swallowed (rule D5).
-- [x] AC6 `SIGTERM` reaches the app (entrypoint ends in `exec`), so `docker stop` is a graceful shutdown (container exit status 0, not killed).
+- [x] AC6 `SIGTERM` reaches the app (entrypoint ends in `exec`), so `docker stop` is a graceful shutdown (container exit status 0, or 143 under an init process; never 137).
 - [x] AC7 `HOST` defaults to `127.0.0.1`; the image sets `0.0.0.0`; `openapi.json` unchanged; no secrets baked into the image.
 
 ## Edge cases

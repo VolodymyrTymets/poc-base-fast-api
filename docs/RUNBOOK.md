@@ -214,10 +214,11 @@ docker build --target worker -t poc-worker .
 docker run -d --name poc-api --add-host=host.docker.internal:host-gateway -p 3077:3001 \
   -e DATABASE_URL=postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/poc poc-api
 curl localhost:3077/api/v1/health        # {"status":"ok"}
-docker stop poc-api                      # graceful; the exit status is 0
+docker stop poc-api                      # graceful; the exit status is 0 (143 under an init process, 137 means killed)
 ```
-- The entrypoint waits for Postgres (`DB_WAIT_ATTEMPTS`, default 30, `DB_WAIT_INTERVAL_SECONDS`, default 1; it prints `attempt i/N failed: <ExceptionClass>` and gives up with exit 1), then runs `alembic upgrade head` and `python -m app.seeds`, then the command. `RUN_MIGRATIONS=0` skips the migrate and seed steps; the `worker` target sets it, so only the API container owns the schema.
+- The entrypoint waits for Postgres (`DB_WAIT_ATTEMPTS`, default 30, `DB_WAIT_INTERVAL_SECONDS`, default 1; it prints `attempt i/N failed: <ExceptionClass>` and gives up with exit 1; each attempt can take up to 5 s when packets are dropped, so the worst case is about 3 minutes; a `DATABASE_URL` that is not `postgresql+asyncpg://` is exit 2 at once), then runs `alembic upgrade head` and `python -m app.seeds`, then the command. `RUN_MIGRATIONS=0` skips the migrate and seed steps; the `worker` target sets it, so only the API container owns the schema.
 - A failed migration or seed ends the container with a non-zero status and the server never starts (for example, a Postgres without PostGIS: `extension "postgis" is not available`). Read it with `docker logs`.
+- The image does not set `APP_ENV`, so it is `local`: the sample admin and customers are seeded, the OTP `code` is in the response body and the worker logs reset tokens. Pass `-e APP_ENV=...` (and, for `development` or `production`, the JWT secrets) for anything shared.
 - The image sets `HOST=0.0.0.0`; outside a container `HOST` stays `127.0.0.1`. `docker run <image> sh` still waits and migrates first; use `--entrypoint sh` to skip that.
 - Tests: `tests/e2e/test_docker_image.py` builds both targets and runs them against the test Postgres (and Redis for the worker); it needs Docker, so it is selected by `-m db` and never by `-m "not db and not redis"`.
 

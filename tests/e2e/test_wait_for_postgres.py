@@ -126,3 +126,31 @@ def test_succeeds_on_the_first_attempt_when_the_database_is_up(
     assert result.returncode == 0, result.stdout + result.stderr
     assert attempt_lines(result.stdout) == []
     assert "reachable" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"postgresql://postgres:{CANARY}@127.0.0.1:5432/poc",
+        f"mysql+aiomysql://root:{CANARY}@127.0.0.1:3306/poc",
+        f"not a url, only the secret {CANARY}",
+    ],
+    ids=["no-driver", "other-database", "not-a-url"],
+)
+def test_a_url_the_app_would_refuse_exits_2_after_one_look_and_hides_the_secret(
+    url: str,
+) -> None:
+    # Arrange
+    env = {"DATABASE_URL": url, "DB_WAIT_INTERVAL_SECONDS": "0"}
+
+    # Act
+    result = run_script(env)
+
+    # Assert
+    output = result.stdout + result.stderr
+    assert (result.returncode, attempt_lines(output), CANARY in output) == (
+        2,
+        [],
+        False,
+    )
+    assert "DATABASE_URL" in output

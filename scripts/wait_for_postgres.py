@@ -14,12 +14,15 @@ import os
 import sys
 
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 DEFAULT_ATTEMPTS = 30
 DEFAULT_INTERVAL_SECONDS = 1.0
 CONNECT_TIMEOUT_SECONDS = 5.0
+# The only URL the app accepts (RUNBOOK, "First run"); anything else is a setting error, not a database that is not up yet.
+DRIVER = "postgresql+asyncpg"
 
 logger = logging.getLogger("wait_for_postgres")
 
@@ -29,6 +32,14 @@ def read_settings() -> tuple[str, int, float]:
     url = os.environ.get("DATABASE_URL", "").strip()
     if not url:
         raise ValueError("DATABASE_URL is not set")
+    try:
+        driver = make_url(url).drivername
+    except ArgumentError:
+        # Not a URL at all; the check below reports it without the text.
+        driver = ""
+    if driver != DRIVER:
+        # Never `str(error)`: SQLAlchemy's message for a bad URL contains the whole URL, password included (rule D8).
+        raise ValueError(f"DATABASE_URL must be a {DRIVER}:// URL")
     raw_attempts = os.environ.get("DB_WAIT_ATTEMPTS", str(DEFAULT_ATTEMPTS))
     try:
         attempts = int(raw_attempts)
