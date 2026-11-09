@@ -15,14 +15,14 @@ Goal 1 (scaffolding: file storage in Postgres is one of the pieces a POC would r
   (no column uses it), image content sniffing (the declared type is trusted, as in Node), virus scanning, rate limiting (issue I.8).
 
 ## Acceptance criteria
-- [ ] AC1 Given a Bearer token and a multipart `file` (png, under 10 MB) with an optional `name`, `POST /files` answers 201 with `{id, name, mimeType, size, createdAt, contentUrl}`; `size` is the received byte count; `contentUrl` is `/api/v1/files/{id}/content`; the bytes are stored in `File.content`.
-- [ ] AC2 Without `name` (or with an empty one: FastAPI treats `""` as missing), the stored name is the upload's filename when it fits `FileName` (at most 255 characters, no control characters), else `null` (assumption Q2); a `name` over 255 characters is 422.
-- [ ] AC3 No token is 401; a missing `file` part is 422; a disallowed mime type is 422 and an upload over `FILE_MAX_SIZE` is 413, both `VALIDATION_FAILED` with the field in `details` (via `FileAssertService.assert_upload`); nothing is stored in those cases.
-- [ ] AC4 `PATCH /files/{id}` with only `name` renames and keeps the bytes, size and type; with a `file` it replaces bytes, size and mime type, checked against the limits again. 200 with the same shape.
-- [ ] AC5 `GET /files/{id}` returns the metadata and never the bytes. An unknown id, another account's file and a soft-deleted file are the same 403 `FORBIDDEN`, for GET and PATCH.
-- [ ] AC6 Each change is committed by the route (ADR-0021): a following GET shows it; a failed validation leaves the row as it was.
-- [ ] AC7 An uploaded file's id is accepted as `avatarId` by `PATCH /accounts/{id}/profile` (end-to-end over HTTP).
-- [ ] AC8 `openapi.json` is regenerated, the stale test passes, and the response model holds no ORM class and no bytes.
+- [x] AC1 Given a Bearer token and a multipart `file` (png, under 10 MB) with an optional `name`, `POST /files` answers 201 with `{id, name, mimeType, size, createdAt, contentUrl}`; `size` is the received byte count; `contentUrl` is `/api/v1/files/{id}/content`; the bytes are stored in `File.content`.
+- [x] AC2 Without `name` (or with an empty one: FastAPI treats `""` as missing), the stored name is the upload's filename when it fits `FileName` (at most 255 characters, no control characters), else `null` (assumption Q2); a `name` over 255 characters is 422.
+- [x] AC3 No token is 401; a missing `file` part is 422; a disallowed mime type is 422 and an upload over `FILE_MAX_SIZE` is 413, both `VALIDATION_FAILED` with the field in `details` (via `FileAssertService.assert_upload`); nothing is stored in those cases.
+- [x] AC4 `PATCH /files/{id}` with only `name` renames and keeps the bytes, size and type; with a `file` it replaces bytes, size and mime type, checked against the limits again. 200 with the same shape.
+- [x] AC5 `GET /files/{id}` returns the metadata and never the bytes. An unknown id, another account's file and a soft-deleted file are the same 403 `FORBIDDEN`, for GET and PATCH.
+- [x] AC6 Each change is committed by the route (ADR-0021): a following GET shows it; a failed validation leaves the row as it was.
+- [x] AC7 An uploaded file's id is accepted as `avatarId` by `PATCH /accounts/{id}/profile` (end-to-end over HTTP).
+- [x] AC8 `openapi.json` is regenerated, the stale test passes, and the response model holds no ORM class and no bytes.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

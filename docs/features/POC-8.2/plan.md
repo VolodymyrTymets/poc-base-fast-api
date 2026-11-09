@@ -46,14 +46,14 @@ flushes, route owns the commit; ADR-0025 one provider per service; `require_role
 - risk: FastAPI's 422 for a missing form part must use the error contract (`VALIDATION_FAILED`, `details`); checked by the missing-file test
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-8.2/spec.md (acceptance criteria checked off)
-- [ ] docs/ARCHITECTURE.md — `services/files.py` and `routers/files.py` built, `get_files_service` in the provider list, three more routes, `python-multipart` in the dependency list, Planned section
-- [ ] docs/RUNBOOK.md — a "Files" section with the curl calls; limits text names the routes
-- [ ] docs/api/ENDPOINTS.md — `createFile`, `updateFile`, `file` marked built; Roles column `ADMIN` or `CUSTOMER` (owner); name fallback (new, not from Node), mime normalisation, duplicate parts, empty `name`
-- [ ] .claude/rules/api-rest.md rule 10 — the "Note for task 8.2" is settled (ask-first path, `.claude/**`)
-- [ ] docs/BUSINESS_MODEL.md and the ARCHITECTURE status line — 8.2 built, 11.6 already merged (#43): stale text fixed here (rule E2)
-- [ ] docs/DOMAIN_GLOSSARY.md — only if a term is new (`contentUrl`); likely one line
-- [ ] CLAUDE.md / ADR: none (no new pattern)
+- [x] docs/features/POC-8.2/spec.md (acceptance criteria checked off)
+- [x] docs/ARCHITECTURE.md — `services/files.py` and `routers/files.py` built, `get_files_service` in the provider list, three more routes, `python-multipart` in the dependency list, Planned section
+- [x] docs/RUNBOOK.md — a "Files" section with the curl calls; limits text names the routes
+- [x] docs/api/ENDPOINTS.md — `createFile`, `updateFile`, `file` marked built; Roles column `ADMIN` or `CUSTOMER` (owner); name fallback (new, not from Node), mime normalisation, duplicate parts, empty `name`
+- [x] .claude/rules/api-rest.md rule 10 — the "Note for task 8.2" is settled (ask-first path, `.claude/**`)
+- [x] docs/BUSINESS_MODEL.md and the ARCHITECTURE status line — 8.2 built, 11.6 already merged (#43): stale text fixed here (rule E2)
+- [x] docs/DOMAIN_GLOSSARY.md — only if a term is new (`contentUrl`); likely one line
+- [x] CLAUDE.md / ADR: none (no new pattern)
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |
