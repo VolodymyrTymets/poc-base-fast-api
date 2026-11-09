@@ -17,6 +17,7 @@ from app.core.db import create_engine, create_session_factory
 from app.core.errors import ErrorResponse, register_error_handlers
 from app.core.logging import configure_logging
 from app.core.queue import ArqQueueClient
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.sentry import init_sentry
 from app.routers import account, account_profile, account_role, auth, files, notifier
 from app.seeds.registry import seed_items
@@ -110,6 +111,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
         allow_headers=["*"],
     )
+    # Added last, so it is the outermost: the 413 of the body limit and a CORS preflight carry the headers too.
+    app.add_middleware(SecurityHeadersMiddleware)
 
     register_error_handlers(app, expose_trace=settings.app_env == "local")
 
