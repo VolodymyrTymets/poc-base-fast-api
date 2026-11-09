@@ -18,14 +18,14 @@ Goal 1 (scaffolding) and goal 3 (test base): a fork gets a working read cache wh
 - **out (explicit):** caching `AccountProfileService.get_by_account_id` (its readers are `update`, a read-modify-write, and the notifier, which picks the phone or email a code is sent to: a stale value is a security fault) and `AccountService.get_by_phone` (the OTP and seed paths); negative caching; stale-while-revalidate; a role-change endpoint and its invalidation (none exists); list helpers (9.3); a Redis client dependency declaration beyond what `arq` already brings (`core/queue.py` imports `redis` today); `fakeredis`.
 
 ## Acceptance criteria
-- [ ] AC1 Given the cache on, when `GET /account` is called twice for one account, then the second call is served from Redis (the database sees no query for the account) and both bodies are equal, including `createdAt` as a timestamp.
-- [ ] AC2 Given a cached account, when the profile is updated through `PATCH /accounts/{id}/profile`, then the next `GET /account` is a miss and shows the new value.
-- [ ] AC3 Given a cached role read, when `require_roles` runs twice for one account, then the second is a hit and returns the same `AccountRoleType` members (not strings).
-- [ ] AC4 Given Redis is unreachable, when `GET /account` is called, then it answers 200 from the database and one warning is logged with no account id, email or phone.
-- [ ] AC5 Given an entry that cannot be decoded (unknown tag, bad JSON), when read, then it is a miss, is reloaded and overwritten.
-- [ ] AC6 Given `invalidate("Account")`, when it runs, then every `cache*Account*…` key is gone and `cache*AccountRole*…` keys remain; it uses `SCAN`, never `KEYS`.
-- [ ] AC7 Given `CACHE_ENABLED=false`, then no Redis connection is opened and reads hit the database; the default test app has the cache off.
-- [ ] AC8 Given a `None` result (unknown or soft-deleted account), then nothing is stored.
+- [x] AC1 Given the cache on, when `GET /account` is called twice for one account, then the second call is served from Redis (the database sees no query for the account) and both bodies are equal, including `createdAt` as a timestamp.
+- [x] AC2 Given a cached account, when the profile is updated through `PATCH /accounts/{id}/profile`, then the next `GET /account` is a miss and shows the new value.
+- [x] AC3 Given a cached role read, when `require_roles` runs twice for one account, then the second is a hit and returns the same `AccountRoleType` members (not strings).
+- [x] AC4 Given Redis is unreachable, when `GET /account` is called, then it answers 200 from the database and one warning is logged with no account id, email or phone.
+- [x] AC5 Given an entry that cannot be decoded (unknown tag, bad JSON), when read, then it is a miss, is reloaded and overwritten.
+- [x] AC6 Given `invalidate("Account")`, when it runs, then every `cache*Account*…` key is gone and `cache*AccountRole*…` keys remain; it uses `SCAN`, never `KEYS`.
+- [x] AC7 Given `CACHE_ENABLED=false`, then no Redis connection is opened and reads hit the database; the default test app has the cache off.
+- [x] AC8 Given a `None` result (unknown or soft-deleted account), then nothing is stored.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |

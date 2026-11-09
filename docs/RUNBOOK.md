@@ -37,7 +37,7 @@ serve, when the database is unreachable, was never migrated (`relation "SeedHist
 After a `git pull` that adds a migration, run steps 2 and 3 again before starting.
 
 `DATABASE_URL` (`postgresql+asyncpg://...`, nothing else is accepted) is optional: unset or blank, steps 1 to 3 do not apply, the server still
-boots and `/api/v1/health` answers, and only a route that needs a database session fails. There is no cache. `uv build` writes the
+boots and `/api/v1/health` answers, and only a route that needs a database session fails. The read cache needs Redis only when it is on (see "Read cache"). `uv build` writes the
 wheel and sdist into `dist/` (gitignored). Settings come from the environment first and `.env` second; `.env.development.example` is the
 same file for a shared development host. A bad value (for example `PORT=abc`) stops the boot and names the field.
 
@@ -131,6 +131,14 @@ The notifier (task 6.3) enqueues those jobs by channel. An enqueue that fails be
 **Redis in the tests** (`tests/e2e/test_worker_arq.py`, marker `redis`): with `TEST_REDIS_URL` unset, the first such test starts one `redis:7-alpine` container (testcontainers) for the session;
 set `TEST_REDIS_URL` (a `redis://` URL with host and port, in `.env.test` or exported) to use an existing server instead. The tests use database index 15 only and flush only that
 index, whatever the URL says, so a developer's default database and queue are left alone. Without Docker and without the variable the tests fail with a message; they never skip.
+
+## Read cache
+The API caches two reads in the Redis the queue uses (task 9.2, ADR-0035): the account with its profile (`GET /api/v1/account`) and the roles `require_roles` checks. An entry lives 60 seconds. `CACHE_ENABLED` (default `true`; `false` sends every read to the database) is the only setting; it uses `REDIS_*`.
+- **What is stored:** keys `cache*Account*<sha256>` and `cache*AccountRole*<sha256>`, values are JSON. The account value holds the profile, so email, phone number and date of birth are in Redis for up to 60 seconds: do not expose that Redis to a network.
+- **Redis down:** reads still answer from the database; the log has one `read cache read failed: ConnectionError` warning per request (no key, no value), and a request pays at most a 1 second connect timeout. A wrong `REDIS_PASSWORD` is not an outage: it fails the request with the error.
+- **After a write:** `PATCH /api/v1/accounts/{accountId}/profile` removes every `cache*Account*` key after it commits, so the next `GET /account` reads the database. Anything that changes the data another way (SQL by hand, a seed) leaves the entry for up to 60 seconds.
+- **Look and flush by hand:** `redis-cli --scan --pattern 'cache*'`, then `redis-cli ttl <key>`; delete by pattern, for example `redis-cli --scan --pattern 'cache\*Account\**' | xargs redis-cli unlink`. Never `FLUSHALL` or `FLUSHDB` on the queue's database: it drops queued jobs. Never `KEYS` on a busy server.
+- **Tests:** the test environment sets `CACHE_ENABLED=false`; `tests/integration/http/test_http_read_cache.py` turns it on with the test Redis (index 15, the `redis_settings` fixture) and proves a hit by counting the statements the app's engine runs.
 
 ## Sign-in code (OTP)
 `POST /api/v1/auth/otp/request` with `{"phoneNumber": "+12125550142"}` (task 7.1) answers `{"success": true, "code": "123456"}`. An unknown number becomes a customer account;

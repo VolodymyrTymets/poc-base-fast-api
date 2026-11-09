@@ -45,14 +45,14 @@ New pattern: a service built from a core seam with a null default (`ReadCache`):
 - risk: the invalidation must not run when the commit fails: it sits after it, tested by a PATCH that is a 409 and leaves the cache intact.
 
 ## Docs to update in this PR
-- [ ] docs/features/POC-9.2/spec.md (acceptance criteria checked off)
-- [ ] docs/decisions/ADR-0035-read-cache-policy.md (new)
-- [ ] docs/ARCHITECTURE.md — `core/cache.py` row, "No cache is wired" paragraph, the cached reads, Decided and Planned bullets
-- [ ] docs/RUNBOOK.md — a "Read cache" section: the setting, what is cached, fail open, how to flush by hand (`SCAN`, not `FLUSHALL`: it drops queued jobs), the 60 s staleness and the personal data in Redis
-- [ ] docs/DOMAIN_GLOSSARY.md — "Read cache", "Snapshot"
-- [ ] docs/BUSINESS_MODEL.md — status line
-- [ ] `.claude/rules/backend-fastapi.md` — one rule: a read goes through the cache only when no write or authentication decision reads it; invalidate after the commit (ask-first path: `.claude/**`)
-- [ ] `.env.example`, `.env.development.example` — `CACHE_ENABLED`
+- [x] docs/features/POC-9.2/spec.md (acceptance criteria checked off)
+- [x] docs/decisions/ADR-0035-read-cache-policy.md (new)
+- [x] docs/ARCHITECTURE.md — `core/cache.py` row, "No cache is wired" paragraph, the cached reads, Decided and Planned bullets
+- [x] docs/RUNBOOK.md — a "Read cache" section: the setting, what is cached, fail open, how to flush by hand (`SCAN`, not `FLUSHALL`: it drops queued jobs), the 60 s staleness and the personal data in Redis
+- [x] docs/DOMAIN_GLOSSARY.md — "Read cache", "Snapshot"
+- [x] docs/BUSINESS_MODEL.md — status line
+- [x] `.claude/rules/backend-fastapi.md` — one rule: a read goes through the cache only when no write or authentication decision reads it; invalidate after the commit (ask-first path: `.claude/**`)
+- [ ] `.env.example`, `.env.development.example` — `CACHE_ENABLED` (edited; not committed: the A6 guard hook blocks staging them, see the PR)
 
 ## Risks
 | Risk | Impact | Cheapest way to find out early |
@@ -67,3 +67,10 @@ New pattern: a service built from a core seam with a null default (`ReadCache`):
 - Spec Q4 and Q5; Q1, Q2 and Q3 need a human.
 - 9.1 is merged (PR #46, `bcd5dc5` on `main`); the branch starts from it. The untracked `Scope Breakdown ... .md`, `.serena/` and `dump.rdb` are not part of this PR.
 - The scope row's file list (`app/services/account*.py`) holds; the extra files are `app/main.py`, `app/dependencies.py`, `app/config.py`, `app/routers/*`, the env templates and tests.
+
+## Deviations (found while implementing, recorded here and in the PR)
+- R1: the cache protocol is `Cache` (with `ReadCache` and `NullReadCache` implementing it), not `ReadCache | None`; a service takes `cache: Cache | None = None` as a keyword and uses `NullReadCache` when omitted.
+- R2: the read cache is switched off for every test app by the autouse `isolated_settings_env` fixture (`CACHE_ENABLED=false`), not only in `asgi_app`, because many tests build `create_app(Settings(...))` themselves.
+- R3: `tests/integration/http/test_http_service_providers.py` changed (unplanned): its fake account service provided `get_by_id`, and `GET /account` now calls `get_snapshot`. The assertions are unchanged.
+- R3: shared test helpers `tests/utils/cache.py` (`MemoryStore`, moved out of the unit test) and `tests/utils/sql.py` (`count_statements`).
+- R4: `PATCH /accounts/{accountId}/profile` imports `ACCOUNT_CACHE_MODEL` from `app/services/account.py`; the role model constant is `ROLE_CACHE_MODEL` in `account_role.py`.

@@ -39,3 +39,6 @@ This file restates decisions that already have an ADR or a rule ID; each line na
 ## Errors
 18. When the client should see a failure, raise a domain exception from `app/core/errors.py` (a server fault is rule 7's `RuntimeError` subclass); the handlers there turn it into the one error body (ADR-0003, `docs/api/ERRORS.md` "Adding an error", `api-rest.md`).
 19. A new middleware is pure ASGI, never `BaseHTTPMiddleware` (it buffers a body), lives in `app/core/` and is added in `create_app` with its position stated in a comment: the last one added is the outermost (`body_limit.py`, `security_headers.py`, `request_id.py`, ADR-0033). A log line gets the request id from `request_id_var`; code that runs after the middleware has finished reads `request_id_of(scope)` (ADR-0033).
+
+## Read cache
+20. A read goes through the cache (`app/core/cache.py`, `get_or_load`) only when no write and no authentication or notification decision depends on it, and it returns plain data, never an ORM object. A write that changes cached data calls `cache.invalidate(model)` after its commit, never before it. A cache failure never fails a read (ADR-0035). The test environment has the cache off; a test that needs it passes `cache_enabled=True` and a real Redis.
