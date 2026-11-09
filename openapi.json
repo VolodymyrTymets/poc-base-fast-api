@@ -136,6 +136,63 @@
         "title": "AccountResponse",
         "type": "object"
       },
+      "Body_create_file_api_v1_files_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "The bytes: jpeg or png, at most FILE_MAX_SIZE",
+            "title": "File",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_file_api_v1_files_post",
+        "type": "object"
+      },
+      "Body_update_file_api_v1_files__id__patch": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "Body_update_file_api_v1_files__id__patch",
+        "type": "object"
+      },
       "ChangePasswordInput": {
         "additionalProperties": false,
         "properties": {
@@ -218,6 +275,61 @@
           "error"
         ],
         "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FileResponse": {
+        "description": "A file's metadata as the API shows it; the bytes are only ever served by `GET /files/{id}/content` (ADR-0009).\n\nIt lists the fields one by one, so `File.content` can never reach a response.",
+        "properties": {
+          "contentUrl": {
+            "readOnly": true,
+            "title": "Contenturl",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "mimeType",
+          "size",
+          "createdAt",
+          "contentUrl"
+        ],
+        "title": "FileResponse",
         "type": "object"
       },
       "HealthResponse": {
@@ -1056,6 +1168,190 @@
         "summary": "Sign Up",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "post": {
+        "description": "Store an upload for the caller; the size and mime type come from the upload, never from the client.",
+        "operationId": "create_file_api_v1_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_file_api_v1_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create File",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}": {
+      "get": {
+        "description": "The metadata of the caller's file, with `contentUrl`; the bytes are served by the content route (task 8.3).",
+        "operationId": "get_file_api_v1_files__id__get",
+        "parameters": [
+          {
+            "description": "The file's id",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The file's id",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get File",
+        "tags": [
+          "files"
+        ]
+      },
+      "patch": {
+        "description": "Rename the caller's file, replace its bytes, or both; what is not sent stays as it is.",
+        "operationId": "update_file_api_v1_files__id__patch",
+        "parameters": [
+          {
+            "description": "The file's id",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "The file's id",
+              "title": "Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_file_api_v1_files__id__patch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Validation failed"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unexpected error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update File",
+        "tags": [
+          "files"
         ]
       }
     },
