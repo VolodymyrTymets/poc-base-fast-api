@@ -18,6 +18,8 @@ Task 11.2 ports the Node base's `docker-compose.yml`, `set-ports.sh` and `move-e
 - `set-ports.sh <BASE>` (1024-65530) gives API = BASE, Postgres = BASE+1, Redis = BASE+2 and writes the three `EXPOSE_*`, plus `PORT`, `REDIS_PORT` and the port of an existing `DATABASE_URL`, into `.env`. Container-internal ports never change.
   Because `PORT` in `.env` is the published API port, a local `uv run poc-base-fast-api` and the `api` container cannot run in the same checkout at once.
 - `move-env.sh [--force] <dir>` copies `.env`, `.env.development` and `.env.test` (those that exist) to another checkout, and refuses to overwrite a file already there unless `--force` is given: it may hold that checkout's secrets.
+- Ports are published on `127.0.0.1` only (`EXPOSE_HOST`, default `127.0.0.1`; `0.0.0.0` opens them). The stack runs `APP_ENV=development`, which returns OTP codes in responses and seeds a known admin, and Redis has no password, so a port open to the network would let anyone read queued reset tokens or sign in as the admin.
+- `move-env.sh` resolves a relative target from where it was run and refuses the checkout it runs in. `set-ports.sh` warns, and changes nothing, when `DATABASE_URL` has no `:port/` to rewrite.
 - Both scripts sit at the repo root, not in `scripts/` (ADR-0030): the acceptance criterion and decision D9 call `./set-ports.sh`, and they are for people, where `scripts/` holds what the image runs.
 - A second stack is a second checkout or worktree (compose names the project after the directory), given its env files by `move-env.sh` and its ports by `set-ports.sh`.
 
@@ -31,6 +33,8 @@ Task 11.2 ports the Node base's `docker-compose.yml`, `set-ports.sh` and `move-e
 
 ## Consequences
 - `APP_ENV=development` refuses to boot on the example's placeholder secrets, so a copied `.env.development` must get two different 32+ character secrets before `up` (RUNBOOK).
+- The `db` container reads all of `.env.development`, so the JWT secrets are in its environment and visible in `docker inspect`. Accepted for a local stack: compose cannot fill `POSTGRES_*` from a file it does not interpolate.
+- The example's `POSTGRES_PASSWORD` (`change-me`) is a placeholder: change it, in both places, on any machine others can reach.
 - `postgis/postgis` is amd64 only: on Apple Silicon `db` is emulated and warns once (ADR-0030).
 - Removing the stack with its volumes deletes the database and the queue; a plain `docker compose down` keeps them.
 - Follow-ups: 11.3 (full-stack check), 11.4 (CI).

@@ -53,6 +53,10 @@ set_url_port() {
   port="$3"
   [ -f "$file" ] || return 0
   grep -q "^${key}=.*://" "$file" 2>/dev/null || return 0
+  if ! grep -qE "^${key}=.*://[^/]*:[0-9]+/" "$file"; then
+    echo "warning: $key in $file has no :port/ to rewrite; a local run still uses its old port" >&2
+    return 0
+  fi
   sed -E -i.bak "s|(^${key}=.*://[^/]*:)[0-9]+(/.*)|\\1${port}\\2|" "$file"
   rm -f "$file.bak"
 }

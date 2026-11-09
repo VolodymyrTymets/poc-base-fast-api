@@ -3,6 +3,7 @@
 The script runs as its own process, from a copy in a temp "source" directory with canary files, so the repo's real env files are never read.
 """
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -30,7 +31,11 @@ def target(tmp_path: Path) -> Path:
 def run(source: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["/bin/sh", "-c", '"$SCRIPT" $ARGUMENTS'],
-        env={"SCRIPT": str(source / "move-env.sh"), "ARGUMENTS": " ".join(args)},
+        env={
+            "SCRIPT": str(source / "move-env.sh"),
+            "ARGUMENTS": " ".join(args),
+            "PATH": os.environ["PATH"],
+        },
         cwd=source,
         capture_output=True,
         text=True,
@@ -116,3 +121,35 @@ def test_the_source_files_are_left_unchanged(source: Path, target: Path) -> None
     run(source, str(target))
 
     assert (source / ".env").read_text() == "A=1\n"
+
+
+def test_a_relative_target_is_relative_to_where_the_script_was_run(
+    source: Path, target: Path
+) -> None:
+    # Arrange
+    (source / ".env").write_text("A=1\n")
+
+    # Act
+    result = subprocess.run(
+        ["/bin/sh", "-c", '"$SCRIPT" ../target'],
+        env={"SCRIPT": str(source / "move-env.sh"), "PATH": os.environ["PATH"]},
+        cwd=source,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+
+    # Assert
+    assert (result.returncode, (target / ".env").read_text()) == (0, "A=1\n")
+
+
+def test_the_target_being_this_checkout_is_refused(source: Path) -> None:
+    # Arrange
+    (source / ".env").write_text("A=1\n")
+
+    # Act
+    result = run(source, ".")
+
+    # Assert
+    assert (result.returncode, "this checkout" in result.stderr) == (1, True)

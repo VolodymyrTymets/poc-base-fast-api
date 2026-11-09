@@ -3,6 +3,7 @@
 The script runs as its own process, from a copy placed in a temp directory, so the repo's own `.env` is never touched.
 """
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -23,7 +24,11 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["/bin/sh", "-c", '"$SCRIPT" $ARGUMENTS'],
-        env={"SCRIPT": str(project / "set-ports.sh"), "ARGUMENTS": " ".join(args)},
+        env={
+            "SCRIPT": str(project / "set-ports.sh"),
+            "ARGUMENTS": " ".join(args),
+            "PATH": os.environ["PATH"],
+        },
         cwd=cwd or project,
         capture_output=True,
         text=True,
@@ -118,3 +123,22 @@ def test_running_from_another_directory_writes_next_to_the_script(
     assert result.returncode == 0
     assert (project / ".env").exists()
     assert not (elsewhere / ".env").exists()
+
+
+def test_a_database_url_without_a_port_is_left_alone_with_a_warning(
+    project: Path,
+) -> None:
+    # Arrange
+    (project / ".env").write_text(
+        "DATABASE_URL=postgresql+asyncpg://user:pw@localhost/poc\n"
+    )
+
+    # Act
+    result = run(project, "4000")
+
+    # Assert
+    assert (
+        result.returncode,
+        env_values(project)["DATABASE_URL"],
+        "no :port/ to rewrite" in result.stderr,
+    ) == (0, "postgresql+asyncpg://user:pw@localhost/poc", True)

@@ -4,7 +4,7 @@
 # Refuses to overwrite a file already in TARGET_DIR unless --force is given: it may hold that checkout's secrets.
 set -eu
 
-cd "$(dirname "$0")"
+# Resolve the target before the cd below: a relative TARGET_DIR is relative to where the user ran this.
 
 usage() {
   echo "Usage: ./move-env.sh [--force] <TARGET_DIR>" >&2
@@ -20,6 +20,12 @@ fi
 [ $# -eq 1 ] || usage
 target=$1
 [ -d "$target" ] || { echo "not a directory: $target" >&2; usage; }
+target=$(cd "$target" && pwd)
+cd "$(dirname "$0")"
+if [ "$target" = "$PWD" ]; then
+  echo "target is this checkout: $target" >&2
+  exit 1
+fi
 
 files=".env .env.development .env.test"
 

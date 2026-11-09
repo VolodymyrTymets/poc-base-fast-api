@@ -246,6 +246,8 @@ docker compose down                            # keeps the data; adding the volu
   ```
   `set-ports.sh` writes the three `EXPOSE_*` ports to `.env`, and also `PORT`, `REDIS_PORT` and the port of `DATABASE_URL` there for a run outside Docker. Container-internal ports stay 3001, 5432 and 6379. Because `PORT` in `.env` becomes the published port, a local `uv run poc-base-fast-api` and the `api` container cannot share a checkout at once.
   A published port already in use on the host fails `up` with a bind error: pick another base.
+- The stack is local-only: ports are published on `127.0.0.1` (`EXPOSE_HOST`, in `.env` or the shell, changes that). With `APP_ENV=development` the API returns OTP codes and has a seeded admin, and Redis has no password, so do not open the ports to a network, and change the `change-me` database password if you do.
+- `move-env.sh <dir>` takes a path relative to where you run it and refuses to target its own checkout.
 - On Apple Silicon `db` runs under emulation and Docker prints a platform warning; it still becomes healthy.
 
 ## Commands

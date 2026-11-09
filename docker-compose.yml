@@ -2,7 +2,8 @@
 #   cp .env.development.example .env.development   # then set two different 32+ character JWT secrets
 #   docker compose up -d --build
 # Containers read .env.development. The root .env is read by compose only to fill the ${EXPOSE_*} host ports below
-# (./set-ports.sh writes them); container-internal ports never change.
+# (./set-ports.sh writes them); container-internal ports never change. Ports are published on 127.0.0.1 only: the stack runs
+# APP_ENV=development, which returns OTP codes in responses and seeds an admin, and Redis has no password. EXPOSE_HOST=0.0.0.0 opens them.
 
 services:
   # PostgreSQL with PostGIS (the first Alembic revision creates the extension)
@@ -12,7 +13,7 @@ services:
     env_file:
       - .env.development
     ports:
-      - "${EXPOSE_POSTGRES_PORT:-5432}:5432"
+      - "${EXPOSE_HOST:-127.0.0.1}:${EXPOSE_POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -20,6 +21,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      # amd64 PostGIS under emulation (Apple Silicon) needs longer than 5 tries for its first init
+      start_period: 30s
     networks:
       - my_network
 
@@ -28,7 +31,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "${EXPOSE_REDIS_PORT:-6379}:6379"
+      - "${EXPOSE_HOST:-127.0.0.1}:${EXPOSE_REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -45,7 +48,7 @@ services:
       context: .
       target: development
     ports:
-      - "${EXPOSE_API_PORT:-3001}:3001"
+      - "${EXPOSE_HOST:-127.0.0.1}:${EXPOSE_API_PORT:-3001}:3001"
     env_file:
       - .env.development
     depends_on:
