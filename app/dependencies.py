@@ -25,6 +25,7 @@ from app.services.account import AccountService
 from app.services.account_profile import AccountProfileService
 from app.services.account_role import AccountRoleService
 from app.services.file_assert import FileAssertService
+from app.services.files import FilesService
 from app.services.notifier import NotifierService
 from app.services.otp import OtpService
 from app.services.password_auth import PasswordAuthService
@@ -72,6 +73,14 @@ def get_file_assert_service(
 ) -> FileAssertService:
     """The `FileAssertService` on the request's session, with the upload limits of the app's settings (ADR-0025)."""
     return FileAssertService(session, settings)
+
+
+def get_files_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    file_assert: Annotated[FileAssertService, Depends(get_file_assert_service)],
+) -> FilesService:
+    """The `FilesService`; its `FileAssertService` is a provider too, so a test may replace either (ADR-0025)."""
+    return FilesService(session, file_assert)
 
 
 def get_account_profile_service(

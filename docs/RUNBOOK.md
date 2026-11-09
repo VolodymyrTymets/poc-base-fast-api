@@ -174,6 +174,15 @@ header, and a soft-deleted account are the same 401 `UNAUTHORIZED`, which is wha
 `POST /api/v1/auth/sign-out` with `Authorization: Bearer <accessToken>` answers 204 with no body: it clears the stored refresh hash and any pending sign-in code (the password stays). It is idempotent: a second call, or an account
 with nothing stored, is 204. The access token is not revoked and works until it expires (default 15 minutes); there is no denylist.
 
+## Files
+Three routes (task 8.2, ADR-0009), all with `Authorization: Bearer <accessToken>`. None returns the bytes; the content route is task 8.3.
+```bash
+curl -X POST localhost:3001/api/v1/files -H "Authorization: Bearer $TOKEN" -F 'file=@photo.png;type=image/png' -F name=Holiday   # 201 {id, name, mimeType, size, createdAt, contentUrl}
+curl -X PATCH localhost:3001/api/v1/files/$ID -H "Authorization: Bearer $TOKEN" -F name=Renamed                                  # 200; add -F 'file=@new.jpg;type=image/jpeg' to replace the bytes
+curl localhost:3001/api/v1/files/$ID -H "Authorization: Bearer $TOKEN"                                                            # 200, metadata
+```
+The size is the number of bytes received and the mime type is the one the upload declares; `image/jpeg` and `image/png` by default (`FILE_ALLOWED_MIME_TYPES`). An upload over `FILE_MAX_SIZE` is 413 and a disallowed or missing type is 422, both `VALIDATION_FAILED` with `file` in `details`, and nothing is stored; a body over `MAX_REQUEST_BODY_BYTES` is 413 before routing. An unknown id, another account's file and a soft-deleted file are the same 403 `FORBIDDEN`. Without `name` the name is the upload's filename (`null` when that is over 255 characters or has control characters). The form is parsed before the handler runs, so one request can hold up to `MAX_REQUEST_BODY_BYTES` in memory.
+
 ## Seeds
 Seed items are the base data the app creates for itself: the two roles (`CUSTOMER`, `ADMIN`) everywhere, and for `APP_ENV` `local`, `development` and `test` also (task 5.5) a sample admin (`+12125550100`, `admin+d1@example.com`, `Admin User`, role `ADMIN`) and three sample customers (`+12125550101` to `+12125550103`, emails `customer+d1@example.com` to `customer+d3@example.com`, role `CUSTOMER`). The phones are in the range reserved for fiction and none of them has a password: they are meant for OTP sign-in. `production` gets the roles only; a fork that needs a production admin adds its own seed item with its own phone.
 - With `DATABASE_URL` set, the app runs them on startup, before it serves. Each item runs in its own transaction and is recorded in `SeedHistory`;

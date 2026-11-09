@@ -88,10 +88,10 @@ Behaviours to keep:
 
 | Operation | Method and path | Request | Response | Success | Errors | Auth | Roles | Node source |
 |-----------|-----------------|---------|----------|---------|--------|------|-------|-------------|
-| `createFile` | `POST /files` | `multipart/form-data`: `file` (required, max 10 MB, `image/jpeg` or `image/png`), `name` (optional, max 255; `files/dto/create-file.input.ts:12-14`) | `{id, name, mimeType, size, createdAt, contentUrl}` | 201 | `UNAUTHORIZED`, `VALIDATION_FAILED` | Bearer | any | `files/files.resolver.ts:33-39`, `files/services/file-assert.service.ts:28-46`, `files/files.service.ts:11-27` |
-| `updateFile` | `PATCH /files/{id}` | `multipart/form-data`: `file` (optional, same limits), `name` (optional, max 255) | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION_FAILED` | Bearer | any (owner) | `files/files.resolver.ts:43-55`, `files/services/file-assert.service.ts:48-69`, `files/files.service.ts:29-44` |
-| `file` | `GET /files/{id}` | none | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN` | Bearer | any (owner) | `files/files.resolver.ts:59-73`, `files/services/file-assert.service.ts:71-83`, `files/files.service.ts:46-58` |
-| (new) | `GET /files/{id}/content` | none | the bytes, with `Content-Type`, `Content-Length` and `X-Content-Type-Options: nosniff` | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND` | Bearer | any (owner) | `files/files.resolver.ts:76-81` (the `publicUrl` field it replaces), ADR-0009 |
+| `createFile` (built, task 8.2) | `POST /files` | `multipart/form-data`: `file` (required, max 10 MB, `image/jpeg` or `image/png`), `name` (optional, max 255; `files/dto/create-file.input.ts:12-14`) | `{id, name, mimeType, size, createdAt, contentUrl}` | 201 | `UNAUTHORIZED`, `FORBIDDEN` (no role), `VALIDATION_FAILED` (422; 413 over the size limit) | Bearer | `ADMIN` or `CUSTOMER` | `files/files.resolver.ts:33-39`, `files/services/file-assert.service.ts:28-46`, `files/files.service.ts:11-27` |
+| `updateFile` (built, task 8.2) | `PATCH /files/{id}` | `multipart/form-data`: `file` (optional, same limits), `name` (optional, max 255) | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION_FAILED` (422; 413 over the size limit) | Bearer | `ADMIN` or `CUSTOMER` (owner) | `files/files.resolver.ts:43-55`, `files/services/file-assert.service.ts:48-69`, `files/files.service.ts:29-44` |
+| `file` (built, task 8.2) | `GET /files/{id}` | none | the same file object | 200 | `UNAUTHORIZED`, `FORBIDDEN` | Bearer | `ADMIN` or `CUSTOMER` (owner) | `files/files.resolver.ts:59-73`, `files/services/file-assert.service.ts:71-83`, `files/files.service.ts:46-58` |
+| (new) | `GET /files/{id}/content` | none | the bytes, with `Content-Type`, `Content-Length` and `X-Content-Type-Options: nosniff` | 200 | `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND` | Bearer | `ADMIN` or `CUSTOMER` (owner) | `files/files.resolver.ts:76-81` (the `publicUrl` field it replaces), ADR-0009 |
 
 Behaviours to keep:
 
@@ -100,6 +100,7 @@ Behaviours to keep:
 - **`updateFile`**: sending a new `file` replaces the stored bytes, size and mime type; the limits are checked again against the new upload. Node let a client resend only `name`; that still works here.
 - **Content:** the bytes are returned only by `GET /files/{id}/content`, and only to the owner; no response carries them inline (mapping decisions 10 and 11). `contentUrl` is the path `/api/v1/files/{id}/content`.
 - **Avatar:** `PATCH` profile with an `avatarId` goes through the same ownership check as a file read.
+- **Built in task 8.2 (decisions recorded there):** the file routes require `ADMIN` or `CUSTOMER` and keep all three layers of rule P7, as ADR-0022 lists them (decision 15 left the role to a human). The stored `mimeType` is the declared media type without parameters, lowercased (`image/PNG; charset=x` is `image/png`). Without a `name` (or with an empty one, which FastAPI treats as not sent) the name is the upload's filename when it fits the limits of `name` (255 characters, no control characters), else `null`; this is new, not read from Node. A `file` or `name` part sent twice keeps the last one; an unknown form field is ignored; a 0-byte part with an empty filename counts as no `file` (422). `PATCH` with neither part changes nothing and returns the file; a `name` cannot be cleared.
 
 ## Mapping decisions
 

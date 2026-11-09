@@ -22,6 +22,7 @@ from pydantic_core import PydanticCustomError
 EMAIL_MAX_LENGTH = 254
 PASSWORD_MAX_BYTES = 72
 NEW_PASSWORD_MIN_BYTES = 8
+FILE_NAME_MAX_LENGTH = 255
 
 
 class StrictModel(BaseModel):
@@ -47,6 +48,11 @@ def _reject_control_characters(value: str) -> None:
         raise PydanticCustomError(
             "control_character", "Must not contain control characters"
         )
+
+
+def _file_name(value: str) -> str:
+    _reject_control_characters(value)
+    return value
 
 
 def _check_password_bytes(value: str, minimum: int) -> str:
@@ -137,3 +143,7 @@ NewPassword = Annotated[str, AfterValidator(_new_password)]
 CurrentPassword = Annotated[str, AfterValidator(_current_password)]
 PhoneNumber = Annotated[str, AfterValidator(_phone_number)]
 UuidStr = Annotated[str, AfterValidator(_uuid)]
+# A file name, from the `name` form field or an upload's filename (task 8.2); the same limits for both.
+FileName = Annotated[
+    str, StringConstraints(max_length=FILE_NAME_MAX_LENGTH), AfterValidator(_file_name)
+]
