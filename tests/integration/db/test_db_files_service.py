@@ -181,23 +181,6 @@ async def test_get_content_returns_the_stored_bytes_and_mime_type(
     assert (result.content, result.mime_type) == (PNG, "image/png")
 
 
-async def test_get_content_returns_the_replacement_after_an_update(
-    db_session: AsyncSession,
-) -> None:
-    # Arrange
-    owner = await make_account(db_session)
-    files = service(db_session)
-    created = await files.create(owner, PNG, "image/png", "a.png", None)
-    new_bytes = b"\xff\xd8\xff-jpeg"
-    await files.update(created.id, owner, content=new_bytes, mime_type="image/jpeg")
-
-    # Act
-    result = await files.get_content(created.id, owner)
-
-    # Assert
-    assert (result.content, result.mime_type) == (new_bytes, "image/jpeg")
-
-
 async def test_get_content_of_a_row_with_no_bytes_is_not_found(
     db_session: AsyncSession,
 ) -> None:

@@ -454,3 +454,28 @@ async def test_the_content_of_a_row_with_no_stored_bytes_is_404(
 
     # Assert
     assert error_of(response) == (404, "NOT_FOUND")
+
+
+async def test_a_file_with_no_stored_mime_type_downloads_as_octet_stream(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        tokens = await sign_up(
+            client, f"{uuid.uuid4().hex}@example.com", "correct-horse"
+        )
+        account = (await client.get("/api/v1/account", headers=tokens.headers)).json()
+        row = File(
+            name="x", mime_type=None, size=1, created_by_id=account["id"], content=b"x"
+        )
+        async with AsyncSession(db_engine) as session, session.begin():
+            session.add(row)
+            await session.flush()
+            file_id = row.id
+
+        # Act
+        response = await client.get(f"{PATH}/{file_id}/content", headers=tokens.headers)
+
+    # Assert
+    assert (response.status_code, response.content) == (200, b"x")
+    assert response.headers["content-type"] == "application/octet-stream"

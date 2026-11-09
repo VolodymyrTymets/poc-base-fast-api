@@ -59,3 +59,8 @@ No precedent for a route that returns bytes: it needs no ADR, because ADR-0009 d
 - ADR-0009 says "chunked" and the scope doc requires `Content-Length`; HTTP/1.1 allows only one. The route sends `Content-Length` and ENDPOINTS.md records it (no superseding ADR: the ADR's explicit requirement is `Content-Length`). The approval of this plan acknowledges that.
 - 8.2 is merged (PR #44, `bec79cd` on `main`); the branch starts from it.
 - The route takes the roles `ADMIN` or `CUSTOMER` like the other file routes (ADR-0022, ENDPOINTS.md "Built in task 8.2").
+
+## Deviations (found while implementing, recorded here and in the PR)
+- `tests/unit/test_response_models.py` (R2, unplanned): `test_every_route_has_a_response_model_that_is_not_an_orm_class` walked only `APIRoute` entries of `app.routes`. In FastAPI 0.162 an included router is one opaque entry there, so the check saw none of the feature routes and passed whatever they returned. The plan's claim that "`/untyped` already tests a route with no model" was true only for a route added straight to the app. The fix reads the routes of the included routers (`effective_route_contexts()`) so the `BYTE_ROUTES` exemption is real; every existing feature route passes under the new walk, and the exemption is keyed on `("GET", path)`. Without it AC7 would be vacuous.
+- Review of the first draft: a test for the null mime type (`application/octet-stream`) was added; the service-level "replacement" test was dropped as a duplicate of the HTTP one.
+
