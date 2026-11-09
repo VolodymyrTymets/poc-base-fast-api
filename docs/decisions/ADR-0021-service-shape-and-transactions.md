@@ -1,7 +1,7 @@
 # ADR-0021 — A service is a class over an `AsyncSession`; the caller owns the transaction
 
 - **Date:** 2026-11-03
-- **Status:** accepted
+- **Status:** accepted; extended by [ADR-0025](ADR-0025-service-providers.md) (providers) and [ADR-0027](ADR-0027-service-built-from-services.md) (services built from services), neither changes it
 - **Deciders:** volodymyr
 - **Ticket:** POC-5.2
 - **Supersedes:** nothing. It adds to ADR-0011, which says only what a service may import.

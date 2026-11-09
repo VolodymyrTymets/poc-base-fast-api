@@ -20,6 +20,10 @@ to `.claude/rules/`, `docs/`, or a skill and leave a pointer.
 | e2e | `uv run pytest tests/e2e` (the app, the worker or a command as a process; the worker file needs Redis) |
 | migrate | `uv run alembic upgrade head` (needs `DATABASE_URL`, a PostGIS database) |
 | migration check | `uv run alembic check` (same database; fails if models and revisions differ) |
+| install, as CI | `uv sync --locked` (fails when `uv.lock` is stale; CI uses it) |
+| tests, as CI | `uv run pytest -m "not e2e"` (what CI's test job runs; needs Docker or `TEST_DATABASE_URL`) |
+| stack up / down | `docker compose up -d --build` / `docker compose down` (db, redis, api, worker; needs `.env.development`, see RUNBOOK) |
+| second stack | `./set-ports.sh <BASE>` then `./move-env.sh [--force] <dir>` (ports and env files for another checkout) |
 | openapi export | `uv run python -m app.cli --export-openapi` (rewrites the root `openapi.json`; never hand-edit it) |
 | openapi check | `uv run python -m app.cli --export-openapi --check` (exit 1 when `openapi.json` is stale) |
 
@@ -88,7 +92,7 @@ Dependency manager: **uv (`uv.lock`, build backend `uv_build`)**. Runtime pinned
 
 ## Where things live
 
-- Stack rules: `.claude/rules/` — auto-loaded when you touch a matching path (installed by `/setup` for this repo's stack)
+- Stack rules: `.claude/rules/` — auto-loaded when you touch a matching path (installed by `/setup` for this repo's stack); the backend ones are `project-structure.md`, `routes-convention.md`, `backend-fastapi.md` and `api-rest.md`
 - Architecture: @docs/ARCHITECTURE.md
 - Product goals & priorities (tie-breaker for judgement calls): @docs/BUSINESS_MODEL.md
 - Domain terms: @docs/DOMAIN_GLOSSARY.md
@@ -106,7 +110,7 @@ Dependency manager: **uv (`uv.lock`, build backend `uv_build`)**. Runtime pinned
 <!-- PROJECT-SPECIFIC RULES: add below this line, keep each one short and say why. -->
 
 - **P1** There is no tracker. The work list is the Claude Docs doc "Scope Breakdown: poc-base on Python + FastAPI (REST)" (https://claude.ai/artifact/DxKipMTcFFg4tsG7tutNRa, read it with the Claude Docs connector). A ticket ID is `POC-<package>.<task>` (task 1.4 is `POC-1.4`); the bootstrap PR is `POC-0`. One PR = one task. Why: the CI evidence check and branch naming need an ID, and the doc is the only plan.
-- **P2** Do the work in the doc's order and honour its dependency lines. Decisions D1–D9 of that doc are recorded in `docs/decisions/` ADR-0003 to ADR-0010 (D10 is dropped: no `web/`): follow them, and change one only through a superseding ADR. Where the doc still says `api/`, `app/` or Python 3.12, the ADRs win.
+- **P2** Do the work in the doc's order and honour its dependency lines. Decisions D1–D9 of that doc are recorded in `docs/decisions/` ADR-0003 to ADR-0010 (D10 is dropped: no `web/`), and later decisions run on to the latest ADR in that folder: follow them, and change one only through a superseding ADR. Task 11.3 is dropped with `web/`. Where the doc still says `api/`, `app/` or Python 3.12, the ADRs win.
 - **P3** Out of scope (so never "helpfully" built): new domain endpoints, admin screens, a real SMS/email provider (log-only), rate limiting, email verification, httpOnly-cookie refresh tokens, staging/production, a GraphQL endpoint. No `web/` in this repo.
 - **P4** No tokens, passwords, DOB or phone numbers in logs (rule D8): the base stores that data on `AccountProfile`, so it is not hypothetical.
 - **P5** Refresh tokens are stored as a sha256 hash, never as bcrypt of the whole JWT (bcrypt >= 5 refuses input over 72 bytes). Why: Node-base issue I.2, scope decision D5.

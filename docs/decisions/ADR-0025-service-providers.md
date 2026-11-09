@@ -1,7 +1,7 @@
 # ADR-0025 — One `Depends` provider per service, in `app/dependencies.py`
 
 - **Date:** 2026-11-04
-- **Status:** accepted
+- **Status:** accepted; extended by [ADR-0027](ADR-0027-service-built-from-services.md) (a provider may depend on other providers)
 - **Deciders:** volodymyr
 - **Ticket:** POC-I.9
 - **Supersedes:** nothing. It extends ADR-0021 (service shape and transactions) and ADR-0011 (what `dependencies` may import).
