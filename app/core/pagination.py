@@ -6,12 +6,16 @@ validation, so a bad one is the usual 422 `VALIDATION_FAILED` and a message neve
 """
 
 import unicodedata
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import Query
 from pydantic import AfterValidator, BaseModel, Field
 from pydantic_core import PydanticCustomError
+from sqlalchemy import ColumnElement, Select
+
+from app.core.errors import ValidationFailedError
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -20,6 +24,7 @@ MAX_OFFSET = 2**31 - 1
 MAX_SEARCH_LENGTH = 100
 # A generous cap on the raw `sort` text; the number of terms is checked when it is parsed.
 MAX_SORT_LENGTH = 200
+MAX_SORT_TERMS = 3
 
 
 class Page[T](BaseModel):
@@ -70,3 +75,73 @@ def like_pattern(search: str) -> str:
     """A contains-pattern for `column.ilike(pattern, escape="\\\\")`, with `%`, `_` and the backslash matched literally."""
     escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     return f"%{escaped}%"
+
+
+@dataclass(frozen=True)
+class SortTerm:
+    field: str
+    direction: Literal["asc", "desc"]
+
+
+def _bad_sort(allowed: Mapping[str, ColumnElement[Any]]) -> ValidationFailedError:
+    # The message lists our own field names and never the submitted text (rules D8, P4).
+    names = ", ".join(sorted(allowed))
+    return ValidationFailedError(
+        details=[
+            {
+                "in": "query",
+                "field": "sort",
+                "message": (
+                    f"Use field or field:asc or field:desc, comma separated, "
+                    f"at most {MAX_SORT_TERMS} different fields from: {names}"
+                ),
+                "type": "sort_invalid",
+            }
+        ]
+    )
+
+
+def parse_sort(
+    raw: str | None, allowed: Mapping[str, ColumnElement[Any]]
+) -> list[SortTerm]:
+    """`name:desc,createdAt` as ordered terms; any field outside `allowed`, a bad direction, a repeat or too many terms is a 422.
+
+    `allowed` maps the API field name to the column, so a client value never reaches `ORDER BY` as text.
+    """
+    if not raw:
+        return []
+    parts = raw.split(",")
+    if len(parts) > MAX_SORT_TERMS:
+        raise _bad_sort(allowed)
+    terms: list[SortTerm] = []
+    for part in parts:
+        field, colon, direction = part.partition(":")
+        if not colon:
+            direction = "asc"
+        if field not in allowed or any(term.field == field for term in terms):
+            raise _bad_sort(allowed)
+        if direction == "asc":
+            terms.append(SortTerm(field, "asc"))
+        elif direction == "desc":
+            terms.append(SortTerm(field, "desc"))
+        else:
+            raise _bad_sort(allowed)
+    return terms
+
+
+def apply_page[*Ts](
+    stmt: Select[*Ts],
+    params: PageParams,
+    allowed: Mapping[str, ColumnElement[Any]],
+    default_order: Sequence[ColumnElement[Any]],
+) -> Select[*Ts]:
+    """Order, limit and offset `stmt`. `default_order` always follows the requested sort, so equal rows never swap between pages."""
+    order = [
+        allowed[term.field].asc()
+        if term.direction == "asc"
+        else allowed[term.field].desc()
+        for term in parse_sort(params.sort, allowed)
+    ]
+    return (
+        stmt.order_by(*order, *default_order).limit(params.limit).offset(params.offset)
+    )

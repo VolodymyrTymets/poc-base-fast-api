@@ -1,14 +1,19 @@
 import pytest
+import sqlalchemy as sa
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from app.core.errors import ValidationFailedError
 from app.core.pagination import (
     DEFAULT_LIMIT,
     MAX_SEARCH_LENGTH,
     Page,
     PageParams,
     SearchText,
+    SortTerm,
+    apply_page,
     like_pattern,
     page_params,
+    parse_sort,
 )
 
 SEARCH = TypeAdapter(SearchText)
@@ -128,3 +133,107 @@ def test_like_pattern_matches_wildcards_literally(search: str, pattern: str) -> 
 
     # Assert
     assert result == pattern
+
+
+ITEMS = sa.table("Item", sa.column("name"), sa.column("createdAt"), sa.column("id"))
+ALLOWED = {"name": ITEMS.c.name, "createdAt": ITEMS.c.createdAt}
+
+
+def sql(params: PageParams) -> str:
+    stmt = apply_page(sa.select(ITEMS.c.id), params, ALLOWED, [ITEMS.c.id])
+    return str(stmt.compile())
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, []),
+        ("", []),
+        ("name", [SortTerm("name", "asc")]),
+        ("name:desc", [SortTerm("name", "desc")]),
+        (
+            "name:asc,createdAt:desc",
+            [SortTerm("name", "asc"), SortTerm("createdAt", "desc")],
+        ),
+    ],
+)
+def test_parse_sort_accepts(raw: str | None, expected: list[SortTerm]) -> None:
+    # Act
+    terms = parse_sort(raw, ALLOWED)
+
+    # Assert
+    assert terms == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "password",
+        "name:up",
+        "name:DESC",
+        "name:",
+        ":asc",
+        "name,name:desc",
+        "name,createdAt,name,createdAt",
+        "name;select 1",
+        "name:asc:desc",
+    ],
+)
+def test_parse_sort_refuses_with_a_sort_invalid_detail(raw: str) -> None:
+    # Act
+    with pytest.raises(ValidationFailedError) as info:
+        parse_sort(raw, ALLOWED)
+
+    # Assert
+    detail = info.value.details[0]
+    assert isinstance(detail, dict)
+    assert (info.value.status_code, detail["field"], detail["type"]) == (
+        422,
+        "sort",
+        "sort_invalid",
+    )
+    assert "createdAt, name" in detail["message"]
+
+
+@pytest.mark.parametrize("raw", ["zqxsecret", "zqxsecret:desc", "name:zqxsecret"])
+def test_parse_sort_never_echoes_the_submitted_text(raw: str) -> None:
+    # Act
+    with pytest.raises(ValidationFailedError) as info:
+        parse_sort(raw, ALLOWED)
+
+    # Assert
+    assert "zqxsecret" not in str(info.value.body())
+
+
+def test_apply_page_orders_by_the_allowed_column_then_the_default() -> None:
+    # Act
+    text = sql(PageParams(limit=5, offset=10, sort="name:desc", search=None))
+
+    # Assert
+    assert 'ORDER BY "Item".name DESC, "Item".id' in text
+    assert "LIMIT :param_1 OFFSET :param_2" in text
+
+
+def test_apply_page_without_a_sort_uses_the_default_order() -> None:
+    # Act
+    text = sql(PageParams(limit=5, offset=0, sort=None, search=None))
+
+    # Assert
+    assert 'ORDER BY "Item".id' in text
+    assert "name" not in text.split("ORDER BY")[1]
+
+
+def test_apply_page_carries_limit_and_offset_as_parameters() -> None:
+    # Arrange
+    stmt = apply_page(
+        sa.select(ITEMS.c.id),
+        PageParams(limit=7, offset=21, sort=None, search=None),
+        ALLOWED,
+        [ITEMS.c.id],
+    )
+
+    # Act
+    values = stmt.compile().params
+
+    # Assert
+    assert sorted(values.values()) == [7, 21]
