@@ -14,7 +14,7 @@ from app.models import Account, AccountIdentity, AccountProfile, AccountRoleType
 from app.schemas.account import AccountResponse
 from app.services.account_role import AccountRoleService
 
-# The cache model of the account snapshot; the profile update invalidates it (ADR-0035).
+# The cache model of the account snapshot; the profile update forgets the account's entry (ADR-0035).
 ACCOUNT_CACHE_MODEL = "Account"
 
 
@@ -35,7 +35,7 @@ class AccountService:
         """The live account with its live profile as plain data, through the read cache (ADR-0035). `None` is never cached.
 
         Used by `GET /account`. It is a copy: a caller that changes the account reads it with `get_by_id`, which never touches the
-        cache. A profile update invalidates the `Account` model (`ACCOUNT_CACHE_MODEL`) after its commit.
+        cache. A profile update calls `forget_snapshot` after its commit.
         """
 
         async def load() -> AccountResponse | None:
@@ -49,6 +49,10 @@ class AccountService:
             encode=lambda snapshot: snapshot.model_dump(),
             decode=AccountResponse.model_validate,
         )
+
+    async def forget_snapshot(self, account_id: str) -> None:
+        """Drop the cached snapshot of one account. Call it after the commit of a write that changed the account or its profile."""
+        await self._cache.forget(ACCOUNT_CACHE_MODEL, {"accountId": account_id})
 
     async def get_by_phone(self, phone_number: str) -> Account | None:
         """The oldest live account whose live profile has this phone number; `None` when there is none."""

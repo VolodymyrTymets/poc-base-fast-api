@@ -70,10 +70,9 @@ def get_account_service(
 
 def get_account_role_service(
     session: Annotated[AsyncSession, Depends(get_session)],
-    cache: Annotated[Cache, Depends(get_read_cache)],
 ) -> AccountRoleService:
-    """The `AccountRoleService` on the request's session and the read cache (ADR-0025, ADR-0035)."""
-    return AccountRoleService(session, cache=cache)
+    """The `AccountRoleService` on the request's session (ADR-0025). Never cached: `require_roles` decides access on it (ADR-0035)."""
+    return AccountRoleService(session)
 
 
 def get_file_assert_service(

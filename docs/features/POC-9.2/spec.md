@@ -4,7 +4,7 @@
 Task 9.1 built the codec and the keys (`app/core/cache.py`, ADR-0034) but nothing reads or writes Redis. The scope row asks for a read-through cache on the service reads of account, profile and roles, invalidation by model pattern on writes (`SCAN`, never `KEYS`), and a cache that is off in tests unless a fake Redis is injected. Not every read can be cached safely: the services return ORM objects (not cacheable by the 9.1 codec), and some readers are write paths or authentication paths.
 
 ## Goal / business value
-Goal 1 (scaffolding) and goal 3 (test base): a fork gets a working read cache whose hits equal the database reads, which fails open when Redis is down, and which is tested without a mock database. The first reads on it are the two that run on every request: the signed-in account (`GET /api/v1/account`) and the roles checked by `require_roles`.
+Goal 1 (scaffolding) and goal 3 (test base): a fork gets a working read cache whose hits equal the database reads, which fails open when Redis is down, and which is tested without a mock database. The first read on it is the signed-in account (`GET /api/v1/account`); the roles checked by `require_roles` are left out after review (forgeable entry, ADR-0035).
 
 ## Scope
 - in:
@@ -19,8 +19,8 @@ Goal 1 (scaffolding) and goal 3 (test base): a fork gets a working read cache wh
 
 ## Acceptance criteria
 - [x] AC1 Given the cache on, when `GET /account` is called twice for one account, then the second call is served from Redis (the database sees no query for the account) and both bodies are equal, including `createdAt` as a timestamp.
-- [x] AC2 Given a cached account, when the profile is updated through `PATCH /accounts/{id}/profile`, then the next `GET /account` is a miss and shows the new value.
-- [x] AC3 Given a cached role read, when `require_roles` runs twice for one account, then the second is a hit and returns the same `AccountRoleType` members (not strings).
+- [x] AC2 Given a cached account, when the profile is updated through `PATCH /accounts/{id}/profile`, then that account's entry is dropped after the commit and the next `GET /account` is a miss and shows the new value; a Redis failure there still answers 200.
+- [x] AC3 (changed in review) The roles read by `require_roles` is never cached: a second guarded call runs SQL, and a forged `["ADMIN"]` entry in Redis does not open an admin route.
 - [x] AC4 Given Redis is unreachable, when `GET /account` is called, then it answers 200 from the database and one warning is logged with no account id, email or phone.
 - [x] AC5 Given an entry that cannot be decoded (unknown tag, bad JSON), when read, then it is a miss, is reloaded and overwritten.
 - [x] AC6 Given `invalidate("Account")`, when it runs, then every `cache*Account*…` key is gone and `cache*AccountRole*…` keys remain; it uses `SCAN`, never `KEYS`.

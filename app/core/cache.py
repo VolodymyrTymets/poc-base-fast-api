@@ -18,9 +18,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
 from redis.asyncio import Redis
-from redis.exceptions import AuthenticationError, AuthorizationError
-from redis.exceptions import ConnectionError as RedisConnectionError
-from redis.exceptions import TimeoutError as RedisTimeoutError
+from redis.exceptions import RedisError
 
 from app.config import Settings
 
@@ -160,9 +158,10 @@ def invalidation_pattern(model: str) -> str:
     return f"{CACHE_KEY_PREFIX}\\{CACHE_KEY_DELIMITER}{model}\\{CACHE_KEY_DELIMITER}{CACHE_KEY_DELIMITER}"
 
 
-# What "Redis is down" looks like, as in `core/queue.py`. Any other RedisError (a full server, a bad command, a bug) must reach the
-# caller as itself, and so must a wrong or missing password, which is a configuration fault and not an outage (rule D5).
-_UNAVAILABLE = (RedisConnectionError, RedisTimeoutError, OSError)
+# Any failure of the store, not only an outage: a full Redis (`OOM`), a read-only replica after a failover and a wrong password all
+# leave the database able to answer, and the cache is derived data, so none of them may fail a read or turn a committed write into a
+# 500 (ADR-0035). Each is logged with its class name, so a misconfiguration is visible and not silent (rule D5).
+_STORE_FAILURES = (RedisError, OSError)
 
 # One attempt at a connection or a reply may take this long: a read that waits on a dead Redis is slower than the query it saves.
 STORE_TIMEOUT_SECONDS = 1.0
@@ -233,6 +232,8 @@ class Cache(Protocol):
         decode: Callable[[object], T],
     ) -> T | None: ...
 
+    async def forget(self, model: str, args: object) -> None: ...
+
     async def invalidate(self, model: str) -> int: ...
 
     async def close(self) -> None: ...
@@ -251,6 +252,9 @@ class NullReadCache:
         decode: Callable[[object], T],
     ) -> T | None:
         return await load()
+
+    async def forget(self, model: str, args: object) -> None:
+        return None
 
     async def invalidate(self, model: str) -> int:
         return 0
@@ -290,7 +294,7 @@ class ReadCache:
         store_up = True
         try:
             raw = await self._store.get(key)
-        except _UNAVAILABLE as error:
+        except _STORE_FAILURES as error:
             _warn("read", error)
             raw, store_up = None, False
         if raw is not None:
@@ -305,15 +309,27 @@ class ReadCache:
         text = serialize(encode(value))
         try:
             await self._store.set(key, text, ex=self._ttl_seconds)
-        except _UNAVAILABLE as error:
+        except _STORE_FAILURES as error:
             _warn("write", error)
         return value
+
+    async def forget(self, model: str, args: object) -> None:
+        """Delete the one entry of `(model, args)`: a single `DEL`, no scan. A store failure is logged, never raised.
+
+        What a write that changes one record calls, after its commit. An entry a concurrent read stores between the commit and
+        this call, or just after it, survives until its TTL (ADR-0035).
+        """
+        try:
+            await self._store.delete(cache_key(model, args))
+        except _STORE_FAILURES as error:
+            _warn("forget", error)
 
     async def invalidate(self, model: str) -> int:
         """Delete every entry of `model` with `SCAN` (never `KEYS`, which blocks Redis) and return how many went.
 
-        Call it after the transaction that changed the data has committed: before that, a concurrent read could cache the old row
-        again. An unreachable Redis is logged; the stale entries then live for at most the TTL.
+        For a write that changes many records. It walks the whole keyspace of the Redis database, which the queue shares, so a route a
+        client can call in a loop uses `forget` instead. Call it after the commit. A store failure is logged; the stale entries then live
+        for at most the TTL.
         """
         pattern = invalidation_pattern(model)
         deleted = 0
@@ -326,7 +342,7 @@ class ReadCache:
                     batch = []
             if batch:
                 deleted += await self._store.delete(*batch)
-        except _UNAVAILABLE as error:
+        except _STORE_FAILURES as error:
             _warn("invalidate", error)
         return deleted
 
@@ -335,7 +351,4 @@ class ReadCache:
 
 
 def _warn(operation: str, error: Exception) -> None:
-    if isinstance(error, AuthenticationError | AuthorizationError):
-        # Subclasses of the connection error, but a configuration fault: it must not pass for an outage.
-        raise error
     logger.warning("read cache %s failed: %s", operation, type(error).__name__)

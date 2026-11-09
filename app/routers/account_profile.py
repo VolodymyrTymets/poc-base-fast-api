@@ -5,16 +5,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import Cache
 from app.core.db import get_session
 from app.core.security import TokenClaims
-from app.dependencies import get_account_profile_service, get_read_cache, require_roles
+from app.dependencies import (
+    get_account_profile_service,
+    get_account_service,
+    require_roles,
+)
 from app.models import AccountRoleType
 from app.schemas.account_profile import (
     AccountProfileResponse,
     UpdateAccountProfileInput,
 )
-from app.services.account import ACCOUNT_CACHE_MODEL
+from app.services.account import AccountService
 from app.services.account_profile import AccountProfileService
 
 router = APIRouter(prefix="/accounts", tags=["account_profile"])
@@ -33,12 +36,12 @@ async def update_account_profile(
     service: Annotated[AccountProfileService, Depends(get_account_profile_service)],
     # The same session the service uses (`get_session` is cached per request): the handler owns the commit (ADR-0021).
     session: Annotated[AsyncSession, Depends(get_session)],
-    cache: Annotated[Cache, Depends(get_read_cache)],
+    accounts: Annotated[AccountService, Depends(get_account_service)],
 ) -> AccountProfileResponse:
     """Update the caller's own profile: only the fields sent change, `null` clears one."""
     profile = await service.update(claims.account_id, account_id, body)
     await session.commit()
-    # After the commit, never before: a read in between would cache the old row again (ADR-0035). The account snapshot holds
-    # the profile, so its entries go; a failed update (a 409, a 403) raised above and leaves them alone.
-    await cache.invalidate(ACCOUNT_CACHE_MODEL)
+    # After the commit, never before, and only this account's entry (a scan would walk the queue's Redis on every call). It cannot fail
+    # the request: the update is committed, and a store failure is logged (ADR-0035). A failed update raised above.
+    await accounts.forget_snapshot(account_id)
     return AccountProfileResponse.model_validate(profile)

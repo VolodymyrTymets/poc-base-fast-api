@@ -172,22 +172,61 @@ async def test_a_failed_write_is_logged_and_the_value_is_still_returned(
     )
 
 
-async def test_an_error_that_is_not_an_outage_propagates() -> None:
+@pytest.mark.parametrize(
+    ("error", "logged"),
+    [
+        (ResponseError("OOM command not allowed"), "ResponseError"),
+        (AuthenticationError("invalid password"), "AuthenticationError"),
+    ],
+    ids=["full-redis", "wrong-password"],
+)
+async def test_any_store_failure_serves_the_read_and_is_logged_by_class(
+    error: Exception, logged: str, caplog: pytest.LogCaptureFixture
+) -> None:
     # Arrange
-    store = MemoryStore(fail_with=ResponseError("OOM command not allowed"))
+    store = MemoryStore(fail_with=error)
 
-    # Act / Assert
-    with pytest.raises(ResponseError):
-        await read(ReadCache(store), Loader({"id": "a1"}))
+    # Act
+    with caplog.at_level(logging.WARNING, logger="app.core.cache"):
+        result = await read(ReadCache(store), Loader({"id": "a1"}))
+
+    # Assert
+    assert (result, [r.getMessage() for r in caplog.records]) == (
+        {"id": "a1"},
+        [f"read cache read failed: {logged}"],
+    )
 
 
-async def test_a_wrong_password_propagates_and_is_not_taken_for_an_outage() -> None:
+async def test_forget_deletes_the_one_entry_and_no_other() -> None:
     # Arrange
-    store = MemoryStore(fail_with=AuthenticationError("invalid password"))
+    store = MemoryStore()
+    cache = ReadCache(store)
+    for number in (1, 2):
+        await cache.get_or_load(
+            MODEL, {"n": number}, Loader({"x": 1}), encode=encode, decode=decode
+        )
 
-    # Act / Assert
-    with pytest.raises(AuthenticationError):
-        await read(ReadCache(store), Loader({"id": "a1"}))
+    # Act
+    await cache.forget(MODEL, {"n": 1})
+
+    # Assert
+    assert list(store.data) == [cache_key(MODEL, {"n": 2})]
+
+
+async def test_forget_with_a_failing_store_logs_and_does_not_raise(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Arrange
+    store = MemoryStore(fail_with=ResponseError("READONLY"))
+
+    # Act
+    with caplog.at_level(logging.WARNING, logger="app.core.cache"):
+        await ReadCache(store).forget(MODEL, ARGS)
+
+    # Assert
+    assert [r.getMessage() for r in caplog.records] == [
+        "read cache forget failed: ResponseError"
+    ]
 
 
 async def test_invalidate_deletes_the_keys_of_one_model_only() -> None:
@@ -257,4 +296,5 @@ async def test_the_null_cache_always_loads_and_stores_nothing() -> None:
     await read(cache, loader)
 
     # Assert
+    await cache.forget(MODEL, ARGS)
     assert (first, loader.count, await cache.invalidate(MODEL)) == ({"id": "a1"}, 2, 0)

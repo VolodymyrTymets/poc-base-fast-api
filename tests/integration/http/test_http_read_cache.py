@@ -17,7 +17,7 @@ from utils.redis import TEST_REDIS_DATABASE
 from utils.sql import count_statements
 
 from app.config import Settings
-from app.core.cache import ReadCache, RedisCacheStore
+from app.core.cache import ReadCache, RedisCacheStore, cache_key
 from app.core.db import create_session_factory
 from app.core.security import TokenClaims, TokenType, issue_token
 from app.dependencies import require_roles
@@ -142,7 +142,7 @@ async def test_a_rejected_update_leaves_the_cached_account_in_place(
     assert (rejected.status_code, statements) == (409, [])
 
 
-async def test_the_roles_checked_by_require_roles_are_served_from_redis(
+async def test_the_roles_checked_by_require_roles_are_never_served_from_redis(
     module_database_url: str, redis_settings: Settings, db_engine: AsyncEngine
 ) -> None:
     # Arrange
@@ -158,16 +158,76 @@ async def test_the_roles_checked_by_require_roles_are_served_from_redis(
         return {"id": claims.account_id}
 
     async with running_client(app) as client:
-        first = await client.get("/api/v1/_customer", headers=headers_for(account_id))
+        await client.get("/api/v1/_customer", headers=headers_for(account_id))
 
         # Act
         with count_statements(statements_of(app)) as statements:
-            second = await client.get(
-                "/api/v1/_customer", headers=headers_for(account_id)
-            )
+            await client.get("/api/v1/_customer", headers=headers_for(account_id))
 
     # Assert
-    assert (first.status_code, second.status_code, statements) == (200, 200, [])
+    assert len(statements) > 0
+
+
+async def test_a_forged_role_entry_in_redis_does_not_open_an_admin_route(
+    module_database_url: str, redis_settings: Settings, db_engine: AsyncEngine
+) -> None:
+    # Arrange
+    account_id, _ = await new_account(db_engine)
+    app = make_app(module_database_url, redis_settings)
+    redis = Redis(
+        host=redis_settings.redis_host,
+        port=redis_settings.redis_port,
+        db=TEST_REDIS_DATABASE,
+    )
+
+    @app.get("/api/v1/_admin")
+    async def admin_only(
+        claims: Annotated[TokenClaims, Depends(require_roles(AccountRoleType.ADMIN))],
+    ) -> dict[str, str]:
+        return {"id": claims.account_id}
+
+    try:
+        async with running_client(app) as client:
+            for model in ("AccountRole", "Account"):
+                await redis.set(
+                    cache_key(model, {"accountId": account_id}), '["ADMIN"]'
+                )
+
+            # Act
+            response = await client.get(
+                "/api/v1/_admin", headers=headers_for(account_id)
+            )
+    finally:
+        await redis.aclose()
+
+    # Assert
+    assert response.status_code == 403
+
+
+async def test_a_profile_update_with_a_broken_redis_still_answers_200_and_is_stored(
+    module_database_url: str,
+    redis_settings: Settings,
+    db_engine: AsyncEngine,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Arrange
+    account_id, _ = await new_account(db_engine)
+    app = make_app(module_database_url, redis_settings, redis_port=1)
+    async with running_client(app) as client:
+        # Act
+        with caplog.at_level(logging.WARNING, logger="app.core.cache"):
+            patched = await client.patch(
+                f"/api/v1/accounts/{account_id}/profile",
+                headers=headers_for(account_id),
+                json={"firstName": "Ann"},
+            )
+        read = await client.get(ACCOUNT, headers=headers_for(account_id))
+
+    # Assert
+    assert (patched.status_code, read.json()["profile"]["firstName"]) == (200, "Ann")
+    assert "read cache forget failed" in " ".join(
+        record.getMessage() for record in caplog.records
+    )
 
 
 async def test_an_unreachable_redis_still_answers_from_the_database_and_logs_no_data(
