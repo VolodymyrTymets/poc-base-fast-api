@@ -11,13 +11,13 @@ Goal 3 (test base): the real-database suite keeps working because every PR runs 
 - **out (explicit):** the scope row's "web typecheck + build" (no `web/`, ADR-0010); any step that ships anything to an environment (none is defined, rule C5); required-status-check and branch-protection settings (a repo admin sets them in GitHub; the PR body asks); changing `agent-checks.yml`; coverage upload or badges; caching the Docker layers beyond the runner default; a matrix of Python versions (3.14 only, ADR-0002).
 
 ## Acceptance criteria
-- [ ] AC1 Given a clean PR, when CI runs, then every job is green (evidence: the run of the PR itself).
-- [ ] AC2 Given a PR that breaks one test, then the test job is red and names the test (evidence: a throwaway draft PR, closed and its branch deleted afterwards).
-- [ ] AC3 Given a PR that changes a route without regenerating `openapi.json`, then the static job is red at the openapi step; given lint, format or type errors, red at that step.
-- [ ] AC4 CI installs with `uv sync --locked` (a stale `uv.lock` fails it), uses the Python of `.python-version`, and the uv version equals the one the Dockerfile pins.
-- [ ] AC5 The suite needs no secret and no `.env`: no repository secret is read, `permissions` is `contents: read`, and the run is the same with no `.env.test`.
-- [ ] AC6 A new push to the same PR cancels the older run; each job has a timeout.
-- [ ] AC7 `agent-checks.yml` is untouched and still runs beside it.
+- [x] AC1 Given a clean PR, when CI runs, then every job is green (evidence: the run of the PR itself).
+- [x] AC2 Given a PR that breaks one test, then the test job is red and names the test (evidence: a throwaway draft PR, closed and its branch deleted afterwards).
+- [x] AC3 Given a PR that changes a route without regenerating `openapi.json`, then the static job is red at the openapi step; given lint, format or type errors, red at that step.
+- [x] AC4 CI installs with `uv sync --locked` (a stale `uv.lock` fails it), uses the Python of `.python-version`, and the uv version equals the one the Dockerfile pins.
+- [x] AC5 The suite needs no secret and no `.env`: no repository secret is read, `permissions` is `contents: read`, and the run is the same with no `.env.test`.
+- [x] AC6 A new push to the same PR cancels the older run; each job has a timeout.
+- [x] AC7 `agent-checks.yml` is untouched and still runs beside it.
 
 ## Edge cases
 | Case | Expected behaviour | Decided by |
