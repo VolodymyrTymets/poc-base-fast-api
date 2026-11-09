@@ -13,7 +13,10 @@ cp .env.example .env         # every setting has a default; see the file for the
 
 # 1. a PostGIS database. Skip the container if you already have a PostGIS server; use a database of its own, not
 #    the image's default `postgres` one (see "Common failures").
-docker run -d --name poc-base-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgis/postgis:16-3.4
+#    `127.0.0.1:` makes Docker fail loudly when a Postgres already listens on 5432 (see "Common failures"); without it the
+#    container starts anyway and `localhost:5432` keeps reaching the other server. If it fails, use another port (for example
+#    `127.0.0.1:5433:5432`) and put the same port in DATABASE_URL below.
+docker run -d --name poc-base-pg -e POSTGRES_PASSWORD=postgres -p 127.0.0.1:5432:5432 postgis/postgis:16-3.4
 docker exec poc-base-pg psql -U postgres -c 'CREATE DATABASE poc'
 #    .env.example already holds the matching line, so the copied .env works as it is:
 #    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/poc
@@ -112,7 +115,7 @@ Fixtures in `tests/conftest.py`, helpers in `tests/utils/` (task 3.2):
 ## Redis, the queue and the worker
 The API enqueues jobs and a separate process runs them (ADR-0005, ADR-0024). Settings: `REDIS_HOST` (default `localhost`), `REDIS_PORT` (6379),
 `REDIS_DATABASE` (0) and an optional `REDIS_PASSWORD`. The API needs no Redis to boot: the connection opens on the first enqueue, and an enqueue with Redis
-down fails at once. Start a Redis (for example `docker run -d --name poc-base-redis -p 6379:6379 redis:7-alpine`), then the worker, which needs the same
+down fails at once. Start a Redis (for example `docker run -d --name poc-base-redis -p 127.0.0.1:6379:6379 redis:7-alpine`), then the worker, which needs the same
 `REDIS_*` values as the API:
 ```bash
 uv run arq app.worker.WorkerSettings    # logs JSON on stdout; SIGTERM or Ctrl-C lets a running job finish
@@ -266,6 +269,7 @@ See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff 
 | `extension "postgis" is not available` (or permission denied to create it) | the server has no PostGIS files, or the role is not a superuser | use a PostGIS server (the `postgis/postgis` image) and a role that may create extensions |
 | `alembic check` lists tables such as `state` or `geocode_settings` as removed | the database is the default `postgres` database of the `postgis/postgis` image, where the image also installed `postgis_tiger_geocoder` and `postgis_topology` (seen in `pg_extension`) | run against a database made with `CREATE DATABASE`: it starts empty and the first revision adds `postgis` |
 | the app stops at startup with `seed init.roles failed: ... relation "SeedHistory" does not exist` | `DATABASE_URL` points at a database migrated before revision `0002_seed_history` (a developer's `.env` counts) | `uv run alembic upgrade head` against that database |
+| `alembic upgrade head` prints no `Running upgrade` lines on a database you just created, and `psql` in the container shows no tables | another Postgres already listens on the same host port (a local install, another stack): a container published on `0.0.0.0:5432` starts without error, but `localhost:5432` goes to the other server, so migrations and seeds ran on **its** `poc` database | `lsof -nP -iTCP:5432 -sTCP:LISTEN` shows who holds the port; publish the container on a free port bound to loopback (`-p 127.0.0.1:5433:5432`) and set `DATABASE_URL` to that port; the same goes for Redis and `REDIS_PORT` |
 | `uv sync` reports no interpreter satisfies `>=3.14` | no 3.14 installed and downloads are blocked | allow `uv python install 3.14`, or install 3.14 another way; do not lower the pin (rule T2) |
 
 ## Release

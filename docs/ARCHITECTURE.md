@@ -3,8 +3,8 @@
 > What the system **is** and where code belongs. Structure truths only — no style preferences (those live in `.claude/rules/`).
 > Update in the same PR as any structural change (rule E1).
 
-**Status: skeleton with decisions recorded.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0032 but not yet
-built. "Planned" is still intent from the scope doc and is decided by the task named beside it.
+**Status: most of the base is built.** "Current" exists and was run. "Decided" is settled by ADR-0003 to ADR-0032; the bullets there describe what the
+ADRs fixed, and most are built (the file routes, the cache and the hardening are not). "Planned" is intent from the scope doc, built by the task named beside it.
 
 ## Current
 
@@ -110,10 +110,11 @@ Supersession applies to this repo only; the Node repo's ADRs stay in force there
 - Root `app/` package laid out by layer: routers, schemas, models, services, plus core, workers and seeds, with the import
   direction defined in [ADR-0011](decisions/ADR-0011-project-structure.md).
 
-## Planned (intent from the scope doc, not yet decided)
-- Redis as a derived read cache (task 9.1 decides it; Redis is also the arq queue backend, so flushing it drops in-flight jobs).
-- Reference implementation to port from: the Node `poc-base` repo (NestJS + GraphQL + Prisma), 14 GraphQL operations that
-  become REST routes (task 1.2).
+## Planned (intent from the scope doc, not yet built)
+- File routes (tasks 8.2 and 8.3, ADR-0009): `POST /files`, `PATCH /files/{id}`, `GET /files/{id}` and `GET /files/{id}/content`. `FileAssertService` (task 8.1) exists; `routers/files.py` and `services/files.py` are docstring-only.
+- Redis as a derived read cache and the list helpers (package 9; task 9.1 decides the cache; Redis is also the arq queue backend, so flushing it drops in-flight jobs).
+- Hardening (task 11.6): `/docs` and `/openapi.json` off outside local and development, security headers, a request id in logs.
+- Reference implementation the base was ported from: the Node `poc-base` repo (NestJS + GraphQL + Prisma); its 14 GraphQL operations are mapped to REST routes in `docs/api/ENDPOINTS.md`.
 
 ## Key flows
 Five implemented: forgotten password (`POST /auth/password/restore`, then `/reset`, task 7.6: unauthenticated; restore stores the sha256 of a random token valid 30 minutes and queues the email job after the commit, the worker logs it in `local`, `development` and `test`; reset checks the token with no pooled connection held, then one conditional UPDATE stores the new hash and ends every session; an OTP-only account sets its first password this way), password change (`POST /auth/password/change`, task 7.5: Bearer, the current password checked with no pooled connection held, then one conditional UPDATE stores the new hash and ends every session, reset token and sign-in code; 204, the account signs in again), refresh and sign-out (`POST /auth/refresh`, `/auth/sign-out`, task 7.4: the refresh token is single use, swapped by one UPDATE conditional on the hash that was checked; sign-out clears the hash and the sign-in code, 204, idempotent), OTP sign-in (`POST /auth/otp/request`, then `/auth/otp/verify`, tasks 7.1 and 7.2) and password sign-up and sign-in (`POST /auth/sign-up`, `/auth/sign-in`, task 7.3; both unauthenticated, one Argon2 hash or check each with no pooled connection held, every sign-in failure one 401 `INVALID_CREDENTIALS`). The flow still to port (file upload) are
