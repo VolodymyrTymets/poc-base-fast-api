@@ -1,7 +1,7 @@
 # POC-11.6 — implementation plan
 
 <!-- A human writes this line to approve. Until it is here, guard-plan-approval blocks writes to code. -->
-Approved-by:
+Approved-by: Volodymyr - 2026-11-09 (approved in chat, including A1, A3 and A4)
 
 Pattern followed: `app/core/body_limit.py` for a pure ASGI middleware (no `BaseHTTPMiddleware`, which buffers; `http` scope only; JSON bodies built with `error_body`), `create_app` in `app/main.py` for where middleware is added and in what order, `app/core/logging.py` (`JsonFormatter`, `configure_logging`) for the log fields, `tests/unit/test_logging.py` and `tests/integration/http/test_http_*.py` with `running_client(create_app(Settings()))` (no database needed) for the tests, ADR-0020 for putting project code in the layer where it belongs (`core/` imports no layer). The new pattern (docs gating, the request-id contextvar, the security-header set) is recorded in ADR-0033 (rule D1).
 

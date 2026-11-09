@@ -48,6 +48,9 @@ ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 logger = logging.getLogger(__name__)
 
+# The environments that serve /docs, /redoc and /openapi.json (task 11.6): the two a developer runs by hand.
+CONTRACT_PAGE_ENVS = frozenset({"local", "development"})
+
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
@@ -77,11 +80,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     init_sentry(settings)
+    # The Swagger UI, ReDoc and /openapi.json are served for local work only. `app.openapi()` does not need the served
+    # route, so `python -m app.cli --export-openapi` works in every environment (POC-11.6, ADR-0033).
+    serves_contract = settings.app_env in CONTRACT_PAGE_ENVS
     app = FastAPI(
         title="poc-base-fast-api",
         lifespan=lifespan,
         openapi_tags=TAGS,
         responses=ERROR_RESPONSES,
+        docs_url="/docs" if serves_contract else None,
+        redoc_url="/redoc" if serves_contract else None,
+        openapi_url="/openapi.json" if serves_contract else None,
     )
     # Read by the auth dependencies (app/dependencies.py), so they see what the app booted with.
     app.state.settings = settings
