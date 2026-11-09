@@ -11,7 +11,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from utils.auth import sign_up
 from utils.client import running_client
 from utils.jwt import ACCESS_KEY, REFRESH_KEY
@@ -349,3 +349,108 @@ async def test_an_uploaded_file_is_accepted_as_an_avatar(
             )
         ).scalar_one()
     assert (response.status_code, avatar_id) == (200, created["id"])
+
+
+async def test_the_owner_downloads_exactly_the_uploaded_bytes(
+    module_database_url: str,
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        headers = await caller(client)
+        created = (await upload(client, headers)).json()
+
+        # Act
+        response = await client.get(f"{PATH}/{created['id']}/content", headers=headers)
+
+    # Assert
+    assert (response.status_code, response.content) == (200, PNG)
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["content-length"] == str(len(PNG))
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_the_download_after_a_replacement_is_the_new_file(
+    module_database_url: str,
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        headers = await caller(client)
+        created = (await upload(client, headers)).json()
+        await client.patch(
+            f"{PATH}/{created['id']}",
+            headers=headers,
+            files={"file": ("b.jpg", JPEG, "image/jpeg")},
+        )
+
+        # Act
+        response = await client.get(f"{PATH}/{created['id']}/content", headers=headers)
+
+    # Assert
+    assert (response.status_code, response.content) == (200, JPEG)
+    assert response.headers["content-type"] == "image/jpeg"
+
+
+async def test_an_empty_file_downloads_as_an_empty_body(
+    module_database_url: str,
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        headers = await caller(client)
+        created = (await upload(client, headers, content=b"")).json()
+
+        # Act
+        response = await client.get(f"{PATH}/{created['id']}/content", headers=headers)
+
+    # Assert
+    assert (response.status_code, response.content) == (200, b"")
+    assert response.headers["content-length"] == "0"
+
+
+async def test_the_content_without_a_token_is_401(module_database_url: str) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        # Act
+        response = await client.get(f"{PATH}/{MISSING_ID}/content")
+
+    # Assert
+    assert error_of(response) == (401, "UNAUTHORIZED")
+
+
+@pytest.mark.parametrize("target", ["another_accounts_file", "unknown_id"])
+async def test_the_content_of_a_file_the_caller_does_not_own_is_403(
+    module_database_url: str, target: str
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        owner = await caller(client)
+        stranger = await caller(client)
+        owned = (await upload(client, owner)).json()
+        file_id = owned["id"] if target == "another_accounts_file" else MISSING_ID
+
+        # Act
+        response = await client.get(f"{PATH}/{file_id}/content", headers=stranger)
+
+    # Assert
+    assert error_of(response) == (403, "FORBIDDEN")
+
+
+async def test_the_content_of_a_row_with_no_stored_bytes_is_404(
+    module_database_url: str, db_engine: AsyncEngine
+) -> None:
+    # Arrange
+    async with running_client(make_app(module_database_url)) as client:
+        tokens = await sign_up(
+            client, f"{uuid.uuid4().hex}@example.com", "correct-horse"
+        )
+        account = (await client.get("/api/v1/account", headers=tokens.headers)).json()
+        row = File(name="x", mime_type="image/png", size=0, created_by_id=account["id"])
+        async with AsyncSession(db_engine) as session, session.begin():
+            session.add(row)
+            await session.flush()
+            file_id = row.id
+
+        # Act
+        response = await client.get(f"{PATH}/{file_id}/content", headers=tokens.headers)
+
+    # Assert
+    assert error_of(response) == (404, "NOT_FOUND")
