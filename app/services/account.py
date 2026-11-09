@@ -8,14 +8,17 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.cache import Cache, NullReadCache
 from app.core.db import utc_now
 from app.models import Account, AccountIdentity, AccountProfile, AccountRoleType
 from app.services.account_role import AccountRoleService
 
 
 class AccountService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, cache: Cache | None = None) -> None:
         self._session = session
+        # Without a cache every read goes to the database: seeds and the write paths build the service this way (ADR-0035).
+        self._cache: Cache = NullReadCache() if cache is None else cache
 
     async def get_by_id(self, account_id: str) -> Account | None:
         """The live account with its live profile loaded; `None` for an unknown or soft-deleted account (rule P6)."""

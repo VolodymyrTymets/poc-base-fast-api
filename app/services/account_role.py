@@ -6,6 +6,7 @@ The shape of a service (class over a session, flush but never commit) is ADR-002
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import Cache, NullReadCache
 from app.models import AccountOnRole, AccountRole, AccountRoleType
 
 
@@ -14,8 +15,10 @@ class RoleNotFoundError(RuntimeError):
 
 
 class AccountRoleService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, cache: Cache | None = None) -> None:
         self._session = session
+        # Without a cache every read goes to the database: the write paths build the service this way (ADR-0035).
+        self._cache: Cache = NullReadCache() if cache is None else cache
 
     async def get_account_roles(self, account_id: str) -> list[AccountRoleType]:
         """The role types the account holds. A soft-deleted link or role does not count (rule P6)."""

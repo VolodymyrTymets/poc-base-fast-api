@@ -384,11 +384,11 @@ def test_a_bad_redis_port_names_the_field_and_hides_the_password(
     assert "s3cret-value" not in str(error.value)
 
 
-def test_the_read_cache_is_on_by_default() -> None:
+def test_the_read_cache_is_on_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("CACHE_ENABLED")  # the test fixture sets it to false
+
     assert Settings().cache_enabled is True
 
 
-def test_the_read_cache_can_be_switched_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CACHE_ENABLED", "false")
-
+def test_the_test_environment_has_the_read_cache_off() -> None:
     assert Settings().cache_enabled is False

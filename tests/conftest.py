@@ -281,6 +281,9 @@ def isolated_settings_env(
         "JWT_REFRESH_TOKEN_EXPIRES_IN",
     ):
         monkeypatch.delenv(name, raising=False)
+    # The read cache is off in every test app unless a test passes `cache_enabled=True` (an init argument beats the
+    # environment): a database test must not reach for a Redis that may not be there (task 9.2, ADR-0035).
+    monkeypatch.setenv("CACHE_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

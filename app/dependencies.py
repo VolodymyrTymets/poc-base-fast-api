@@ -16,6 +16,7 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.core.cache import Cache
 from app.core.db import get_session
 from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.queue import QueueClient
@@ -53,18 +54,26 @@ def get_queue(request: Request) -> QueueClient:
     return queue
 
 
+def get_read_cache(request: Request) -> Cache:
+    """The read cache (task 9.2, ADR-0035): `ReadCache` over Redis, or one that stores nothing when `CACHE_ENABLED` is false."""
+    cache: Cache = request.app.state.cache
+    return cache
+
+
 def get_account_service(
     session: Annotated[AsyncSession, Depends(get_session)],
+    cache: Annotated[Cache, Depends(get_read_cache)],
 ) -> AccountService:
-    """The `AccountService` on the request's session (ADR-0025)."""
-    return AccountService(session)
+    """The `AccountService` on the request's session and the read cache (ADR-0025, ADR-0035)."""
+    return AccountService(session, cache=cache)
 
 
 def get_account_role_service(
     session: Annotated[AsyncSession, Depends(get_session)],
+    cache: Annotated[Cache, Depends(get_read_cache)],
 ) -> AccountRoleService:
-    """The `AccountRoleService` on the request's session (ADR-0025)."""
-    return AccountRoleService(session)
+    """The `AccountRoleService` on the request's session and the read cache (ADR-0025, ADR-0035)."""
+    return AccountRoleService(session, cache=cache)
 
 
 def get_file_assert_service(
