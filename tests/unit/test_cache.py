@@ -1,12 +1,21 @@
 """Cache serializer and key builder (task 9.1, ADR-0034). Ports the five cases of the Node `prisma.cache-transformer.spec.ts`."""
 
+import re
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 
-from app.core.cache import MAX_PLAIN_INT, CacheDecodeError, deserialize, serialize
+from app.core.cache import (
+    CACHE_STALE_SECONDS,
+    CACHE_TTL_SECONDS,
+    MAX_PLAIN_INT,
+    CacheDecodeError,
+    cache_key,
+    deserialize,
+    serialize,
+)
 
 PLUS_TWO = timezone(timedelta(hours=2))
 
@@ -215,3 +224,62 @@ def test_a_dict_with_the_tag_key_raises_value_error() -> None:
     # Act / Assert
     with pytest.raises(ValueError, match="cacheType"):
         serialize({"$cacheType": "Date", "value": "x"})
+
+
+def test_a_key_has_the_prefix_the_model_and_a_sha256_hex() -> None:
+    # Act
+    key = cache_key("Account", {"id": "a1"})
+
+    # Assert
+    assert re.fullmatch(r"cache\*Account\*[0-9a-f]{64}", key) is not None
+
+
+def test_the_same_args_in_another_order_give_the_same_key() -> None:
+    # Act
+    first = cache_key("Account", {"where": {"id": "a1", "deleted": False}, "take": 1})
+    second = cache_key("Account", {"take": 1, "where": {"deleted": False, "id": "a1"}})
+
+    # Assert
+    assert first == second
+
+
+def test_other_args_give_another_key() -> None:
+    # Act
+    first = cache_key("Account", {"id": "a1"})
+    second = cache_key("Account", {"id": "a2"})
+
+    # Assert
+    assert first != second
+
+
+def test_another_model_gives_another_key() -> None:
+    # Act
+    first = cache_key("Account", {"id": "a1"})
+    second = cache_key("AccountProfile", {"id": "a1"})
+
+    # Assert
+    assert first != second
+
+
+def test_args_with_a_datetime_and_bytes_give_a_stable_key() -> None:
+    # Arrange
+    args = {"since": datetime(2026, 1, 1, tzinfo=UTC), "blob": b"\x01"}
+
+    # Act
+    first = cache_key("File", args)
+    second = cache_key("File", dict(args))
+
+    # Assert
+    assert first == second
+
+
+@pytest.mark.parametrize("model", ["", "Acc*ount"], ids=["empty", "delimiter"])
+def test_a_bad_model_name_raises_value_error(model: str) -> None:
+    # Act / Assert
+    with pytest.raises(ValueError, match="model name"):
+        cache_key(model, {})
+
+
+def test_the_ttl_is_60_seconds_and_the_stale_window_30() -> None:
+    # Assert
+    assert (CACHE_TTL_SECONDS, CACHE_STALE_SECONDS) == (60, 30)

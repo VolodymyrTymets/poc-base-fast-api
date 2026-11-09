@@ -7,11 +7,18 @@ miss have the same shape. The module does no Redis I/O (task 9.2) and imports th
 
 import base64
 import binascii
+import hashlib
 import json
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 TAG = "$cacheType"
+
+# Scope doc 9.1 and the Node base: an entry is fresh for 60 s and may be served stale for 30 s more.
+CACHE_TTL_SECONDS = 60
+CACHE_STALE_SECONDS = 30
+CACHE_KEY_PREFIX = "cache"
+CACHE_KEY_DELIMITER = "*"
 
 # A JSON reader that parses numbers as doubles (any non-Python one) keeps an integer exactly only up to 2**53 - 1, so a larger
 # one is tagged as text. Python's own `int` is unbounded; this is parity with the Node base's `BigInt` tag.
@@ -99,3 +106,17 @@ def deserialize(text: str) -> object:
         return json.loads(text, object_hook=_hook)
     except json.JSONDecodeError as error:
         raise CacheDecodeError("cache entry is not valid JSON") from error
+
+
+def cache_key(model: str, args: object) -> str:
+    """The key `cache*<model>*<sha256 hex of the args>` of one read.
+
+    The hash is over the args serialized with sorted keys, so the same arguments in any dict order give one key, and a `datetime`
+    or `bytes` in them hashes by value. Invalidation (task 9.2) scans `cache*<model>*`, so the model name may not hold the delimiter.
+    """
+    if not model or CACHE_KEY_DELIMITER in model:
+        raise ValueError(
+            f"a cache model name is not empty and has no {CACHE_KEY_DELIMITER!r}"
+        )
+    digest = hashlib.sha256(_dumps(args, sort_keys=True).encode("utf-8")).hexdigest()
+    return CACHE_KEY_DELIMITER.join((CACHE_KEY_PREFIX, model, digest))
