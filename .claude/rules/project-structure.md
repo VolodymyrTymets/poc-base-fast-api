@@ -15,6 +15,8 @@ poc-base-fast-api/
 ├── pyproject.toml
 ├── alembic.ini           # Alembic config; no database URL (ADR-0017)
 ├── migrations/           # Alembic: env.py and hand-written revisions in versions/ (ADR-0017); tooling, not a layer
+├── scripts/              # tooling that imports nothing from app: wait_for_postgres.py, run by the container entrypoint (ADR-0030)
+├── Dockerfile            # targets development and worker; docker-entrypoint.sh waits, migrates, seeds, then execs (ADR-0030)
 ├── .env                  # secrets, never committed
 ├── app/
 │   ├── main.py           # the app: lifespan, middleware, health, include_router; no business logic
