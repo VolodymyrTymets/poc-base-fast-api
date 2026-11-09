@@ -18,6 +18,36 @@ def test_defaults_without_any_environment() -> None:
     assert settings.cors_origins == list(DEFAULT_CORS_ORIGINS)
 
 
+def test_host_defaults_to_loopback() -> None:
+    # Arrange / Act
+    settings = Settings()
+
+    # Assert
+    assert settings.host == "127.0.0.1"
+
+
+def test_host_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    monkeypatch.setenv("HOST", "10.0.0.5")
+
+    # Act
+    settings = Settings()
+
+    # Assert
+    assert settings.host == "10.0.0.5"
+
+
+def test_a_blank_host_is_rejected_and_names_the_field(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    monkeypatch.setenv("HOST", "")
+
+    # Act / Assert
+    with pytest.raises(ValidationError, match="host"):
+        Settings()
+
+
 def test_reads_values_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("PORT", "4000")

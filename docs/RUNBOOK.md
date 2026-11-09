@@ -50,7 +50,7 @@ secret logs everyone out.
   phone numbers are replaced by `[REDACTED]`; this is best effort (rule P4), so still never log a secret.
 - Sentry starts only when `APP_ENV` is not `local` and `SENTRY_DSN` is set; with no DSN nothing is sent. See ADR-0013.
 - Redaction and the JSON format are set up by `uv run poc-base-fast-api` (`app.main:run`). Starting the app another way, for example
-  `uvicorn app.main:create_app --factory`, skips them; a container command (task 11.1) must use the console script.
+  `uvicorn app.main:create_app --factory`, skips them; a container command must use the console script, as the image of task 11.1 does (see "Docker").
 - A request body over `MAX_REQUEST_BODY_BYTES` (12 MiB by default) is answered 413 with the standard error body.
 - Upload limits (task 8.1): `FILE_MAX_SIZE` (bytes, default 10485760) and `FILE_ALLOWED_MIME_TYPES` (comma-separated, default `image/jpeg,image/png`, compared case-insensitively). A blank list stops the boot and names the field. Keep `FILE_MAX_SIZE` below `MAX_REQUEST_BODY_BYTES`: a body over that is answered 413 by the middleware before the check runs.
 - `kill -TERM <pid>` (or Ctrl-C) stops accepting connections, lets in-flight requests finish for up to
@@ -203,6 +203,24 @@ The OpenAPI document is committed as `openapi.json` at the repo root (ADR-0003).
 - `uv run python -m app.cli --export-openapi --check` exits 1 without writing when the file is stale. `tests/unit/test_openapi_stale.py` does the same check, so
   a route added without regenerating fails `uv run pytest tests/unit`.
 - `/docs` (Swagger UI) and `/openapi.json` are served by the running app and list the six feature tags.
+
+## Docker
+One `Dockerfile` at the repo root, two targets (task 11.1, ADR-0030): `development` (the API, with the dev group and `tests/`) and `worker`. Both need `DATABASE_URL`; the worker needs `REDIS_*`. Nothing secret is in the image: pass settings with `-e` or `--env-file` at run time.
+```bash
+docker build --target development -t poc-api .
+docker build --target worker -t poc-worker .
+
+# a PostGIS database, then the API on the host's 3077 (host.docker.internal reaches the host's published port)
+docker run -d --name poc-api --add-host=host.docker.internal:host-gateway -p 3077:3001 \
+  -e DATABASE_URL=postgresql+asyncpg://postgres:postgres@host.docker.internal:5432/poc poc-api
+curl localhost:3077/api/v1/health        # {"status":"ok"}
+docker stop poc-api                      # graceful; the exit status is 0 (143 under an init process, 137 means killed)
+```
+- The entrypoint waits for Postgres (`DB_WAIT_ATTEMPTS`, default 30, `DB_WAIT_INTERVAL_SECONDS`, default 1; it prints `attempt i/N failed: <ExceptionClass>` and gives up with exit 1; each attempt can take up to 5 s when packets are dropped, so the worst case is about 3 minutes; a `DATABASE_URL` that is not `postgresql+asyncpg://` is exit 2 at once), then runs `alembic upgrade head` and `python -m app.seeds`, then the command. `RUN_MIGRATIONS=0` skips the migrate and seed steps; the `worker` target sets it, so only the API container owns the schema.
+- A failed migration or seed ends the container with a non-zero status and the server never starts (for example, a Postgres without PostGIS: `extension "postgis" is not available`). Read it with `docker logs`.
+- The image does not set `APP_ENV`, so it is `local`: the sample admin and customers are seeded, the OTP `code` is in the response body and the worker logs reset tokens. Pass `-e APP_ENV=...` (and, for `development` or `production`, the JWT secrets) for anything shared.
+- The image sets `HOST=0.0.0.0`; outside a container `HOST` stays `127.0.0.1`. `docker run <image> sh` still waits and migrates first; use `--entrypoint sh` to skip that.
+- Tests: `tests/e2e/test_docker_image.py` builds both targets and runs them against the test Postgres (and Redis for the worker); it needs Docker, so it is selected by `-m db` and never by `-m "not db and not redis"`.
 
 ## Commands
 See the command map in `CLAUDE.md` — that is the canonical list: `uv run ruff check .`, `uv run ruff format --check .`,

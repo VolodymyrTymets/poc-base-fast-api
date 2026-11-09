@@ -59,7 +59,7 @@ extend-select = ["B", "S", "ASYNC", "T20"]
 
 [tool.mypy]
 strict = true
-files = ["app", "tests", "migrations"]
+files = ["app", "tests", "migrations", "scripts"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

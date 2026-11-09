@@ -102,6 +102,9 @@ class Settings(BaseSettings):
     )
 
     app_env: Literal["local", "development", "test", "production"] = "local"
+    # Loopback by default; the container image sets 0.0.0.0, because a server bound to
+    # 127.0.0.1 inside a container cannot be reached from outside it (task 11.1).
+    host: str = Field(default="127.0.0.1", min_length=1)
     port: int = Field(default=3001, ge=1, le=65535)
     # 12 MiB: above FILE_MAX_SIZE (10 MB) plus multipart overhead; FileAssertService
     # (task 8.1) enforces the real upload limit.
