@@ -1,7 +1,7 @@
 # POC-11.4 — implementation plan
 
 <!-- A human writes this line to approve. Until it is here, guard-plan-approval blocks writes to code. -->
-Approved-by:
+Approved-by: Volodymyr - 2026-11-09 (approved in chat, including A2, A3 and A5)
 
 Pattern followed: `.github/workflows/agent-checks.yml` (job layout, `ubuntu-latest`, `permissions`, `actions/checkout@v4`), the command map in `CLAUDE.md` (every CI command is one of its rows, rule T1), `Dockerfile` for the pinned uv. No CI precedent for the Python gates exists. The shape is recorded in ADR-0032 (rule D1).
 
