@@ -1,7 +1,7 @@
 # POC-11.5 — implementation plan
 
 <!-- A human writes this line to approve. Until it is here, guard-plan-approval blocks writes to code. -->
-Approved-by:
+Approved-by: Volodymyr - 2026-11-09
 
 Pattern followed: `.claude/rules/routes-convention.md` for the rule-file shape (front matter `description` and `paths`, numbered rules, "Decided in ADR-n, the ADR wins"), the existing RUNBOOK sections for tone, ADR-0011 for the layer rules the new files point to. Docs only: no code, test or workflow file changes, so no new ADR (rule D1 is not triggered); `openapi.json` and `uv.lock` untouched.
 
